@@ -40,33 +40,4 @@ export class Validator {
   ): Promise<void> {
     await expect(page, message).toHaveURL(new RegExp(expected));
   }
-
-  static assertDescendingNumbers(values: number[]): void {
-    expect(values.length).toBeGreaterThan(0);
-    const sortedValues = [...values].sort((a, b) => b - a);
-    expect(values).toEqual(sortedValues);
-  }
-
-  static assertDescendingNumbersWithEmptyLast(
-    values: Array<number | null>,
-  ): void {
-    expect(values.length).toBeGreaterThan(0);
-    const numericValues: number[] = [];
-    let emptyValueFound = false;
-
-    for (const value of values) {
-      if (value === null) {
-        emptyValueFound = true;
-        continue;
-      }
-      expect(
-        emptyValueFound,
-        "Cards without price should appear only after priced cards",
-      ).toBe(false);
-      numericValues.push(value);
-    }
-
-    const sortedValues = [...numericValues].sort((a, b) => b - a);
-    expect(numericValues).toEqual(sortedValues);
-  }
 }

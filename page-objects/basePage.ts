@@ -2,19 +2,10 @@ import { Page, Locator, expect } from "@playwright/test";
 
 export class BasePage {
   protected readonly page: Page;
-  protected readonly cookieBanner: Locator;
-  protected readonly cookieAcceptButton: Locator;
-  protected readonly cookieCloseButton: Locator;
+  
 
   constructor(page: Page) {
     this.page = page;
-    this.cookieBanner = page.locator("#onetrust-consent-sdk");
-    this.cookieAcceptButton = page.locator("#onetrust-accept-btn-handler");
-    this.cookieCloseButton = page
-      .locator(
-        "#onetrust-close-btn-container button, #onetrust-close-btn-container",
-      )
-      .first();
   }
 
   /* ================= NAVIGATION ================= */
@@ -89,19 +80,5 @@ export class BasePage {
 
   async isEnabled(locator: Locator): Promise<boolean> {
     return locator.isEnabled();
-  }
-
-  /* ================= COOKIE HANDLING ================= */
-  async dismissCookies(): Promise<void> {
-    if (await this.cookieBanner.isVisible().catch(() => false)) {
-      if (await this.cookieAcceptButton.isVisible().catch(() => false)) {
-        await this.cookieAcceptButton.click({ force: true }).catch(() => null);
-      } else if (await this.cookieCloseButton.isVisible().catch(() => false)) {
-        await this.cookieCloseButton.click({ force: true }).catch(() => null);
-      }
-      await expect(this.cookieBanner)
-        .toBeHidden({ timeout: 5000 })
-        .catch(() => null);
-    }
   }
 }
