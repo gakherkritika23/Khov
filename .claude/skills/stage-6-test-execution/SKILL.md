@@ -12,53 +12,121 @@ Execute the Playwright spec file, parse results, and provide an actionable
 failure report with suggested fixes.
 
 ## Input
-- Spec file path from Stage 5 (e.g., `tests/homePage.spec.ts`)
-- POM file path from Stage 4 (e.g., `page-objects/homePage.ts`)
+- Spec file absolute path from Stage 5 (e.g., `D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts`)
+- POM file absolute path from Stage 4 (e.g., `D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts`)
+- Manual TC list from Stage 5 (TCs skipped due to unresolved locators)
 
-## Pre-Execution
+---
 
-### 1. TypeScript Compilation Check
-```bash
+## Step 1 — Navigate into the Worktree
+
+**All commands in this stage run from inside the worktree directory.**
+
+```powershell
+cd "D:\Khov\.claude\worktrees\worktree-feat+{slug}"
+```
+
+Never run Playwright or tsc from `D:\Khov` directly — the main repo's `tests/`
+directory has no spec files and tsc won't find the worktree source files.
+
+---
+
+## Step 2 — TypeScript Compilation Check
+
+Run from inside the worktree:
+
+```powershell
 npx tsc --noEmit 2>&1 | grep -v "TS1149"
 ```
-Fix any compilation errors before running tests. TS1149 casing warnings are
-pre-existing and can be ignored.
 
-### 2. Verify Test Data
-Ensure `utils/test_data.json` and `utils/constants.json` have any new entries
-needed by the test cases.
+> Stage 5 should have already run this before handoff. This is a safety net —
+> if Stage 5 confirmed `tsc --noEmit: PASSED`, you may skip this step.
+> If any errors appear, fix them before running tests.
 
-## Execution Commands
+TS1149 casing warnings are pre-existing and can be ignored. All other errors must be fixed.
 
-### Run the spec file against dev environment
-```bash
-npx cross-env TEST_ENV=dev npx playwright test tests/{specFile}.spec.ts --project=chromium --reporter=list
+---
+
+## Step 3 — Verify Test Data
+
+Ensure any new entries needed by the spec exist in:
+- `utils/test_data.json` — form inputs, API endpoints
+- `utils/constants.json` — expected text values, page URLs
+
+Both files are read from the worktree copy.
+
+---
+
+## Step 4 — Environment Selection
+
+Default: `TEST_ENV=dev` (points to `https://www.khov.com/` per `environment/.env.dev`)
+
+```
+Use dev:  standard — live production-equivalent content
+Use uat:  if dev is unreachable or returns unexpected content
+Never use prod for automated smoke/regression runs
 ```
 
-### Run specific test cases by grep
-```bash
-npx cross-env TEST_ENV=dev npx playwright test tests/{specFile}.spec.ts --project=chromium --reporter=list --grep "TC-01|TC-02"
+Switch to UAT only if `dev` shows infrastructure errors (`ERR_CONNECTION_REFUSED`,
+SSL errors, maintenance page). Do not switch environments to mask test failures.
+
+---
+
+## Step 5 — Execute Tests (Two-Phase Strategy)
+
+Run smoke first. Only run regression after smoke passes. This isolates structural
+failures (navigation, block visibility) from deeper data/interaction failures and
+cuts debug time significantly.
+
+### Phase 1 — Smoke Tests
+
+```powershell
+npm run smoke:dev -- tests/{pageName}.spec.ts --reporter=list
 ```
 
-### Run smoke tests only
-```bash
-npx cross-env TEST_ENV=dev npx playwright test tests/{specFile}.spec.ts --project=smoke --reporter=list
+If smoke fails → fix the failures before running regression (Gap 5 pattern below).
+
+### Phase 2 — Regression Tests
+
+```powershell
+npm run regression:dev -- tests/{pageName}.spec.ts --reporter=list
 ```
 
-### Available npm scripts
-```bash
-npm run test:dev    # Full suite against dev
-npm run test:uat    # Full suite against UAT
-npm run smoke:dev   # Smoke tests against dev
+### Run a Single Spec (All Tests)
+
+```powershell
+npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list
 ```
+
+### Run Specific Test Cases by grep
+
+```powershell
+npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list --grep "TC-01|TC-02"
+```
+
+### Available npm scripts (reference)
+
+```
+npm run test:dev        # Full suite, dev
+npm run test:uat        # Full suite, UAT
+npm run smoke:dev       # @smoke tests, dev
+npm run regression:dev  # @regression tests, dev
+```
+
+---
 
 ## Result Analysis
 
 ### Identify Failure Source
-For each failing test, determine if the failure is:
-1. **Test code issue** — locator wrong, assertion incorrect, missing wait
-2. **Navigation flakiness** — transient timing issue (retry confirms)
-3. **Site issue** — actual bug on the page
+
+For each failing test, determine which category applies:
+
+| Category | Description | Action |
+|----------|-------------|--------|
+| **Test code issue** | Wrong locator, bad assertion, missing wait | Fix POM or spec |
+| **Navigation flakiness** | Transient timing, inconsistent page load | Rerun with `--retries=1` to confirm |
+| **Site issue** | Actual content bug on the page | Document, do not fix test |
+| **Infrastructure** | VPN needed, SSL error, site down | Check network, switch to UAT |
 
 ### Common Error Patterns
 
@@ -66,49 +134,101 @@ For each failing test, determine if the failure is:
 |-------|-------|-----|
 | `Element is outside of the viewport` | Element not scrolled into view | Add `scrollIntoView` or retry |
 | `TimeoutError: locator.click()` | Element not found or wrong selector | Re-inspect DOM, update locator |
-| `strict mode violation` | Locator matches multiple elements | Add `.first()` or more specific selector |
+| `strict mode violation` | Locator matches multiple elements | Scope to parent or use `.filter()` |
 | `intercepts pointer events` | Sticky header covers element | Use `{ force: true }` on click |
 | `expect(received).toBe(expected)` | Data mismatch | Verify expected values against live site |
+| `ERR_CONNECTION_REFUSED` / `SSL_ERROR` | Site unreachable or VPN required | Check network, switch to `npm run smoke:uat` |
+| `net::ERR_NAME_NOT_RESOLVED` | DNS failure / no network | Restore network connection |
 
 ### Fix Iteration Process
-1. Apply fixes to POM or spec
-2. Rerun only failing tests: `--grep "TC-XX|TC-YY"`
-3. If still failing, inspect live site again with Playwright MCP
-4. Maximum 3 fix iterations before flagging for manual investigation
+
+1. **Apply fixes to the worktree files only:**
+   ```
+   D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+   D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+   ```
+   **NEVER edit files in `D:\Khov\page-objects\` or `D:\Khov\tests\` directly.**
+
+2. **Rerun only the failing tests:**
+   ```powershell
+   npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list --grep "TC-XX|TC-YY"
+   ```
+
+3. **If still failing — re-inspect the live site** using Playwright MCP browser tools.
+   Navigate to the same URL used in `beforeEach`, re-run DOM inspection on the
+   failing element, update the locator if it has changed.
+
+4. **Investigating suspected flakiness:**
+   ```powershell
+   # Add --retries=1 (local default is 0)
+   npm run test:dev -- tests/{pageName}.spec.ts --retries=1 --grep "TC-XX" --reporter=list
+   # Passes on retry → flaky (timing issue, add explicit wait in POM)
+   # Fails twice → real failure (fix the test or document as site bug)
+   ```
+
+5. **Maximum 3 fix iterations.** If a test still fails after 3 iterations, flag it:
+   ```
+   TC-XX: Unresolved after 3 iterations
+   Reason: [describe what was tried]
+   Recommendation: Manual investigation required — mark as @manual for now
+   ```
+
+---
 
 ## Reporting
 
 ### Summary Format
+
 ```
-Test Execution Results — {specFile}.spec.ts
+Test Execution Results — {pageName}.spec.ts
 ───────────────────────────────────────────
-Total: XX tests
-Passed: XX
-Failed: XX (list test IDs)
+Environment: dev (https://www.khov.com/)
+Total automated: XX tests
+  Passed:  XX
+  Failed:  XX  → [TC-XX, TC-YY]
 Duration: Xm Xs
 
+Manual (skipped — unresolved locators from Stage 4):
+  XX TCs  → [TC-XX, TC-YY]
+
 Failures:
-  TC-XX: [error summary] — [fix applied/suggested]
+  TC-XX: [error summary] — [fix applied / suggested fix]
+  TC-YY: [error summary] — [fix applied / suggested fix]
 ```
 
 ### For Flaky Navigation Failures
-If failures are in `beforeEach` navigation, rerun those tests
-to confirm they pass. Report as:
+
+If failures are in `beforeEach` navigation, rerun with `--retries=1` to confirm:
+
 ```
-Note: X tests failed due to transient navigation flakiness.
-Confirmed passing on rerun. Not a test code issue.
+Note: TC-XX failed due to transient navigation timing.
+Confirmed passing on retry. Not a test code issue.
+No fix applied — Playwright retries handle this in CI (retries: 2).
 ```
+
+---
 
 ## Handoff
-When all tests pass (or flaky-only failures confirmed), **always invoke Stage 6b — Code Review** before proceeding to Stage 7.
 
-Invoke the `stage-6b-code-review` skill automatically at this point. Do not wait for user instruction.
+When all automated tests pass (or flaky-only failures confirmed), **automatically
+invoke Stage 6b — Code Review**. Do not wait for user instruction.
 
-After Stage 6b completes and any issues are resolved, proceed to Stage 7:
-"Code review complete. Ready for **Stage 7 — Git Push**."
+Pass to Stage 6b:
+- POM file absolute path
+- Spec file absolute path
+- Any test data files modified during this stage
 
-Provide the list of all files to commit:
-- `page-objects/{pageName}Page.ts`
-- `tests/{pageName}.spec.ts`
-- `utils/test_data.json` (if modified)
-- `utils/constants.json` (if modified)
+After Stage 6b completes and all violations are resolved, proceed to Stage 7:
+
+```
+Code review complete. Ready for Stage 7 — Git Push.
+
+Files to commit:
+  page-objects/{pageName}Page.ts
+  tests/{pageName}.spec.ts
+  utils/test_data.json     ← if modified
+  utils/constants.json     ← if modified
+
+Automated tests: XX passing
+Manual TCs:      XX (listed above)
+```
