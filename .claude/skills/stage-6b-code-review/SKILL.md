@@ -18,13 +18,39 @@ Run after Stage 6 (tests passing) and before Stage 7 (git push).
 ## Input
 - POM file(s) modified/created in Stage 4
 - Spec file(s) modified/created in Stage 5
-- Test data files modified (utils/test_data.json, utils/constants.json)
+- Test data files modified (`utils/test_data.json`, `utils/constants.json`)
+
+---
 
 ## Review Process
 
-Read every file that was created or modified during the workflow, then check
-against each rule category below. Report violations with file path, line number,
-the offending code, and the correct replacement.
+### Worktree Path Reference
+
+All generated files live inside the worktree — NOT in the main repo. Read files from:
+
+```
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json    (if modified)
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json    (if modified)
+```
+
+**`{slug}` = everything after `feat/` in the confirmed branch name.**
+
+```
+Branch: feat/khov-394-hero-block  →  slug: khov-394-hero-block
+Branch: feat/khov-945-contact-form  →  slug: khov-945-contact-form
+Branch: feat/hero-block  (no Jira ID)  →  slug: hero-block
+```
+
+**NEVER read from `D:\Khov\page-objects\` or `D:\Khov\tests\` — those directories
+contain the base scaffold only, not the generated files.**
+
+### How to Review
+
+Read every file listed above, then check against each checklist below. Report
+violations with the absolute file path, line number, the offending code, and the
+correct replacement.
 
 ---
 
@@ -38,12 +64,14 @@ the offending code, and the correct replacement.
 | Spec location | Files in `tests/` | `tests/specs/form.spec.ts` ← WRONG |
 | No leftover files | No temp/helper scripts committed | `export_csv.py` ← WRONG |
 
-**How to check:**
-```bash
-# Flag any new spec files that duplicate an existing page spec
-ls tests/*.spec.ts
-# Flag any POM files outside page-objects/
-find . -name "*Page.ts" -not -path "*/page-objects/*" -not -path "*/node_modules/*"
+**How to check (use Glob tool — no bash commands on Windows):**
+```
+Glob pattern: page-objects/**/*.ts
+  → Flag any file whose name does not match {pageName}Page.ts
+
+Glob pattern: tests/**/*.spec.ts
+  → Flag any spec file that duplicates an existing page spec
+    (e.g. homeHeroBlock.spec.ts when homePage.spec.ts already exists)
 ```
 
 ---
@@ -58,6 +86,7 @@ find . -name "*Page.ts" -not -path "*/page-objects/*" -not -path "*/node_modules
 | Readonly locators | All locators declared as `readonly` in class body |
 | Locators in constructor | All locator assignments in `constructor()`, not in methods |
 | Validator import | Must import `Validator` from `../utils/validator` |
+| waitForApi import | If POM has `verifyNetworkRequest()`, must import `waitForApi` from `../utils/apiUtils` |
 | Three-category methods | Each block has Verification / Actions / Data Getters sections |
 
 ### Verification Methods
@@ -105,6 +134,7 @@ async getPriceRange(): Promise<string> {
 | TC-XX naming | Test names follow `TC-XX \| Description @tag` format |
 | Inline tags | Tags at end of test name string, not `{ tag: [...] }` annotation |
 | TC numbering per block | Each `test.describe` restarts at TC-01 |
+| `@form` tag on form tests | Any test inside a form `test.describe` must include `@form` before `@smoke`/`@regression` |
 | POM in beforeEach | Page objects instantiated in `beforeEach`, never in test body |
 | No afterEach screenshots | Already handled by config — don't add redundant afterEach |
 
@@ -180,6 +210,7 @@ await homePage.verifyFormTitleIsDisplayed();
 | No auto-generated IDs | IDs that may change between deploys |
 | Scoped to parent | Locators scoped to block container, not page-wide |
 | Consistent naming | camelCase with block prefix: `heroBlockHeadline`, `formFirstNameInput` |
+| No `UNRESOLVED_SELECTOR` in active tests | Locators with value `"UNRESOLVED_SELECTOR"` must only appear in TODO-commented stub methods — never called by an active automated test |
 
 **Locator priority check:**
 ```
@@ -196,6 +227,7 @@ await homePage.verifyFormTitleIsDisplayed();
 | Expected text in constants.json | Reusable text values not inline |
 | API endpoints in test_data.json | Under `endpoint` key |
 | No sensitive data | No real emails, passwords, or PII |
+| test_data.json exists if imported | If spec or POM imports `testData`, `utils/test_data.json` must exist in the worktree |
 
 ---
 
@@ -205,7 +237,8 @@ await homePage.verifyFormTitleIsDisplayed();
 |------|-------|
 | Standard beforeEach | Follows the established navigation pattern for this page |
 | Correct page objects initialized | All needed POMs created in beforeEach |
-| Uses constants/env for URLs | Not hardcoded strings unless a specific URL test |
+| Uses `constants.{page}.url` for navigation | Not `process.env.BASE_URL` — env is already handled by `playwright.config.ts` |
+| No hardcoded deep-page URL | Community detail / floor plan specs must navigate via listing page + `clickRandom*()`, not a fixed URL string in `beforeEach` |
 
 ---
 
@@ -216,9 +249,9 @@ await homePage.verifyFormTitleIsDisplayed();
 Code Review — PASSED
 ────────────────────────────────────────
 Files reviewed:
-  page-objects/homePage.ts
-  tests/homePage.spec.ts
-  utils/test_data.json
+  D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+  D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
 
 All 6 checklists passed. Ready for Stage 7 (git push).
 ```
@@ -228,26 +261,26 @@ All 6 checklists passed. Ready for Stage 7 (git push).
 Code Review — X VIOLATIONS FOUND
 ────────────────────────────────────────
 Files reviewed:
-  page-objects/homePage.ts
-  tests/homePage.spec.ts
+  D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
 
 VIOLATIONS:
 
-1. [Spec Structure] tests/homePage.spec.ts:345
+1. [Spec Structure] ...\tests\homePage.spec.ts:345
    Validator called directly in spec instead of POM verify method
-   
+
    Current:
      await Validator.requireVisible(homePage.heroBlock, "...");
-   
+
    Fix:
      await homePage.verifyHeroBlockIsDisplayed();
 
-2. [Wait Pattern] tests/homePage.spec.ts:520
+2. [Wait Pattern] ...\tests\homePage.spec.ts:520
    page.waitForTimeout used for form submission
-   
+
    Current:
      await page.waitForTimeout(2000);
-   
+
    Fix:
      await formPage.verifyNetworkRequest(testData.endpoint.submit_form);
 
