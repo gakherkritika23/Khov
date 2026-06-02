@@ -38,19 +38,21 @@ Jira Story
 └────────────────────────┬────────────────────────────┘
                          │ (requires explicit YES)
               ┌──────────┘
-              │   OR (after Stage 1, terminal — does not feed Stage 3+)
+              │   OR ──────────────────────────────────────────┐
+              │                                               ▼
+              │                         ┌─────────────────────────────────────────────────────┐
+              │                         │  Stage 1b: CSV Export  📄 TERMINAL                  │
+              │                         │  Alternative to Stage 2 — does NOT feed Stage 3+    │
+              │                         │  Input:  test-cases.json                            │
+              │                         │  Output: {jira-id}-test-cases.csv (local only)      │
+              │                         │  Skill:  stage-1b-csv-export/SKILL.md               │
+              │                         └─────────────────────────────────────────────────────┘
               ▼
-┌─────────────────────────────────────────────────────┐
-│  Stage 1b: CSV Export  📄 TERMINAL                  │
-│  Input:  test-cases.json                            │
-│  Output: {jira-id}-test-cases.csv                   │
-│  Skill:  stage-1b-csv-export/SKILL.md               │
-└─────────────────────────────────────────────────────┘
-                         ▼
 ┌─────────────────────────────────────────────────────┐
 │  Stage 3: Locator Discovery                         │
 │  Input:  approved-plan.json (automated_cases)       │
-│  Output: locators added to existing POM             │
+│  Output: locator discovery summary (verified         │
+│          selectors table) + confirmed branch name   │
 │  Skill:  stage-3-locator-discovery/SKILL.md         │
 └────────────────────────┬────────────────────────────┘
                          │
@@ -59,7 +61,8 @@ Jira Story
 │  ⛔ WORKTREE GATE (between Stage 3 and Stage 4)     │
 │  REQUIRED before any .ts files are written          │
 │  Create a git worktree:                             │
-│    EnterWorktree tool → branch: feat/<story-slug>   │
+│    EnterWorktree → feat/khov-{id}-{block-slug}      │
+│    e.g. feat/khov-394-hero-block                    │
 │  All Stages 4–7 run inside the worktree             │
 │  NEVER write POM/spec files to main repo directly   │
 └────────────────────────┬────────────────────────────┘
@@ -111,11 +114,11 @@ Jira Story
 |------------|------------------------------------|----------|
 | Stage 1    | `test_cases`, `metadata`           | Stage 2  |
 | Stage 2    | `automated_cases`, `metadata`      | Stage 3  |
-| Stage 3    | `pages[].elements[]`, `metadata`   | Stage 4  |
-| Stage 4    | POM file paths + class names       | Stage 5  |
-| Stage 5    | Spec file path                     | Stage 6  |
-| Stage 6    | All file paths + results           | Stage 6b |
-| Stage 6b   | Pass/fail + violation list         | Stage 7  |
+| Stage 3    | locator summary table, confirmed branch name, worktree path, unresolved list | Stage 4  |
+| Stage 4    | POM file path, class name, new method names, unresolved stubs list | Stage 5  |
+| Stage 5    | Spec file path, automated TC count, manual TC list | Stage 6  |
+| Stage 6    | POM + spec + data file paths, pass/fail results, manual TC count | Stage 6b |
+| Stage 6b   | Pass/fail verdict + violation list | Stage 7  |
 
 ## Project File Structure (Actual)
 
@@ -126,16 +129,17 @@ project-root/             ← D:\Khov
 ├── package.json
 ├── environment/            ← .env.dev / .env.uat / .env.prod
 ├── page-objects/           ← Page Object Model classes
-│   ├── basePage.ts         ← Base class with click(), type(), navigate(), etc.
+│   ├── basePage.ts         ← Base class with click(), type(), navigate(), getText(), etc.
 │   └── ...                 ← One POM per page
 ├── tests/                  ← Test spec files
+│   ├── baseTest.ts         ← Extends Playwright test with Allure hooks (import test from here)
 │   └── ...                 ← One spec per page (all blocks in one file)
 └── utils/
-    ├── validator.ts        ← Static Validator class (requireVisible, requireText, etc.)
-    ├── apiUtils.ts         ← waitForApi(), apiResponseData()
-    ├── stringUtils.ts      ← Text normalization, currency parsing
-    ├── constants.json      ← Expected text values, URLs, endpoints
-    └── test_data.json      ← Form data, test URLs, endpoints
+    ├── validator.ts        ← Static Validator class (requireVisible, requireHidden, requireText, requireUrlContains)
+    ├── apiUtils.ts         ← waitForApi(page, endpoint), apiResponseData<T>(page, endpoint)
+    ├── stringUtils.ts      ← Text normalization: escapeRegExp, normalizeText
+    ├── constants.json      ← Expected text values and page URLs keyed by page name
+    └── test_data.json      ← Form inputs and API endpoints (create when first needed)
 ```
 
 ---
@@ -210,18 +214,23 @@ provided, the richer the generated test cases.
 ## Loading Sub-Stage Skills
 
 Each stage has its own SKILL.md with detailed instructions. When you reach a
-stage, read it with the `view` tool before proceeding:
+stage, use the Read tool to load it before proceeding. Skills exist at both
+project level (preferred) and user level:
 
 ```
-view /mnt/skills/user/stage-1-test-generation/SKILL.md
-view /mnt/skills/user/stage-1b-csv-export/SKILL.md
-view /mnt/skills/user/stage-2-human-review/SKILL.md
-view /mnt/skills/user/stage-3-locator-discovery/SKILL.md
-view /mnt/skills/user/stage-4-pom-generation/SKILL.md
-view /mnt/skills/user/stage-5-spec-generation/SKILL.md
-view /mnt/skills/user/stage-6-test-execution/SKILL.md
-view /mnt/skills/user/stage-6b-code-review/SKILL.md
-view /mnt/skills/user/stage-7-git-push/SKILL.md
+Project-level (D:\Khov\.claude\skills\):
+  Read: D:\Khov\.claude\skills\stage-1-test-generation\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-1b-csv-export\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-2-human-review\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-3-locator-discovery\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-4-pom-generation\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-5-spec-generation\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-6-test-execution\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-6b-code-review\SKILL.md
+  Read: D:\Khov\.claude\skills\stage-7-git-push\SKILL.md
+
+User-level fallback (C:\Users\kritika\.claude\skills\):
+  Same folder names — use if project-level is unavailable
 ```
 
 **If a sub-stage skill file is not found**, do not halt — proceed using the
@@ -259,7 +268,7 @@ remotely, use `--force-with-lease` (never bare `--force`).
 ## Constraints & Best Practices
 
 - **Hard gate**: Stage 3 never starts without explicit Stage 2 approval
-- **Worktree gate**: Stage 4 never starts without creating a git worktree first using the `EnterWorktree` tool. Branch name: `feat/<story-slug>` (e.g. `feat/footer-tests`). All `.ts` file writes (POM, spec, test data) happen inside the worktree. This is MANDATORY — never write generated files to the main repo directory.
+- **Worktree gate**: Stage 4 never starts without creating a git worktree first using the `EnterWorktree` tool. Branch name: `feat/khov-{id}-{block-slug}` (e.g. `feat/khov-394-hero-block`). No Jira ID: `feat/{block-slug}`. All `.ts` file writes (POM, spec, test data) happen inside the worktree at `D:\Khov\.claude\worktrees\worktree-feat+{slug}\`. This is MANDATORY — never write generated files to the main repo directory.
 - **Conventional commits**: all Git messages follow `test(scope): message [JIRA-ID]`
 - **No skipped tests**: if a case can't be automated, mark it `@manual` with a comment, don't skip
 
@@ -319,13 +328,20 @@ all fields and clicks submit. Also create `clickFormSubmit()` for validation tes
 
 **Import order**:
 ```typescript
-import { test } from "./baseTest";  // NOT from "@playwright/test" — always use baseTest
+import { expect } from "@playwright/test";   // expect only — NOT test
+import { test } from "./baseTest";            // test from baseTest — includes Allure hooks
 import { HomePage } from "../page-objects/homePage";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 ```
 
-**NEVER import in spec files**: `Validator`, `waitForApi`, or direct `expect` from `@playwright/test` — these belong in POM only. Only import the POM classes, `constants`, and `testData` the spec actually uses.
+**Why `./baseTest` for `test`**: `baseTest.ts` wraps Playwright's test with Allure lifecycle
+hooks. Importing `test` from `@playwright/test` directly silently bypasses all Allure
+attachments and test descriptions. `expect` is imported separately because `baseTest.ts`
+does not re-export it.
+
+**NEVER import in spec files**: `Validator` or `waitForApi` — these belong in the POM only.
+Only import the POM classes, `constants`, and `testData` the spec actually uses.
 
 **Test structure** — each `test.describe` block has:
 - `let` declarations for page objects
