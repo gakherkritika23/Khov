@@ -210,20 +210,40 @@ first (Step 1) and match its navigation pattern exactly.
 
 ### Deep-Page Navigation (Community Detail, Floor Plan, Model Home)
 
-For pages with dynamic URLs, store the example URL from Stage 3 in `constants.json`:
+Do NOT hardcode a specific community URL in the spec or in `constants.json`.
+A fixed URL targets the same data every run — it hides content issues that only appear
+on communities with different data sets.
 
-```json
-"community_detail": {
-  "example_url": "/new-homes/texas/austin/community-name/"
+Instead, navigate to the **listing page first** and have the POM click a **random**
+community card so each run exercises different data:
+
+```typescript
+test.beforeEach(async ({ page }) => {
+  searchPage = new SearchResultsPage(page);
+  communityPage = new CommunityDetailPage(page);
+  await searchPage.navigate(constants.search_results.url);
+  await searchPage.clickRandomCommunityCard();
+  // now on a randomly selected live community detail page
+});
+```
+
+The POM implements `clickRandomCommunityCard()` by counting all visible community
+cards, picking one at a random index, and clicking it:
+
+```typescript
+async clickRandomCommunityCard(): Promise<void> {
+  const cards = this.communityCards;
+  const count = await cards.count();
+  expect(count, "No community cards found on listing page").toBeGreaterThan(0);
+  const index = Math.floor(Math.random() * count);
+  await cards.nth(index).click();
+  console.log(`Clicked community card at index ${index} of ${count}`);
 }
 ```
 
-Then in `beforeEach`:
-```typescript
-await communityDetailPage.navigate(constants.community_detail.example_url);
-```
-
-Do NOT hardcode specific URL strings inline in the spec.
+> **Stage 3 note:** Stage 3 still navigates to a specific example URL to inspect the
+> DOM and discover locators — that URL is a throwaway tool for discovery and is never
+> stored in `constants.json` or referenced in the spec.
 
 ### Section Comments Within Describe Blocks
 Group related tests with `// ── Category ─────` comments inside the describe block:
