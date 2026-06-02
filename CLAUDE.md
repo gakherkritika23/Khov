@@ -69,7 +69,12 @@ environment/    → .env.dev / .env.uat / .env.prod (base URLs, browser, timeout
 
 ### Allure Integration
 
-`tests/baseTest.ts` extends Playwright's base test with Allure lifecycle hooks (environment properties, test descriptions, failure screenshots). **Note:** tests currently import `test` directly from `@playwright/test`, not from `baseTest.ts` — the base test hooks run via the config but the custom `test` export is not yet wired into spec files.
+`tests/baseTest.ts` extends Playwright's base test with Allure lifecycle hooks (environment properties, test descriptions, failure screenshots). All spec files must import `test` from `./baseTest` — importing directly from `@playwright/test` bypasses these hooks and produces incomplete Allure reports. `expect` is imported separately from `@playwright/test` since `baseTest.ts` does not re-export it:
+
+```typescript
+import { expect } from "@playwright/test";
+import { test } from "./baseTest";
+```
 
 ### Page Object Pattern
 

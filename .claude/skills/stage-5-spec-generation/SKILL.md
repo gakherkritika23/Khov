@@ -135,15 +135,26 @@ For every locator the Stage 4 output marked as unresolved (stub with `TODO`):
 
 ### Import Pattern (exact order)
 ```typescript
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 ```
 
+**Why `./baseTest` and not `@playwright/test` for `test`?**
+`baseTest.ts` wraps Playwright's `test` with Allure lifecycle hooks (`description()`,
+`attachment("Test Start/End")`, failure screenshots). Importing `test` directly from
+`@playwright/test` silently bypasses all of these hooks — the Allure report loses
+test descriptions, timestamps, and captured attachments for every test in the suite.
+
+`expect` is imported separately from `@playwright/test` because `baseTest.ts` does
+not re-export it.
+
 **Do NOT import `Validator` or `waitForApi` in spec files.** These belong in the POM only.
 
 Only import what the spec actually uses. If the spec has no form tests, omit `testData`.
+If the spec has no inline `expect()` calls, omit the `expect` import.
 
 ### constants.json — When and How to Use
 
@@ -410,7 +421,8 @@ Do NOT add `afterEach` for screenshots — this is already handled by
 ## Spec Template (Path B — New Spec File)
 
 ```typescript
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./baseTest";
 import { {PageName}Page } from "../page-objects/{pageName}Page";
 import constants from "../utils/constants.json";
 // import testData from "../utils/test_data.json";  // Uncomment if needed

@@ -127,7 +127,7 @@ async getPriceRange(): Promise<string> {
 
 | Rule | Check |
 |------|-------|
-| Import order | `@playwright/test` → page objects → utils → constants → testData |
+| Import order | `expect` from `@playwright/test` → `test` from `./baseTest` → page objects → constants → testData |
 | No Validator in spec | Spec calls POM `verify*()` methods, never `Validator.requireVisible()` directly |
 | No raw getText in spec | Spec calls POM `get*()` methods, never `page.getText(locator)` |
 | No raw locator access for assertions | Spec doesn't pass `page.someLocator` to `Validator` |
