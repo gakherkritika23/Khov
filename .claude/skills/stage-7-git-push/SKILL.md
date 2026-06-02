@@ -209,13 +209,13 @@ Display this summary to the engineer and wait for explicit YES:
 ```
 Ready to push to remote. Please confirm:
 
-  Branch:  worktree-feat+{story-slug}
+  Branch:  feat/khov-{id}-{block-slug}   ← git branch name (not worktree dir name)
   Files:   page-objects/{pageName}Page.ts
            tests/{pageName}.spec.ts
            [utils/test_data.json — if modified]
   Commit:  test({scope}): {summary} [{JIRA-ID}]
   Tests:   X passing on dev
-  Target:  origin/worktree-feat+{story-slug}
+  Target:  origin/feat/khov-{id}-{block-slug}
 
 Type YES to push, or NO to abort.
 ```
@@ -227,8 +227,10 @@ Only proceed after explicit YES.
 ## Step 7 — Push
 
 ```powershell
-# First push — creates the remote tracking branch
-git push -u origin worktree-feat+{story-slug}
+# First push — uses the git branch name, NOT the worktree directory name
+# Branch name:        feat/khov-{id}-{block-slug}   (e.g. feat/khov-394-hero-block)
+# Worktree dir name:  worktree-feat+{slug}           (different — directory only)
+git push -u origin feat/khov-{id}-{block-slug}
 ```
 
 ---
@@ -291,15 +293,15 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ### Push rejected — non-fast-forward
 ```powershell
 # Remote branch has new commits — rebase and retry
-git pull --rebase origin worktree-feat+{story-slug}
+git pull --rebase origin feat/khov-{id}-{block-slug}
 # Resolve any conflicts, then:
-git push -u origin worktree-feat+{story-slug}
+git push -u origin feat/khov-{id}-{block-slug}
 ```
 
 ### Branch already exists remotely with different history (re-ran Stage 4)
 ```powershell
 # Use force-with-lease — safer than --force (fails if remote has unexpected commits)
-git push --force-with-lease origin worktree-feat+{story-slug}
+git push --force-with-lease origin feat/khov-{id}-{block-slug}
 ```
 
 ### Pre-push hook failed
@@ -332,7 +334,7 @@ Check SSH key or git credentials. Do not retry without resolving the auth issue 
 ```
 Git Push Complete
 ─────────────────────────────────────────
-Branch:  worktree-feat+{story-slug}
+Branch:  feat/khov-{id}-{block-slug}
 Commit:  {short-sha} — test({scope}): {summary}
 Files:   {count} files committed
 PR:      {gh-pr-url}

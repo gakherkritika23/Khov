@@ -40,8 +40,8 @@ directly (no Python script needed). Present the file path to the user when done.
 ## CSV Format
 
 ```
-TCID,Priority,Summary,Steps,Expected Result
-TC-001,High,"Block is visible on page","1. Navigate to page\n2. Locate block","Block is visible"
+"TCID","Priority","Summary","Steps","Expected Result"
+"TC-001","High","Block is visible on page","1. Navigate to page\n2. Locate block","Block is visible"
 ```
 
 Rules:
@@ -76,7 +76,7 @@ Rules:
 
 **Output row:**
 ```
-TC-001,High,"Block is visible on the home page","1. Navigate to the home page\n2. Scan the page for the hero block","The hero block is visible on the page"
+"TC-001","High","Block is visible on the home page","1. Navigate to the home page\n2. Scan the page for the hero block","The hero block is visible on the page"
 ```
 
 ## Notes

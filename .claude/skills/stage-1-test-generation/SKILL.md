@@ -40,7 +40,10 @@ Tables in Jira break when copy-pasted — images are the preferred input format.
 
 From all provided inputs, extract:
 
-- **Jira ID** — from ticket header or URL (e.g. `KHOV-1298`); use `UNKNOWN` if not visible
+- **Jira ID** — from ticket header or URL (e.g. `KHOV-1298`); use `UNKNOWN` if not visible.
+  Format must be `KHOV-XXXX` (uppercase prefix, hyphen, numeric ID) — this exact value
+  is used in Stage 3 to derive the git branch name (`feat/khov-1298-block-slug`).
+  A malformed ID (e.g. `KHOV1298` or `khov-1298`) will fail Stage 3's branch validation.
 - **Page** — which page the block lives on (e.g. Home Page, Community Page)
 - **Block** — the specific block being tested (e.g. Hero Block, Intro Block)
 - **Content Model** — the CMS model driving the block (if applicable)
