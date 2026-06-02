@@ -10,69 +10,146 @@ description: >
 # Stage 4 — POM Generation
 
 ## Purpose
-Convert discovered locators into a clean, typed POM class (or update an existing
-one) that spec files import to interact with khov.com pages.
+Convert the locator summary from Stage 3 into a clean, typed POM class (or update
+an existing one) that spec files import to interact with khov.com pages.
+
+---
 
 ## Input
-Locator discovery output from Stage 3.
+
+The structured locator summary from Stage 3, including:
+- Page name and POM file path
+- Confirmed branch name (`feat/khov-{id}-{block-slug}`)
+- Worktree path (from `EnterWorktree` output)
+- New locators table (verified ✅ and unresolved ❌)
+- List of locators already present in the existing POM (no action needed)
+
+---
 
 ## ⛔ REQUIRED PRECONDITION — WORKTREE CHECK
 
-Before writing ANY `.ts` files, verify you are inside a git worktree:
+Before writing ANY `.ts` files, verify you are inside a git worktree.
 
-1. The working directory must be inside `D:\Khov\.claude\worktrees\<branch-name>\`
-2. If NOT already in a worktree, **STOP** and use the `EnterWorktree` tool first:
-   - Branch name: `feat/<story-slug>` (e.g., `feat/footer-tests`, `feat/home-hero-block`)
-   - The `EnterWorktree` tool will create the worktree at `.claude/worktrees/worktree-feat+<story-slug>`
-3. ALL file writes (POM `.ts`, spec `.spec.ts`, test data JSON) go inside the worktree
-4. **NEVER write generated files to the main repository directory** — they will be lost if the session is interrupted
+1. The worktree path was confirmed at the end of Stage 3. It is:
+   ```
+   D:\Khov\.claude\worktrees\worktree-feat+{slug}\
+   ```
+   Where `{slug}` = the story slug from your branch name (e.g. `khov-394-hero-block`).
 
-If you are resuming a session and a worktree already exists for this branch, continue writing to that same worktree path.
+2. If NOT already in a worktree, **STOP** and use the `EnterWorktree` tool:
+   - Branch name: `feat/khov-{id}-{block-slug}` (confirmed in Stage 3)
+   - Examples: `feat/khov-394-hero-block`, `feat/khov-945-contact-form`
+   - The tool creates the worktree at `D:\Khov\.claude\worktrees\worktree-feat+{slug}\`
+
+3. If a worktree already exists (resuming a session), use that same path.
+
+### Absolute Paths for All File Writes
+
+All `Write` tool calls MUST use absolute paths inside the worktree:
+
+```
+POM:       D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+Spec:      D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+Test data: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
+Constants: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+```
+
+**NEVER write to `D:\Khov\page-objects\` directly** — changes in the main repo
+directory are not on the feature branch and will be overwritten.
+
+---
+
+## Step 1 — Read the Existing POM (Always First)
+
+Before writing a single line, use the Read tool on the existing POM file:
+
+```
+Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+```
+
+**If the file does not exist** → use Path B (Create New POM) below.
+
+**If the file exists** → record:
+- All `readonly` locator properties already declared (do NOT redeclare)
+- All block sections already present (add new blocks AFTER the last one)
+- The exact import block and class name to preserve
+
+---
+
+## Step 2 — Path A or Path B
+
+### Path A — Updating an Existing POM
+
+1. Locate the last block's `readonly` property group in the class body
+2. Add new `readonly` properties **after** the last existing block's properties
+3. Locate the last block's constructor assignments
+4. Add new constructor assignments **after** the last existing block's assignments
+5. Locate the last block's methods
+6. Add new method sections **after** the last existing block's methods
+7. Never remove or rename existing locators or methods
+
+### Path B — Creating a New POM
+
+Start from the POM template below. Replace all `{placeholders}` before writing.
+Write to: `D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts`
+
+---
 
 ## CRITICAL RULES
 
 ### File Organization
-- **Location**: `page-objects/{pageName}Page.ts` (NOT `tests/pages/`)
+- **Location**: `page-objects/{pageName}Page.ts` inside the worktree (NOT `tests/pages/`)
 - **One POM per page**: `homePage.ts` covers ALL blocks on the home page
 - **NEVER create separate POM files per block or per Jira story**
-- **ALWAYS update the existing POM** — read it first, add new sections
+- **ALWAYS update the existing POM** — read it first (Step 1), add new sections
 
 ### Class Structure
-- **MUST extend `BasePage`** — inherits `click()`, `type()`, `navigate()`,
-  `getText()`, `isVisible()`, `waitForVisible()`, `scrollIntoView()`, `dismissCookies()`
-- `page` property is **`protected`** (inherited from BasePage) — never redeclare as public
+- **MUST extend `BasePage`** — inherits these methods (actual `basePage.ts`):
+  ```
+  navigate(url)          getTitle()             getUrl()
+  getHref(locator)       verifyNavigation(url)
+  click(locator, name?)  type(locator, text, name?)
+  waitForVisible(locator, timeout?)              waitForHidden(locator, timeout?)
+  waitForLoad()          scrollIntoView(locator)
+  getText(locator)       isVisible(locator, timeout?)    isEnabled(locator)
+  ```
+  > ⚠️ `dismissCookies()` does **NOT** exist in `BasePage`. If a POM needs to
+  > dismiss cookies, implement it directly using the site's specific locators.
+
+- `page` property is **`protected`** (inherited) — never redeclare it as public
 - All locators are **`readonly`** properties initialized in the constructor
 - Import `Validator` from `../utils/validator`
 
 ### Three-Category Method Pattern (MANDATORY)
 
-Every block MUST have methods organized into these three categories:
+Every block MUST have methods in exactly these three categories:
 
 ```typescript
 // ── Block Name — Verification ──────────────────────────────
 /** Verify the block is visible on the page. */
 async verifyBlockIsDisplayed(): Promise<void> {
-  await Validator.requireVisible(this.locator, "Block is not displayed");
+  await Validator.requireVisible(this.blockContainer, "Block is not displayed");
 }
 
 // ── Block Name — Actions ───────────────────────────────────
 /** Click the CTA button. */
-async clickSomething(): Promise<void> {
-  await this.click(this.locator, "Something");
+async clickBlockCTA(): Promise<void> {
+  await this.scrollIntoView(this.blockCTA);
+  await this.blockCTA.click({ force: true });
+  console.log("Clicked Block CTA");
 }
 
 // ── Block Name — Data Getters ──────────────────────────────
 /** Return the block's title text. */
 async getBlockTitle(): Promise<string> {
-  return await this.getText(this.locator);
+  return await this.getText(this.blockTitle);
 }
 ```
 
 ### Assertion Pattern — Validator vs raw expect
 
 Use **`Validator`** for: visibility checks, hidden checks, and text content assertions.
-Use **raw `expect()`** for: count checks, regex pattern matching, attribute value comparisons,
-numeric/boolean comparisons, and anything `Validator` doesn't cover.
+Use **raw `expect()`** for: count checks, regex, attribute comparisons, numeric/boolean.
 
 ```typescript
 // ✓ Validator — visibility
@@ -83,27 +160,51 @@ await Validator.requireHidden(this.button, "Button should be hidden");
 await Validator.requireText(this.title, "Expected text", "Title mismatch");
 
 // ✓ raw expect — count
-const count = await this.items.count();
+const count = await this.blockContainer.locator("li").count();
 expect(count, "No items displayed").toBeGreaterThan(0);
-
-// ✓ raw expect — regex match on attribute
-const placeholder = await this.input.getAttribute("placeholder");
-expect(placeholder, "Required field missing *").toMatch(/\*$/);
 
 // ✓ raw expect — attribute comparison
 const href = await this.link.getAttribute("href");
 expect(href, "Link href mismatch").toContain("/expected-path");
 
-// ✓ raw expect — numeric equality
-expect(displayed, `Count mismatch — expected ${expected}`).toBe(expected);
-
-// ✗ WRONG — raw expect() for visibility (use Validator instead)
-await expect(this.block).toBeVisible(); // ← use Validator.requireVisible
+// ✗ WRONG — raw expect for visibility (use Validator instead)
+await expect(this.block).toBeVisible();
 ```
 
 `expect` must be imported: `import { Page, Locator, expect } from "@playwright/test";`
 
-## POM Template
+---
+
+## Step 3 — Handle Unresolved Locators
+
+For every locator marked `❌ unresolved` in the Stage 3 summary:
+
+**1. Declare the property with a TODO comment:**
+```typescript
+// TODO: locator not found during Stage 3 discovery — needs manual DOM inspection
+readonly videoModal: Locator;
+```
+
+**2. In the constructor, use a sentinel that won't throw at import time:**
+```typescript
+// TODO: update selector after manual DOM inspection on {URL}
+this.videoModal = page.locator("UNRESOLVED_SELECTOR");
+```
+
+**3. Stub the verification method with a warning:**
+```typescript
+async verifyVideoModalIsDisplayed(): Promise<void> {
+  // TODO: locator unresolved — update selector before enabling this assertion
+  console.warn("videoModal locator not yet resolved — test case requires manual execution");
+}
+```
+
+**4. List all unresolved locators in the Stage 4 output** so Stage 5 marks the
+corresponding test cases as `@manual`.
+
+---
+
+## POM Template (Path B — New POM)
 
 ```typescript
 import { Page, Locator, expect } from "@playwright/test";
@@ -111,7 +212,7 @@ import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 
 export class {PageName}Page extends BasePage {
-  /* ================= BLOCK NAME (KHOV-XXXX) ================= */
+  /* ================= {BLOCK NAME} ({KHOV-XXXX}) ================= */
   readonly blockContainer: Locator;
   readonly blockTitle: Locator;
   readonly blockCTA: Locator;
@@ -119,48 +220,35 @@ export class {PageName}Page extends BasePage {
   constructor(page: Page) {
     super(page);  // MUST call super — BasePage sets this.page
 
-    /* ================= BLOCK NAME ================= */
-    // Block container — section#block-id (verified live on PageName page)
-    this.blockContainer = page.locator("section#block-id");
-    // Block title — h2 scoped to container
+    /* ================= {BLOCK NAME} ================= */
+    // Block container — section#{block-id} (verified live on {PageName} page)
+    this.blockContainer = page.locator("section#{block-id}");
+    // Block title — h2 scoped to block container
     this.blockTitle = this.blockContainer.locator("h2");
-    // CTA button
+    // Primary CTA — a[data-testid="cta-button"] inside block
     this.blockCTA = this.blockContainer.locator('a[data-testid="cta-button"]');
   }
 
-  // ── Block Name — Verification ─────────────────────────────
+  // ── {Block Name} — Verification ──────────────────────────────
 
   async verifyBlockIsDisplayed(): Promise<void> {
-    await Validator.requireVisible(this.blockContainer, "Block not displayed");
+    await Validator.requireVisible(this.blockContainer, "{Block Name} not displayed");
   }
 
   async verifyBlockTitleIsDisplayed(): Promise<void> {
-    await Validator.requireVisible(this.blockTitle, "Block title not displayed");
+    await Validator.requireVisible(this.blockTitle, "{Block Name} title not displayed");
   }
 
-  async verifyItemCountIsAboveZero(): Promise<void> {
-    const count = await this.items.count();
-    expect(count, "No items displayed in block").toBeGreaterThan(0);
-  }
-
-  // ── Block Name — Private Helpers ──────────────────────────
-
-  /** Scroll container into view and wait for the element that lazy-loads. */
-  private async waitForBlockReady(): Promise<void> {
-    await this.scrollIntoView(this.blockContainer);
-    await this.blockTitle.waitFor({ state: "visible", timeout: 10000 });
-  }
-
-  // ── Block Name — Actions ──────────────────────────────────
+  // ── {Block Name} — Actions ────────────────────────────────────
 
   /** Click the CTA. Scrolls into view first to avoid sticky header interception. */
   async clickBlockCTA(): Promise<void> {
     await this.scrollIntoView(this.blockCTA);
     await this.blockCTA.click({ force: true });
-    console.log("Clicked Block CTA");
+    console.log("Clicked {Block Name} CTA");
   }
 
-  // ── Block Name — Data Getters ─────────────────────────────
+  // ── {Block Name} — Data Getters ───────────────────────────────
 
   async getBlockTitleText(): Promise<string> {
     return await this.getText(this.blockTitle);
@@ -168,11 +256,12 @@ export class {PageName}Page extends BasePage {
 }
 ```
 
-### Locator Comments (constructor)
-Every locator assignment must have an inline comment:
-- What element it targets and which tag/selector was chosen
-- `(verified live on PageName page)` when confirmed from DOM inspection
+---
 
+## Locator Patterns
+
+### Comments in Constructor
+Every locator assignment must have an inline comment:
 ```typescript
 // Block container — section#hero-block (verified live on Home page)
 this.heroBlock = page.locator("section#hero-block");
@@ -181,9 +270,6 @@ this.heroHeadline = this.heroBlock.locator("h1");
 ```
 
 ### Property Group Headers
-Use `/* ===== NAME (KHOV-XXXX) ===== */` for the readonly property declarations
-and `/* ===== NAME ===== */` inside the constructor:
-
 ```typescript
 /* ================= HERO BLOCK (KHOV-1234) ================= */
 readonly heroBlock: Locator;
@@ -193,13 +279,11 @@ constructor(page: Page) {
   super(page);
   /* ================= HERO BLOCK ================= */
   this.heroBlock = page.locator("section#hero-block");
+  this.heroHeadline = this.heroBlock.locator("h1");
 }
 ```
 
-### Action Methods — Click Pattern
-Most click actions should scroll into view first, then force-click. Use `{ force: true }`
-to bypass sticky header interception (common on sites with fixed headers):
-
+### Click Pattern — Scroll + Force
 ```typescript
 async clickCarouselNext(): Promise<void> {
   await this.scrollIntoView(this.carouselNextButton);
@@ -209,43 +293,92 @@ async clickCarouselNext(): Promise<void> {
 ```
 
 ### Complex DOM State — page.evaluate()
-Use `page.evaluate()` when Playwright's built-in waiting would hang (e.g., carousel boundary state
-where a button is removed from DOM rather than set to disabled):
-
 ```typescript
 async verifyCarouselNextIsDisabledOrAbsent(): Promise<void> {
   const result = await this.page.evaluate(() => {
-    const btn = document.querySelector("section#block button.carousel__next");
+    const btn = document.querySelector("section#block button.next");
     return !btn || btn.hasAttribute("disabled");
   });
   expect(result, "Next button should be disabled or absent on last slide").toBe(true);
 }
 ```
 
-### Filter by Text — .filter({ hasText: "..." })
-Use `.filter({ hasText: "..." })` to scope a locator to a specific list item when
-items share the same selector but differ by visible text:
-
+### Filter by Text
 ```typescript
-this.homeCount = this.block
+this.homeCount = this.statsBlock
   .locator("div.stat-item")
   .filter({ hasText: "HOMES" })
   .locator("span.count");
 ```
 
+---
+
 ## Form-Specific Patterns
 
-For forms, create these additional helpers:
+When the block under test is a form, add the following. Note the three separate
+sections — class body, constructor, and methods — and where each belongs.
+
+### Add to class body (with other readonly properties)
+```typescript
+/* ================= {FORM NAME} ({KHOV-XXXX}) ================= */
+readonly formContainer: Locator;
+readonly formFirstNameInput: Locator;
+readonly formLastNameInput: Locator;
+readonly formEmailInput: Locator;
+readonly formPhoneInput: Locator;
+readonly formCommentInput: Locator;
+readonly formSubmitButton: Locator;
+readonly formSuccessModal: Locator;
+```
+
+### Add to constructor
+```typescript
+/* ================= {FORM NAME} ================= */
+// Form container — form#{form-id} (verified live on {PageName} page)
+this.formContainer = page.locator("form#{form-id}");
+this.formFirstNameInput = this.formContainer.locator('input[name="first_name"]');
+this.formLastNameInput = this.formContainer.locator('input[name="last_name"]');
+this.formEmailInput = this.formContainer.locator('input[name="email"]');
+this.formPhoneInput = this.formContainer.locator('input[name="phone"]');
+this.formCommentInput = this.formContainer.locator('textarea[name="comment"]');
+this.formSubmitButton = this.formContainer.locator('button[type="submit"]');
+// Success modal — confirm selector on live site after form submission
+this.formSuccessModal = page.locator(".modal-body");
+```
+
+### Add as methods
 
 ```typescript
-// Fill and submit helper
+// ── {Form Name} — Verification ────────────────────────────────
+
+async verifyFormIsDisplayed(): Promise<void> {
+  await Validator.requireVisible(this.formContainer, "Form not displayed");
+}
+
+async verifySuccessModalisDisplayed(): Promise<void> {
+  await Validator.requireVisible(this.formSuccessModal, "Success modal not displayed", 15000);
+}
+
+async verifySuccessModalText(): Promise<void> {
+  // Import testData at top of file: import testData from "../utils/test_data.json";
+  // {pageKey} = the top-level key for this page in test_data.json
+  // e.g. testData.contactUs.success_message — add the key if it doesn't exist yet
+  await Validator.requireText(
+    this.formSuccessModal,
+    testData.{pageKey}.success_message,
+    "Success modal text mismatch",
+  );
+}
+
+// ── {Form Name} — Actions ──────────────────────────────────────
+
 async fillAndSubmitForm(data: {
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
   comment?: string;
-}) {
+}): Promise<void> {
   await this.formFirstNameInput.fill(data.firstName);
   await this.formLastNameInput.fill(data.lastName);
   await this.formEmailInput.fill(data.email);
@@ -254,67 +387,111 @@ async fillAndSubmitForm(data: {
   await this.formSubmitButton.click();
 }
 
-// Click submit without filling (for validation tests)
 async clickFormSubmit(): Promise<void> {
   await this.formSubmitButton.click();
 }
 
-// Field validation error locator
+// ── {Form Name} — Network ──────────────────────────────────────
+
+// Import at top of file: import { waitForApi } from "../utils/apiUtils";
+// Note: waitForApi already checks status === 200 — no extra expect needed.
+async verifyNetworkRequest(endpoint: string): Promise<void> {
+  await waitForApi(this.page, endpoint);
+}
+
+// ── {Form Name} — Validation Helpers ──────────────────────────
+
 formFieldError(fieldLocator: Locator): Locator {
+  // TODO: confirm the error span selector on the live site
   return fieldLocator.locator("..").locator("span.error-message");
 }
 
-// Check if field has validation-fail class
 async isFieldInvalid(fieldLocator: Locator): Promise<boolean> {
   const parent = fieldLocator.locator("..");
   const classes = (await parent.getAttribute("class")) ?? "";
   return classes.includes("error") || classes.includes("invalid");
 }
 
-// Verify validation error is visible
 async verifyFieldValidationError(fieldLocator: Locator): Promise<void> {
-  const errorMsg = this.formFieldError(fieldLocator);
-  await Validator.requireVisible(errorMsg, "Validation error not shown");
+  await Validator.requireVisible(this.formFieldError(fieldLocator), "Validation error not shown");
 }
 
-// Get validation error text
 async getFieldErrorText(fieldLocator: Locator): Promise<string> {
   return await this.getText(this.formFieldError(fieldLocator));
 }
 
-// ── Success Modal ─────────────────────────────────────────────────────────────
-readonly modal: Locator;
+// ── {Form Name} — Data Getters ─────────────────────────────────
 
-// In constructor:
-// this.modal = page.locator(".modal-body");
-
-async verifySuccessModalisDisplayed(): Promise<void> {
-  await Validator.requireVisible(this.modal, "Success modal not displayed", 15000);
-}
-
-async verifySuccessModalText(): Promise<void> {
-  await Validator.requireText(
-    this.modal,
-    testData.{pageKey}.success_message,
-    "Success Modal Text",
-  );
-}
-
-// ── Network Request ───────────────────────────────────────────────────────────
-// Encapsulate waitForApi inside the POM — spec NEVER imports waitForApi directly.
-async verifyNetworkRequest(endpoint: string): Promise<void> {
-  const response = await waitForApi(this.page, endpoint);
-  expect(response.status()).toBe(200);
+async getFormTitle(): Promise<string> {
+  return await this.getText(this.formContainer.locator("h2, h3").first());
 }
 ```
 
+### Required imports for forms
+```typescript
+import { waitForApi } from "../utils/apiUtils";
+import testData from "../utils/test_data.json";
+```
+
+---
+
 ## Locator Naming Convention
 - camelCase with block prefix: `heroBlockHeadline`, `formFirstNameInput`
-- Descriptive suffixes: `CTA`, `Input`, `Button`, `Icon`, `Modal`, `Block`
-- Group by block with section comment headers
+- Descriptive suffixes: `CTA`, `Input`, `Button`, `Icon`, `Modal`, `Block`, `Container`
+- Group by block with property group headers
 
-## Output
-Provide the updated POM file. List which sections were added/modified.
+---
 
-## Handoff
-Pass the POM file path and class name to **Stage 5 — Spec File Creation**.
+## Step 4 — TypeScript Compilation Check
+
+After writing the POM, run immediately (from the worktree directory):
+
+```bash
+npx tsc --noEmit 2>&1 | grep -v "TS1149"
+```
+
+Fix all errors before handing off to Stage 5. Common causes:
+- Missing import (`Validator`, `waitForApi`, `testData`)
+- Locator used in a method but not declared as a `readonly` property
+- Return type mismatch on getter method
+- `super()` not called in constructor
+- `this.items` or other undeclared property reference
+
+Do NOT proceed to Stage 5 with TypeScript errors outstanding.
+
+---
+
+## Output — Report After Writing POM
+
+Present this summary to the engineer before calling Stage 5:
+
+```
+POM Generation Complete
+──────────────────────────────────────────────────
+POM file:   D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+Class name: {PageName}Page
+Branch:     feat/khov-{id}-{block-slug}
+Action:     [Created new / Updated existing — added {block} section]
+
+New methods added:
+  Verification:  verify{Block}IsDisplayed(), verify{Field}IsDisplayed()
+  Actions:       click{Block}CTA(), fillAndSubmit{Form}()
+  Data Getters:  get{Block}Title(), get{Field}Text()
+
+Unresolved stubs (Stage 5 must mark as @manual):
+  {locatorName} — selector not found, stub added with TODO comment
+
+tsc --noEmit: PASSED ✅  (or list errors if FAILED ❌)
+──────────────────────────────────────────────────
+```
+
+---
+
+## Handoff to Stage 5
+
+Pass to Stage 5 — Spec File Creation:
+- Worktree POM file path (absolute)
+- Class name (e.g. `HomePage`)
+- Full list of new method names (so Stage 5 calls the right ones)
+- List of unresolved stubs (so Stage 5 marks those TCs as `@manual`)
+- Confirmation that `tsc --noEmit` passed
