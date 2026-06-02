@@ -15,22 +15,123 @@ automated test cases.
 
 ## Input
 - `automated_cases` from Stage 2 (or test-cases JSON)
-- POM class from Stage 4
+- POM Generation Complete output from Stage 4 (method names, unresolved stubs list)
+
+---
 
 ## ⛔ REQUIRED PRECONDITION — WORKTREE CHECK
 
-Write the spec file to the **same worktree** used in Stage 4:
-- Path: `D:\Khov\.claude\worktrees\<branch-name>\tests\`
-- If no worktree was created yet (Stage 4 was skipped), use `EnterWorktree` now before writing
-- **NEVER write spec files to the main repository directory**
+Write the spec file to the **same worktree** used in Stage 4.
+
+The worktree path is:
+```
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\
+```
+Where `{slug}` = the story slug from the branch name (e.g. `khov-394-hero-block`).
+
+If no worktree was created yet (Stage 4 was skipped), use `EnterWorktree` now before
+writing any files.
+
+### Absolute Paths for All File Writes
+
+All `Write` tool calls MUST use absolute paths inside the worktree:
+
+```
+Spec:      D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+Test data: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
+Constants: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+```
+
+**NEVER write to `D:\Khov\tests\` directly** — changes in the main repo directory are
+not on the feature branch and will be lost.
+
+---
+
+## Step 1 — Read Existing Spec (Always First)
+
+Before writing a single line, use the Read tool on the existing spec file:
+
+```
+Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+```
+
+**If the file does not exist** → use Path B (Create New Spec) in Step 2.
+
+**If the file exists** → record:
+- All existing `import` statements (do NOT duplicate them)
+- All existing `test.describe` block names (do NOT create a block with the same name)
+- The highest TC-XX number used in each describe block
+  (new tests in the same block must continue the sequence, or restart at TC-01 for a
+  new describe block)
+
+---
+
+## Step 2 — Path A or Path B
+
+### Path A — Adding to an Existing Spec
+
+1. Append the new `test.describe` block **after** the last closing `});` in the file
+2. Do NOT duplicate any existing `import` statements — only add imports for new symbols
+3. TC numbering **restarts at TC-01** for each new `test.describe` block
+4. Do NOT modify any existing test blocks
+
+### Path B — Creating a New Spec File
+
+Start from the full spec template below (includes import block).
+
+Write to:
+```
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+```
+
+---
+
+## Before Writing Imports
+
+### Check `test_data.json`
+
+`utils/test_data.json` may not exist yet. Check before importing it:
+
+```
+Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
+```
+
+- **File exists** → import it and use it normally
+- **File does not exist AND the spec has form tests or API calls** → create it first:
+  ```json
+  {
+    "endpoint": {},
+    "{pageKey}": {}
+  }
+  ```
+  Write to: `D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json`
+- **File does not exist AND the spec has no form tests or API calls** → omit the
+  `testData` import entirely; do NOT create an empty file just to satisfy the import
+
+---
+
+## Unresolved Locators — Skip in Spec
+
+For every locator the Stage 4 output marked as unresolved (stub with `TODO`):
+
+1. Find all test cases in `approved_cases` that depend on that element
+2. Do NOT generate automated test code for them
+3. Add a commented-out placeholder:
+   ```typescript
+   // TODO: TC-12 | Video Modal opens @regression — MANUAL
+   // Reason: videoModal locator unresolved in Stage 3. Enable after selector is confirmed.
+   ```
+4. List all skipped TCs in the Stage 6 handoff output
+
+---
 
 ## CRITICAL RULES
 
 ### File Organization
-- **Location**: `tests/{pageName}.spec.ts` (NOT `tests/specs/`)
+- **Location**: `tests/{pageName}.spec.ts` inside the worktree (NOT `tests/specs/`)
 - **One spec per page**: ALL blocks for a page go in the SAME spec file
 - **NEVER create separate spec files per block or per Jira story**
-- **Add new `test.describe` blocks** to the existing spec file
+- **Add new `test.describe` blocks** to the existing spec file (Path A above)
 
 ### Import Pattern (exact order)
 ```typescript
@@ -41,12 +142,34 @@ import testData from "../utils/test_data.json";
 ```
 
 **Do NOT import `Validator` or `waitForApi` in spec files.** These belong in the POM only.
-Only import the POM classes, `constants`, and `testData` that the spec actually uses.
+
+Only import what the spec actually uses. If the spec has no form tests, omit `testData`.
+
+### constants.json — When and How to Use
+
+Use `constants` for: page titles, expected static text, navigation link text, and page URLs.
+
+Structure: `constants.{page_key}.{property}`
+
+```typescript
+// Page title assertion
+expect(title).toBe(constants.home_page.title);
+
+// Navigate using constants URL (resolves against playwright.config.ts baseURL)
+await homePage.navigate(constants.home_page.url);  // "/" → https://www.khov.com/
+```
+
+If the needed constant key does not exist yet, add it to:
+```
+D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+```
+under the appropriate page key before referencing it in the spec.
+
+**Do NOT hardcode expected text strings directly in spec assertions. Always use constants.**
 
 ### Test Describe Block Structure
 
-Each block gets its own `test.describe` with its own `test.beforeEach`. Multiple
-describe blocks live in the same spec file — separated by block-level comments.
+Each block gets its own `test.describe` with its own `test.beforeEach`.
 
 ```typescript
 /* ================================================================
@@ -58,8 +181,7 @@ test.describe("Page Name — Block Name", () => {
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
-    await homePage.navigate(process.env.BASE_URL ?? "https://www.khov.com/");
-    await homePage.dismissCookies();
+    await homePage.navigate(constants.home_page.url);
   });
 
   // ── Block Rendering ─────────────────────────────────────────────
@@ -79,7 +201,29 @@ test.describe("Page Name — Block Name", () => {
 });
 ```
 
-**Navigation pattern varies by page — always read the existing spec's `beforeEach` first and match its navigation pattern exactly.**
+> ⚠️ **`dismissCookies()` does NOT exist in `BasePage`** — never call it in `beforeEach`.
+> If a specific page requires cookie dismissal, the POM must implement it with the page's
+> own locators. The `beforeEach` template above is the correct baseline.
+
+**Navigation pattern varies by page** — always read the existing spec's `beforeEach`
+first (Step 1) and match its navigation pattern exactly.
+
+### Deep-Page Navigation (Community Detail, Floor Plan, Model Home)
+
+For pages with dynamic URLs, store the example URL from Stage 3 in `constants.json`:
+
+```json
+"community_detail": {
+  "example_url": "/new-homes/texas/austin/community-name/"
+}
+```
+
+Then in `beforeEach`:
+```typescript
+await communityDetailPage.navigate(constants.community_detail.example_url);
+```
+
+Do NOT hardcode specific URL strings inline in the spec.
 
 ### Section Comments Within Describe Blocks
 Group related tests with `// ── Category ─────` comments inside the describe block:
@@ -102,8 +246,7 @@ test.describe("Home Page — Hero Block", () => {
 - Format: `TC-XX | Description @tag`
 - TC numbering **restarts at TC-01** per `test.describe` block
 - Tags at END of string: `@smoke` or `@regression`
-- **Form tests** must also include `@form` tag — any test inside a form-related
-  describe block must have `@form` before the `@smoke`/`@regression` tag
+- **Form tests** must also include `@form` tag — before the `@smoke`/`@regression` tag
 - NEVER use Playwright `{ tag: [...] }` annotation syntax
 
 ```typescript
@@ -164,13 +307,17 @@ const priceText = await homePage.getText(homePage.priceRange);
 
 ### Form Submission — verifyNetworkRequest in POM, NEVER waitForTimeout in spec
 The POM encapsulates `waitForApi` inside a `verifyNetworkRequest(endpoint)` method.
-The spec calls it after `clickSubmit()` — never use `waitForApi` or `waitForTimeout` directly in the spec.
+The spec calls it after `clickSubmit()` — never use `waitForApi` or `waitForTimeout`
+directly in the spec.
 
 ```typescript
 // CORRECT — POM-encapsulated network check
 test("TC-01 | Submit contact form @form @smoke", async () => {
-  await formPage.fillPersonalInfo(testData.contactUs.first_name, testData.contactUs.last_name);
-  await formPage.clickSubmit();
+  await formPage.fillAndSubmitForm({
+    firstName: testData.contactUs.first_name,
+    lastName:  testData.contactUs.last_name,
+    email:     testData.contactUs.email,
+  });
   await formPage.verifyNetworkRequest(testData.endpoint.submit_form);
   await formPage.verifySuccessModalisDisplayed();
   await formPage.verifySuccessModalText();
@@ -194,9 +341,7 @@ await formPage.verifySuccessModalText();
 ```typescript
 // CORRECT — isVisible check with console.log for skipped branch
 test("TC-12 | Video CTA displayed @regression", async () => {
-  const videoVisible = await homePage.isVisible(
-    homePage.videoCTA, 3000,
-  );
+  const videoVisible = await homePage.isVisible(homePage.videoCTA, 3000);
   if (videoVisible) {
     const ctaText = await homePage.getText(homePage.videoCTA);
     expect(ctaText).toContain("Watch");
@@ -218,27 +363,127 @@ console.log("Form submitted successfully with required fields only");
 
 ### scrollIntoView
 Do NOT add `scrollIntoView` before every test. Playwright auto-scrolls. Only
-use when explicitly needed (e.g., lazy-loaded content).
+use when explicitly needed (e.g., lazy-loaded content below the fold).
 
-### POM instantiation
+### POM Instantiation
 **Standard**: instantiate in `beforeEach`, not in the test body.
 
 **Exception**: when a `test.describe` block contains tests that each navigate to a
-specific hardcoded URL (not the standard navigation flow), create POMs inline inside the
-test. In this case there is no `beforeEach` block at all.
+specific hardcoded URL (not the standard navigation flow), create POMs inline inside
+the test. In this case there is no `beforeEach` block at all.
 
 ### afterEach
 Do NOT add `afterEach` for screenshots — this is already handled by
-`baseTest.ts` and `playwright.config.ts` (`screenshot: "on-first-failure"`).
+`tests/baseTest.ts` and `playwright.config.ts` (`screenshot: "on-first-failure"`).
+
+---
 
 ## Test Data
-- Form data: `utils/test_data.json` under a named key
-- Expected text: `utils/constants.json` under page-specific keys
-- API endpoints: `utils/test_data.json` under `endpoint`
 
-## Output
-Provide the complete test code to add to the existing spec file. Specify which
-`test.describe` blocks are new.
+- Form inputs: `utils/test_data.json` under a named page key (e.g. `testData.contactUs.first_name`)
+- Expected static text: `utils/constants.json` under page-specific keys
+- API endpoints: `utils/test_data.json` under the `endpoint` key
+- Page URLs: `utils/constants.json` under `{page_key}.url` or `{page_key}.example_url`
 
-## Handoff
-Pass the spec file path to **Stage 6 — Test Execution**.
+---
+
+## Spec Template (Path B — New Spec File)
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { {PageName}Page } from "../page-objects/{pageName}Page";
+import constants from "../utils/constants.json";
+// import testData from "../utils/test_data.json";  // Uncomment if needed
+
+/* ================================================================
+   {KHOV-XXXX} — {Block Name}
+   {Page Name}
+   ================================================================ */
+test.describe("{Page Name} — {Block Name}", () => {
+  let {pageName}Page: {PageName}Page;
+
+  test.beforeEach(async ({ page }) => {
+    {pageName}Page = new {PageName}Page(page);
+    await {pageName}Page.navigate(constants.{page_key}.url);
+  });
+
+  // ── Block Rendering ──────────────────────────────────────────────
+
+  test("TC-01 | {Block} is visible on the page @smoke", async () => {
+    await {pageName}Page.verify{Block}IsDisplayed();
+    console.log("{Block} verified visible");
+  });
+
+  // ── Content Mapping ──────────────────────────────────────────────
+
+  test("TC-02 | {Block} title is present and non-empty @smoke", async () => {
+    await {pageName}Page.verify{Block}TitleIsDisplayed();
+    const text = await {pageName}Page.get{Block}TitleText();
+    expect(text.length).toBeGreaterThan(0);
+    console.log(`{Block} title: ${text}`);
+  });
+
+  // ── CTAs ─────────────────────────────────────────────────────────
+
+  test("TC-03 | {Block} CTA is visible and clickable @smoke", async () => {
+    await {pageName}Page.verify{Block}CTAIsDisplayed();
+    await {pageName}Page.click{Block}CTA();
+    console.log("CTA clicked successfully");
+  });
+});
+```
+
+---
+
+## Final Step — TypeScript Compilation Check
+
+After writing the spec, run from the worktree directory:
+
+```bash
+npx tsc --noEmit 2>&1 | grep -v "TS1149"
+```
+
+Fix all errors before handing off to Stage 6. Common causes:
+- Calling a POM method that does not exist (check exact names from Stage 4 output)
+- Missing `import` (constants, testData, page object)
+- Using `testData` import when `test_data.json` doesn't exist yet
+- Wrong `async/await` usage (missing `await` before `verify*()` calls)
+- Locator property name mismatch (e.g. `homePage.heroCta` vs `homePage.heroBlockCTA`)
+
+Do NOT proceed to Stage 6 with TypeScript errors outstanding.
+
+---
+
+## Output — Report After Writing Spec
+
+Present this summary to the engineer before calling Stage 6:
+
+```
+Spec Generation Complete
+──────────────────────────────────────────────────
+Spec file:  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+Action:     [Created new / Added {block} describe block to existing file]
+Branch:     feat/khov-{id}-{block-slug}
+
+Test cases generated ({N} automated):
+  Smoke (@smoke):       TC-01, TC-02, TC-03, TC-07
+  Regression (@regression): TC-04, TC-05, TC-06, TC-08
+  Form (@form):         TC-09, TC-10
+
+Skipped — manual only ({M} TCs):
+  TC-12 — videoModal locator unresolved (Stage 4 stub)
+  [none — all TCs automated]
+
+tsc --noEmit: PASSED ✅  (or list errors if FAILED ❌)
+──────────────────────────────────────────────────
+```
+
+---
+
+## Handoff to Stage 6
+
+Pass to Stage 6 — Test Execution:
+- Worktree spec file path (absolute)
+- Total automated test count and tag breakdown
+- List of skipped/manual TCs (for test counts in Stage 7 commit message)
+- Confirmation that `tsc --noEmit` passed

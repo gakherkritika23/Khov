@@ -73,12 +73,12 @@ environment/    → .env.dev / .env.uat / .env.prod (base URLs, browser, timeout
 
 ### Page Object Pattern
 
-- `page-objects/basePage.ts` — Base class with reusable methods: `click()`, `type()`, `navigate()`, `dismissCookies()`, and wait utilities. All page objects extend this.
+- `page-objects/basePage.ts` — Base class with reusable methods: `click()`, `type()`, `navigate()`, `getText()`, `isVisible()`, `waitForVisible()`, `scrollIntoView()`, and related utilities. All page objects extend this. Note: `dismissCookies()` has been removed — pages that need cookie dismissal implement it directly.
 - Each page object defines `readonly Locator` fields in the constructor and exposes named action methods.
 
 ### Test Structure Pattern
 
-Tests use `test.describe.serial()` with a shared `Page` instance created in `beforeAll` and torn down in `afterAll`. Test case IDs follow the convention `TC-XX | Description`.
+Tests use `test.describe()` with a fresh `Page` instance created per test in `beforeEach`. `playwright.config.ts` sets `fullyParallel: false` so tests within a file run sequentially. Test case IDs follow the convention `TC-XX | Description @tag`.
 
 ### Test Data
 
@@ -87,9 +87,9 @@ Tests use `test.describe.serial()` with a shared `Page` instance created in `bef
 
 ### Utilities
 
-- `utils/validator.ts` — Static `Validator` class with assertion helpers (`requireVisible`, `requireText`, `assertDescendingNumbers`, etc.)
-- `utils/stringUtils.ts` — Text normalization, currency parsing, number range formatting
-- `utils/apiUtils.ts` — `waitForApi()` and `apiResponseData<T>()` for intercepting network responses
+- `utils/validator.ts` — Static `Validator` class with assertion helpers: `requireVisible`, `requireHidden`, `requireEnabled`, `requireText`, `requireUrlContains`
+- `utils/stringUtils.ts` — Text normalization helpers: `escapeRegExp`, `normalizeText`
+- `utils/apiUtils.ts` — `waitForApi(page, endpoint)` for intercepting network responses (checks status 200 in predicate)
 
 ### Test Tagging
 
