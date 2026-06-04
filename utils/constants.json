@@ -9,5 +9,15 @@
       "why_khov": "Why K. Hovnanian",
       "resources": "Resources"
     }
+  },
+  "home_search": {
+    "input_aria_label": "Search input",
+    "dallas_results_url": "/new-construction-homes/texas/dallas-tx/",
+    "dallas_results_heading": "Dallas New Homes"
+  },
+  "region": {
+    "texas_url": "/new-construction-homes/texas/",
+    "communities_heading": "New Home Communities",
+    "community_detail_url_pattern": "new-construction-homes/texas/[^/]+/[^/]+"
   }
 }
