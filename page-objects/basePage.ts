@@ -46,6 +46,31 @@ export class BasePage {
     console.log(`Typed in: ${name ?? "input"} → ${text}`);
   }
 
+  // Use for inputs that react to real keystrokes (e.g. autocomplete/typeahead
+  // fields where fill() does not trigger the suggestion handler).
+  async typeSequentially(
+    locator: Locator,
+    text: string,
+    name?: string,
+    delay = 100,
+  ): Promise<void> {
+    await this.waitForVisible(locator);
+    await locator.click();
+    await locator.fill("");
+    await locator.pressSequentially(text, { delay });
+    console.log(`Typed sequentially in: ${name ?? "input"} → ${text}`);
+  }
+
+  // Clicks an element programmatically via the DOM. Use for zero-size overlay
+  // anchors (e.g. "stretched link" cards) that Playwright cannot click through
+  // the normal actionability checks because the visible content sits on top.
+  async clickViaScript(locator: Locator, name?: string): Promise<void> {
+    const target = locator.first();
+    await target.waitFor({ state: "attached" });
+    await target.evaluate((el) => (el as HTMLElement).click());
+    console.log(`Clicked (script) on: ${name ?? "element"}`);
+  }
+
   /* ================= WAITS ================= */
   async waitForVisible(locator: Locator, timeout = 5000): Promise<void> {
     await expect(locator).toBeVisible({ timeout });

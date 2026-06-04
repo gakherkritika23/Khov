@@ -1,0 +1,13 @@
+{
+  "home_search": {
+    "term": "Texas",
+    "suggestion": "Dallas"
+  },
+  "region": {
+    "term": "Texas",
+    "suggestion": "Texas"
+  },
+  "endpoint": {
+    "search": "/api/search"
+  }
+}

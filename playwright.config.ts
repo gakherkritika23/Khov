@@ -6,6 +6,12 @@ const testEnv = process.env.TEST_ENV ?? "dev";
 const envPath = path.resolve(process.cwd(), `environment/.env.${testEnv}`);
 dotenv.config({ path: envPath });
 
+if (!process.env.BASE_URL) {
+  throw new Error(
+    `BASE_URL is not set. Create environment/.env.${testEnv} (copy environment/.env.example) and define BASE_URL.`,
+  );
+}
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
@@ -19,7 +25,7 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report", open: "never" }],
   ],
   use: {
-    baseURL: process.env.BASE_URL || "https://www.khov.com/",
+    baseURL: process.env.BASE_URL,
     trace: "on-first-retry",
     browserName: (process.env.BROWSER ?? "chromium") as
       | "chromium"
