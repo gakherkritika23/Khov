@@ -16,7 +16,8 @@ Tracks delivered work, current status per epic, and key decisions. See
 | **Search bar → region page** + **Region → community detail** (SB-01, RG-01, RG-02) | `page-objects/regionPage.ts`, `page-objects/communityDetailPage.ts`, `tests/regionPage.spec.ts` (TC-01) | ✅ prod, stable (~17–27s, 60s timeout) |
 | **Search bar → community page** (SB-03) | `tests/homePage.spec.ts` (TC-02, "River Ranch Trails"); reuses `HomePage` + `CommunityPage` POMs | ✅ prod, stable (~15s) |
 | **Community page header** (CP-01, CP-02) | `page-objects/communityPage.ts`, `tests/communityPage.spec.ts` (Listing Header TC-01 name/price/location, TC-02 onsite sales team + hours) | ✅ prod |
-| **Community floorplan/home cards** (CP-10, CP-14) | `communityPage.ts` + `communityPage.spec.ts` (Floorplan & Home Cards TC-01 cards render, TC-02 "View Home Details" → detail page) | ✅ prod, full suite 7/7 stable (×2) |
+| **Community floorplan/home cards** (CP-10, CP-12, CP-13, CP-14) | `communityPage.spec.ts` Floorplan & Home Cards (cards, images, carousel, CTA→detail) | ✅ prod |
+| **Community QMI section** (CP-20, CP-21, CP-22, CP-23) | `communityPage.spec.ts` Quick Move-In Homes (availability, promo rate, was/now, card→QMI detail) | ✅ prod, full suite 13/13 stable |
 | Rename `communityDetailPage` → `communityPage` | `communityPage.ts`; updated `homePage`/`regionPage` specs (`verifyCommunityPageDisplayed`) | ✅ |
 | Rename `stateSearchPage` → `regionPage` | `regionPage.ts` / `regionPage.spec.ts`; `state_search` → `region` keys in `constants.json` / `test_data.json` | ✅ re-run passing |
 | Code review (pre-commit) | All POM/spec/util files | ✅ passed (1 caveat — see Decisions) |
@@ -32,7 +33,7 @@ Tracks delivered work, current status per epic, and key decisions. See
 | E0 | Framework / helpers | ✅ Done | `typeSequentially`, `clickViaScript`, `waitForApi` timeout |
 | E1 | Search bar | 🟡 Partial | SB-01, SB-02, SB-03 done; SB-04 (suggestion grouping) / SB-05 (no-match) pending |
 | E2 | Region page | 🟡 Partial | RG-01, RG-02 done; maps/filters/sort (RG-03…RG-11) pending |
-| E3 | Community page | 🟡 Partial | Header (CP-01/02) ✅; floorplan/home cards (CP-10/14) ✅; CP-03 modal + CP-11/12/13 deferred; QMI section (CP-20–23) pending |
+| E3 | Community page | 🟡 Nearly done | Header (CP-01/02) ✅; floorplan/home cards + images + carousel (CP-10/12/13/14) ✅; QMI section (CP-20–23) ✅. Remaining: CP-03 (consultant modal — need a community that has it); CP-11 (calculator modal → moved to E5) |
 | E4 | QMI details page | ⬜ Not started | Gallery, pricing, IFP, sticker, CTAs |
 | E5 | Floorplan details page | ⬜ Not started | Gallery, pricing, IFP, CTAs |
 | E6 | Contact form (site-wide) | ⬜ Not started | Shared component, `@form` tests |
@@ -46,21 +47,20 @@ Tracks delivered work, current status per epic, and key decisions. See
 | `tests/homePage.spec.ts` | TC-01 — search 'Texas' → select 'Dallas' → Dallas homes page | @smoke | Home / search bar → market results |
 | `tests/homePage.spec.ts` | TC-02 — search 'River Ranch Trails' → select community → community page | @smoke | Home / search bar → community page |
 | `tests/regionPage.spec.ts` | TC-01 — search 'Texas' → select 'Texas' → first community → detail | @regression | Home → region page → community detail |
-| `tests/communityPage.spec.ts` | Listing Header TC-01 — community page loads (name/price/location) | @smoke | Region → community page header |
-| `tests/communityPage.spec.ts` | Listing Header TC-02 — onsite sales team + office hours displayed | @regression | Community page header |
-| `tests/communityPage.spec.ts` | Floorplan & Home Cards TC-01 — cards render (specs + pricing) | @smoke | Community page floorplan/home cards |
-| `tests/communityPage.spec.ts` | Floorplan & Home Cards TC-02 — "View Home Details" → detail page | @regression | Community → home/floorplan detail |
+| `tests/communityPage.spec.ts` | Listing Header TC-01/02 — loads (name/price/location); sales team + hours | @smoke / @regression | Community page header |
+| `tests/communityPage.spec.ts` | Floorplan & Home Cards TC-01–04 — cards render; images; carousel; "View Home Details" → detail | @smoke / @regression | Community floorplan/home cards |
+| `tests/communityPage.spec.ts` | Quick Move-In Homes TC-01–04 — availability; promo rate; was/now; card → QMI detail | @smoke / @regression | Community QMI section |
 
+All community-page tests are pinned to **River Ranch Trails** (navigated directly).
 POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
 
 ---
 
 ## Next up
 
-1. **E3 QMI section** (CP-20…CP-23) — QMI cards/availability, promo rate, was/now pricing, clickable card/CTA → QMI details. (The "12 Quick Move-in Homes Available" section + `Card_price-last` was/now pricing were observed during discovery.)
-2. **E4 / E5** — QMI & floorplan details pages (reached from E3). Pick up the deferred CP-11/12/13 (calculator modal, gallery/carousel) on the detail pages.
-3. **CP-03** — find a community with a sales-consultant modal (deferred).
-4. Resolve cross-cutting data questions (example communities with promo/was-now/hero-gallery-2.0/QMI sticker).
+1. **CP-03** — find a community with a sales-consultant modal, then add the test pinned to it.
+2. **Verification enrichment** — the user will provide the detailed verifications to layer onto the community-page baseline tests.
+3. **E4 / E5** — QMI & floorplan details pages (reached from E3). Includes CP-11 (calculator modal) which lives on the detail pages.
 
 ---
 
@@ -71,6 +71,7 @@ POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
 - **2026-06-03** — Region community cards navigate via a zero-size "stretched link" anchor whose overlay paints behind content; click handled by `clickViaScript` (programmatic DOM click).
 - **2026-06-03** — Region-page community assertions are kept **robust** (URL pattern + heading naming the clicked community) so they don't break when the "Featured" ordering changes.
 - **2026-06-03** — Renamed `stateSearchPage` → `regionPage` to match the "Region page" terminology in the coverage plan.
+- **2026-06-04** — Completed the community-page baseline coverage (10 tests): added floorplan card images (CP-12), image carousel displayed (CP-13), and the QMI section — availability (CP-20), promo rate (CP-21), was/now pricing (CP-22), QMI card → detail (CP-23). Pinned the whole community spec to **River Ranch Trails via direct navigation** (deterministic for conditional features; the search-bar route is covered by SB-03). Card-image locator uses `:visible` to skip lazy/hidden carousel slides. `navigateToCommunity` waits for `load` so link clicks don't race hydration. CP-11 (calculator modal) reclassified to **E5** (community page only shows a tooltip). CP-03 (consultant modal) still needs a community that has one.
 - **2026-06-04** — CP-14 ("View Home Details" → detail page) made reliable: assert only the detail URL (one segment deeper) — the robust proof of navigation — and dropped the post-click `h1` content check, which raced the navigation and flaked in full-suite runs (both detail-page types do have an h1 on direct load; the issue was timing, not a missing element). Also added `waitForLoadState("load")` after the card click.
 - **2026-06-04** — Client-friendly reporting: `Validator` now wraps every assertion in a boxed `test.step(message, …, { box: true })`, so Allure/HTML reports show plain-English steps (e.g. "Community name should be visible") instead of raw locator code (`getByRole(...).first()`) + `validator.ts` source lines.
 - **2026-06-04** — Set `workers: 1` (serial). The suite drives one live site (khov.com); parallel spec files caused browser contention → timeouts and `0ms` worker crashes. Serial = 7/7 stable (~2 min). Also removed the `scrollIntoView` from `RegionPage.clickFirstCommunity` (region card list re-renders → "element not stable"); `clickViaScript` re-resolves the locator and needs no viewport.

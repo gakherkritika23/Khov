@@ -103,28 +103,31 @@ to be captured during Stage 3.
 ### Floorplan section
 > On the community page, floorplan and QMI homes share one `Card` component
 > ("View Home Details" CTA), and there's no distinct "Floorplans" heading. CP-10/14
-> are covered generically as **home/floorplan cards**. The mortgage figure is an
-> info **tooltip** (not a calculator modal), and the rich gallery/carousel live on
-> the **detail** page — so CP-11/12/13 are deferred to E5.
+> are covered generically as **home/floorplan cards**. The mortgage figure on the
+> community page is an info **tooltip** (not a calculator modal) — the real
+> calculator modal lives on the detail pages, so **CP-11 moves to E5**.
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
 | CP-10 | Floorplan/home cards render (name, specs, pricing) | @smoke | ✅ (`communityPage.spec.ts` Floorplan & Home Cards TC-01) |
-| CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | @regression | ✅ (Floorplan & Home Cards TC-02) |
-| CP-11 | Pricing / Mortgage calculator modal opens, computes, closes | @regression | ⬜ deferred to E5 — community-page figure is a tooltip, not a modal |
-| CP-12 | Static floorplan image(s) render | @regression | ⬜ deferred to E5 |
-| CP-13 | Image carousel navigates (next/prev, indicators) | @regression | ⬜ deferred to E5 |
+| CP-12 | Floorplan/home card image(s) render | @regression | ✅ (Floorplan & Home Cards TC-02) |
+| CP-13 | Image carousel is displayed | @regression | ✅ baseline (Floorplan & Home Cards TC-03); next/prev navigation TBD |
+| CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | @regression | ✅ (Floorplan & Home Cards TC-04) |
+| CP-11 | Pricing / Mortgage calculator modal opens, computes, closes | @regression | ➡️ moved to **E5** — only a tooltip on the community page; real modal is on the detail page |
 
 ### QMI (Quick Move-In) section
-| ID | Test case | Tag |
-|----|-----------|-----|
-| CP-20 | QMI cards render with availability | @smoke |
-| CP-21 | Promo rate badge shown _(if applicable)_ | @regression |
-| CP-22 | Mortgage calculator / pricing (was/now) on QMI card | @regression |
-| CP-23 | Clickable QMI card / CTA → QMI details page | @regression |
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| CP-20 | QMI section shows homes with availability ("Available Now") | @smoke | ✅ (`communityPage.spec.ts` Quick Move-In Homes TC-01) |
+| CP-21 | Promo rate badge shown | @regression | ✅ (Quick Move-In Homes TC-02) |
+| CP-22 | Was/now (discounted) pricing on QMI card | @regression | ✅ (Quick Move-In Homes TC-03) |
+| CP-23 | Clickable QMI card / CTA → QMI details page | @regression | ✅ (Quick Move-In Homes TC-04) |
 
-**Open data questions:** need a community URL that reliably has (a) a sales
-consultant modal, (b) QMI homes, (c) a promo rate, (d) was/now pricing.
+> The community spec is **pinned to River Ranch Trails** (navigated directly) so
+> the conditional features (promo rate, was/now, QMI homes) are deterministic.
+
+**Open data questions:** still need a community that reliably has a **sales
+consultant modal** (CP-03).
 
 ---
 

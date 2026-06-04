@@ -12,6 +12,13 @@ export class CommunityPage extends BasePage {
   readonly homeCards: Locator;
   readonly homeCardPricing: Locator;
   readonly viewHomeDetailsCta: Locator;
+  readonly qmiSectionHeading: Locator;
+  readonly availabilityBadge: Locator;
+  readonly promoRateBadge: Locator;
+  readonly wasPrice: Locator;
+  readonly featuredHomeLink: Locator;
+  readonly cardImage: Locator;
+  readonly carousel: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -31,6 +38,26 @@ export class CommunityPage extends BasePage {
     this.viewHomeDetailsCta = page.getByRole("link", {
       name: "View Home Details",
     });
+    // Quick Move-In (QMI) section.
+    this.qmiSectionHeading = page.getByRole("heading", {
+      name: /Quick Move-in Homes Available/i,
+    });
+    this.availabilityBadge = page.getByText("Available Now");
+    this.promoRateBadge = page.getByText(/Promo Rate/i);
+    this.wasPrice = page.locator("[class*='Card_old-price']");
+    // The featured "Home of the Week" QMI card navigates via a stretched link.
+    this.featuredHomeLink = page.locator("[class*='stretched-link']");
+    // Media. `:visible` avoids lazy/zero-size or hidden carousel-slide images.
+    this.cardImage = page.locator("[class*='Card_'] picture:visible");
+    this.carousel = page.locator("[class*='FeaturedCarousel']");
+  }
+
+  // ── Navigation — Actions ───────────────────────────────
+  async navigateToCommunity(url: string): Promise<void> {
+    await this.navigate(url);
+    // Let the page hydrate before any interactions, so link clicks trigger
+    // client-side navigation reliably.
+    await this.page.waitForLoadState("load");
   }
 
   // ── Navigation — Verification ──────────────────────────
@@ -141,9 +168,65 @@ export class CommunityPage extends BasePage {
   async openFirstHomeDetails(): Promise<void> {
     await this.scrollIntoView(this.viewHomeDetailsCta.first());
     await this.click(this.viewHomeDetailsCta.first(), "View Home Details (first card)");
-    // Wait for the detail page to finish loading before assertions run, so the
-    // heading check doesn't race the navigation.
-    await this.page.waitForLoadState("load");
+    // No waitForLoadState: detail pages are heavy (galleries/IFP) and their
+    // "load" event can take minutes. The URL assertion auto-waits for the
+    // navigation, which is the verification we need.
+  }
+
+  // ── Quick Move-In (QMI) — Verification ─────────────────
+  async verifyQmiSectionIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.qmiSectionHeading.first(),
+      "'Quick Move-in Homes Available' section should be visible",
+      25000,
+    );
+    await Validator.requireVisible(
+      this.availabilityBadge.first(),
+      "A quick move-in availability badge ('Available Now') should be visible",
+      25000,
+    );
+  }
+
+  async verifyPromoRateIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.promoRateBadge.first(),
+      "A quick move-in promo-rate badge should be visible",
+      25000,
+    );
+  }
+
+  async verifyWasNowPricingIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.wasPrice.first(),
+      "Discounted (was/now) pricing should be visible",
+      25000,
+    );
+  }
+
+  // ── Quick Move-In (QMI) — Actions ──────────────────────
+  async openFeaturedQmiHome(): Promise<void> {
+    await this.clickViaScript(
+      this.featuredHomeLink.first(),
+      "featured quick move-in home card",
+    );
+  }
+
+  // ── Media (images / carousel) — Verification ───────────
+  async verifyCardImagesAreDisplayed(): Promise<void> {
+    await this.scrollIntoView(this.cardImage.first());
+    await Validator.requireVisible(
+      this.cardImage.first(),
+      "Floorplan/home card image should be visible",
+      25000,
+    );
+  }
+
+  async verifyCarouselIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.carousel.first(),
+      "An image carousel should be displayed",
+      25000,
+    );
   }
 
   // ── Data Getters ───────────────────────────────────────
