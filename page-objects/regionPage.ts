@@ -53,7 +53,9 @@ export class RegionPage extends BasePage {
 
   // ── New Home Communities — Actions ─────────────────────
   async clickFirstCommunity(): Promise<void> {
-    await this.scrollIntoView(this.firstCommunityCard);
+    // No scrollIntoView: the region card list re-renders as the map/data load,
+    // which makes the first card "unstable". clickViaScript does a DOM click
+    // (re-resolving the locator), so the element need not be in the viewport.
     await this.clickViaScript(this.firstCommunityLink, "first community card");
   }
 

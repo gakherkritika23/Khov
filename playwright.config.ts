@@ -17,7 +17,10 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: undefined,
+  // Serial execution: this suite drives one live external site (khov.com).
+  // Running spec files in parallel makes multiple browsers contend for the same
+  // prod pages, causing timeouts and worker crashes. One worker = reliable.
+  workers: 1,
   reporter: [
     ["list"],
     ["junit", { outputFile: "results.xml" }],
