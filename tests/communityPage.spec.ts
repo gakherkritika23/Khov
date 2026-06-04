@@ -36,6 +36,13 @@ test.describe("Community Page — Listing Header", () => {
     console.log(
       `Community: ${await communityPage.getHeading()} | ${await communityPage.getStartingPriceText()}`,
     );
+
+    // Sales office hours are present (days + timings) and logged.
+    await communityPage.verifySalesOfficeHoursNotEmpty();
+
+    // "Your Onsite Sales Team" opens the contact modal — every section present.
+    await communityPage.openSalesTeamModal();
+    await communityPage.verifySalesTeamModalDetails();
   });
 
   test("TC-02 | Onsite sales team and office hours are displayed @regression", async () => {

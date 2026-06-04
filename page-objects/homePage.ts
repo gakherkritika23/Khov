@@ -19,7 +19,9 @@ export class HomePage extends BasePage {
   // ── Hero Search — Actions ──────────────────────────────
   async navigateToHome(url: string): Promise<void> {
     await this.navigate(url);
-    await this.page.waitForLoadState("load");
+    // Best-effort hydration wait: the home page's "load" event can be slow
+    // (hero video), so cap it and proceed — the search box assertion auto-waits.
+    await this.page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
   }
 
   /**

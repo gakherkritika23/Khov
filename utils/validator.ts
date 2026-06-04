@@ -78,4 +78,14 @@ export class Validator {
       { box: true },
     );
   }
+
+  static async requireNotEmpty(value: string, message: string): Promise<void> {
+    await test.step(
+      message,
+      async () => {
+        expect(value.trim(), message).not.toBe("");
+      },
+      { box: true },
+    );
+  }
 }

@@ -19,6 +19,15 @@ export class CommunityPage extends BasePage {
   readonly featuredHomeLink: Locator;
   readonly cardImage: Locator;
   readonly carousel: Locator;
+  readonly salesOfficeSchedule: Locator;
+  readonly salesOfficeRows: Locator;
+  readonly salesTeamModal: Locator;
+  readonly modalOnsiteTeamHeading: Locator;
+  readonly modalCallLink: Locator;
+  readonly modalAddress: Locator;
+  readonly modalHours: Locator;
+  readonly consultantNames: Locator;
+  readonly consultantPhotos: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -50,14 +59,42 @@ export class CommunityPage extends BasePage {
     // Media. `:visible` avoids lazy/zero-size or hidden carousel-slide images.
     this.cardImage = page.locator("[class*='Card_'] picture:visible");
     this.carousel = page.locator("[class*='FeaturedCarousel']");
+    // On-page sales office hours schedule (day labels + time values).
+    this.salesOfficeSchedule = page.locator(
+      "[class*='SalesCenterOperationHours']",
+    );
+    // Each schedule row (<li>) holds a day label (<span>) + a <time> value.
+    this.salesOfficeRows = page.locator(
+      "[class*='SalesCenterOperationHours_content'] li",
+    );
+    // "Your Onsite Sales Team" contact modal and its detail sections.
+    this.salesTeamModal = page.locator("[class*='Modal_bottom']");
+    this.modalOnsiteTeamHeading = this.salesTeamModal.getByText(
+      "Our Onsite Team",
+    );
+    this.modalCallLink = this.salesTeamModal.getByRole("link", {
+      name: /^Call/i,
+    });
+    this.modalAddress = this.salesTeamModal.getByText(/,\s*(Texas|TX)\b/i);
+    // Hours rows that carry both a weekday and a time range.
+    this.modalHours = this.salesTeamModal.getByText(
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday).*(AM|PM)/i,
+    );
+    this.consultantNames = this.salesTeamModal.locator(
+      "[class*='Modal_sales-agents'] p.b2",
+    );
+    this.consultantPhotos = this.salesTeamModal.locator(
+      "[class*='Modal_avatar']",
+    );
   }
 
   // ── Navigation — Actions ───────────────────────────────
   async navigateToCommunity(url: string): Promise<void> {
     await this.navigate(url);
-    // Let the page hydrate before any interactions, so link clicks trigger
-    // client-side navigation reliably.
-    await this.page.waitForLoadState("load");
+    // Best-effort hydration wait: the community page's "load" event can be very
+    // slow (galleries/video/maps), so cap it and proceed — assertions auto-wait
+    // and click() waits for its target, so we don't need a guaranteed load.
+    await this.page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
   }
 
   // ── Navigation — Verification ──────────────────────────
@@ -120,6 +157,115 @@ export class CommunityPage extends BasePage {
       "Community Location block should be visible",
       25000,
     );
+  }
+
+  async verifySalesOfficeHoursNotEmpty(): Promise<void> {
+    await Validator.requireVisible(
+      this.salesOfficeSchedule.first(),
+      "Sales office hours block should be visible",
+      25000,
+    );
+    await Validator.requireVisible(
+      this.salesOfficeRows.first(),
+      "Sales office schedule rows should be visible",
+      25000,
+    );
+
+    const rowCount = await this.salesOfficeRows.count();
+    for (let i = 0; i < rowCount; i++) {
+      const row = this.salesOfficeRows.nth(i);
+      const day = (await row.locator("> span").first().innerText()).trim();
+      const time = (await row.locator("time").first().innerText()).trim();
+      await Validator.requireNotEmpty(
+        day,
+        `Sales office day label (row ${i + 1}) should not be empty`,
+      );
+      await Validator.requireNotEmpty(
+        time,
+        `Sales office timing (row ${i + 1}) should not be empty`,
+      );
+      console.log(`Sales office hours — ${day}: ${time}`);
+    }
+  }
+
+  // ── Onsite Sales Team Modal — Actions ──────────────────
+  async openSalesTeamModal(): Promise<void> {
+    // "Your Onsite Sales Team" is a JS-only link (no href) — it needs React
+    // hydration to open the modal. If the page wasn't hydrated when first
+    // clicked, give it time to hydrate, then retry.
+    await this.click(this.onsiteSalesTeam.first(), "Your Onsite Sales Team");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (await this.salesTeamModal.first().isVisible().catch(() => false)) break;
+      await this.page.waitForLoadState("load", { timeout: 12000 }).catch(() => {});
+      if (await this.salesTeamModal.first().isVisible().catch(() => false)) break;
+      await this.click(
+        this.onsiteSalesTeam.first(),
+        "Your Onsite Sales Team (retry)",
+      );
+    }
+    await Validator.requireVisible(
+      this.salesTeamModal.first(),
+      "Onsite sales team modal should open",
+      12000,
+    );
+  }
+
+  // ── Onsite Sales Team Modal — Verification ─────────────
+  /**
+   * Validates every section of the contact modal is present AND carries a
+   * value (no empty section), and logs the values.
+   */
+  async verifySalesTeamModalDetails(): Promise<void> {
+    await Validator.requireVisible(
+      this.modalOnsiteTeamHeading.first(),
+      "Modal 'Our Onsite Team' heading should be visible",
+    );
+    await Validator.requireVisible(
+      this.modalCallLink.first(),
+      "Modal phone (Call) link should be visible",
+    );
+    await Validator.requireVisible(
+      this.modalAddress.first(),
+      "Modal community address should be visible",
+    );
+    await Validator.requireVisible(
+      this.modalHours.first(),
+      "Modal sales-office hours should be visible",
+    );
+    await Validator.requireVisible(
+      this.consultantNames.first(),
+      "At least one consultant name should be visible",
+    );
+    await Validator.requireVisible(
+      this.consultantPhotos.first(),
+      "At least one consultant photo should be visible",
+    );
+
+    const phone = (await this.modalCallLink.first().innerText()).trim();
+    const address = (await this.modalAddress.first().innerText())
+      .replace(/\s+/g, " ")
+      .trim();
+    const hours = (await this.modalHours.allInnerTexts())
+      .map((t) => t.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("; ");
+    const names = (await this.consultantNames.allInnerTexts())
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    await Validator.requireNotEmpty(phone, "Modal phone number should not be empty");
+    await Validator.requireNotEmpty(address, "Modal address should not be empty");
+    await Validator.requireNotEmpty(hours, "Modal sales hours should not be empty");
+    await Validator.requireNotEmpty(
+      names.join(""),
+      "Modal consultant names should not be empty",
+    );
+
+    console.log(`Modal phone: ${phone}`);
+    console.log(`Modal address: ${address}`);
+    console.log(`Modal hours: ${hours}`);
+    console.log(`Modal consultants: ${names.join(", ")}`);
+    console.log(`Modal consultant photos: ${await this.consultantPhotos.count()}`);
   }
 
   async verifyOnsiteSalesTeamIsDisplayed(): Promise<void> {
