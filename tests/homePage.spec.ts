@@ -11,7 +11,7 @@ test.describe("Home Page — Hero Search", () => {
     await homePage.navigateToHome(constants.home_page.url);
   });
 
-  test("@smoke TC-01 | Searching 'Texas' and selecting 'Dallas' opens the Dallas homes page", async () => {
+  test("TC-01 | Searching 'Texas' and selecting 'Dallas' opens the Dallas homes page @smoke", async () => {
     await homePage.verifySearchInputIsDisplayed();
 
     await homePage.searchAndSelectSuggestion(

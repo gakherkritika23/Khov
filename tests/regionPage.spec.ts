@@ -17,7 +17,7 @@ test.describe("Region Page — Community Results", () => {
     await homePage.navigateToHome(constants.home_page.url);
   });
 
-  test("@regression TC-01 | Selecting 'Texas' suggestion then the first community opens its detail page", async () => {
+  test("TC-01 | Selecting 'Texas' suggestion then the first community opens its detail page @regression", async () => {
     // Multi-page journey on prod (home → region page → community detail);
     // give it headroom over the 30s default to absorb network variance.
     test.setTimeout(60000);
