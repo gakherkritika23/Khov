@@ -61,6 +61,6 @@ test.describe("Community Page — Floorplan & Home Cards", () => {
     await communityPage.verifyHomeDetailOpened(
       constants.community.home_detail_url_pattern,
     );
-    console.log(`Detail heading: ${await communityPage.getHeading()}`);
+    console.log(`Opened detail page: ${await communityPage.getUrl()}`);
   });
 });

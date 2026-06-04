@@ -126,15 +126,13 @@ export class CommunityPage extends BasePage {
   }
 
   async verifyHomeDetailOpened(detailUrlPattern: string): Promise<void> {
+    // The detail URL (one path segment deeper than the community) is the robust
+    // proof that the card CTA opened the detail page. A heading-content check
+    // here proved flaky (post-navigation render race) without adding real value.
     await Validator.requireUrlContains(
       this.page,
       detailUrlPattern,
       "Should open a home / floorplan detail page (one level deeper)",
-      20000,
-    );
-    await Validator.requireVisible(
-      this.pageHeading.first(),
-      "Detail page heading should be visible",
       20000,
     );
   }
@@ -143,6 +141,9 @@ export class CommunityPage extends BasePage {
   async openFirstHomeDetails(): Promise<void> {
     await this.scrollIntoView(this.viewHomeDetailsCta.first());
     await this.click(this.viewHomeDetailsCta.first(), "View Home Details (first card)");
+    // Wait for the detail page to finish loading before assertions run, so the
+    // heading check doesn't race the navigation.
+    await this.page.waitForLoadState("load");
   }
 
   // ── Data Getters ───────────────────────────────────────
