@@ -13,6 +13,7 @@
     "regression:dev": "cross-env TEST_ENV=dev npx playwright test --project=regression",
     "regression:uat": "cross-env TEST_ENV=uat npx playwright test --project=regression",
     "regression:prod": "cross-env TEST_ENV=prod npx playwright test --project=regression",
+    "report:client": "ts-node scripts/generate-client-report.ts",
     "allure:generate": "npx allure generate allure-results --clean -o allure-report",
     "allure:open": "npx allure open allure-report"
   },
