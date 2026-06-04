@@ -7,6 +7,10 @@
     "term": "Texas",
     "suggestion": "Texas"
   },
+  "community_search": {
+    "term": "River Ranch Trails",
+    "suggestion": "River Ranch Trails"
+  },
   "endpoint": {
     "search": "/api/search"
   }

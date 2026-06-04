@@ -20,7 +20,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | Epic | Page | POM (`page-objects/`) | Spec (`tests/`) | Status |
 |------|------|-----------------------|-----------------|--------|
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
-| E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 |
+| E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
 | E3 | Community page | `communityPage.ts` _(new)_ | `communityPage.spec.ts` _(new)_ | ⬜ |
 | E4 | QMI details page | `qmiDetailPage.ts` _(new)_ | `qmiDetailPage.spec.ts` _(new)_ | ⬜ |
@@ -53,7 +53,7 @@ Done as part of the first two specs:
 |----|-----------|-----|--------|
 | SB-01 | Search a state/region term → select region suggestion → land on region page | @smoke | ✅ (`regionPage.spec.ts` TC-01 covers the region-suggestion path) |
 | SB-02 | Search a market/city term → select suggestion → land on results page | @smoke | ✅ (`homePage.spec.ts` TC-01 — Texas → Dallas) |
-| SB-03 | Search a **community name** → select community suggestion → land directly on that **community page** | @regression | ⬜ |
+| SB-03 | Search a **community name** → select community suggestion → land directly on that **community page** | @smoke | ✅ (`homePage.spec.ts` TC-02 — "River Ranch Trails") |
 | SB-04 | Suggestion list groups/renders for partial input (markets, counties, communities) | @regression | ⬜ |
 | SB-05 | Empty / no-match query shows appropriate state | @regression | ⬜ |
 
