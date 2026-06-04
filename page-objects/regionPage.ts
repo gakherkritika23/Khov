@@ -27,6 +27,12 @@ export class RegionPage extends BasePage {
     );
   }
 
+  // ── New Home Communities — Actions ─────────────────────
+  async navigateToRegion(url: string): Promise<void> {
+    await this.navigate(url);
+    await this.page.waitForLoadState("load");
+  }
+
   // ── New Home Communities — Verification ────────────────
   async verifyOnRegionPage(expectedUrlPart: string): Promise<void> {
     await Validator.requireUrlContains(

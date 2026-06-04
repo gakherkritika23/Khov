@@ -1,16 +1,16 @@
 import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
-import { CommunityDetailPage } from "../page-objects/communityDetailPage";
+import { CommunityPage } from "../page-objects/communityPage";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
 test.describe("Home Page — Hero Search", () => {
   let homePage: HomePage;
-  let communityDetailPage: CommunityDetailPage;
+  let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
-    communityDetailPage = new CommunityDetailPage(page);
+    communityPage = new CommunityPage(page);
     await homePage.navigateToHome(constants.home_page.url);
   });
 
@@ -41,10 +41,10 @@ test.describe("Home Page — Hero Search", () => {
       testData.endpoint.search,
     );
 
-    await communityDetailPage.verifyCommunityDetailDisplayed(
+    await communityPage.verifyCommunityPageDisplayed(
       constants.community.river_ranch_trails_url,
       constants.community.river_ranch_trails_heading,
     );
-    console.log(`Community heading: ${await communityDetailPage.getHeading()}`);
+    console.log(`Community heading: ${await communityPage.getHeading()}`);
   });
 });

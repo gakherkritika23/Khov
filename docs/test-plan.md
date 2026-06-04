@@ -22,13 +22,14 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
-| E3 | Community page | `communityPage.ts` _(new)_ | `communityPage.spec.ts` _(new)_ | ⬜ |
+| E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | 🟡 (header ✅) |
 | E4 | QMI details page | `qmiDetailPage.ts` _(new)_ | `qmiDetailPage.spec.ts` _(new)_ | ⬜ |
 | E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
 | E6 | Contact form (site-wide) | `contactForm.ts` _(new, shared)_ | `contactForm.spec.ts` _(new)_ | ⬜ |
 
-`communityDetailPage.ts` already exists as a thin POM used to verify navigation
-landed on a community detail page; it will be folded into / extended by E3.
+The thin navigation-verification POM was **renamed `communityDetailPage.ts` →
+`communityPage.ts`** and extended for E3 (it's the single Community-page POM,
+also reused by `homePage`/`regionPage` specs for the post-navigation check).
 
 ---
 
@@ -93,20 +94,26 @@ to be captured during Stage 3.
 > sales consultant modals). Floorplan section. QMI section."
 
 ### Listing / header
-| ID | Test case | Tag |
-|----|-----------|-----|
-| CP-01 | Community page loads (name heading, starting price, address) | @smoke |
-| CP-02 | Sales office hours displayed | @regression |
-| CP-03 | Sales consultant modal opens / closes with expected content | @regression |
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| CP-01 | Community page loads (name heading, starting price, location) | @smoke | ✅ (`communityPage.spec.ts` TC-01) |
+| CP-02 | Onsite sales team + sales office hours displayed | @regression | ✅ (`communityPage.spec.ts` TC-02) |
+| CP-03 | Sales consultant modal opens / closes with expected content | @regression | ⬜ deferred — no distinct consultant modal on River Ranch Trails (only Call / Request a Tour / Self Tour / Contact Us). Needs a community that has one. |
 
 ### Floorplan section
-| ID | Test case | Tag |
-|----|-----------|-----|
-| CP-10 | Floorplan cards render (name, price, beds/baths/sqft metadata) | @smoke |
-| CP-11 | Pricing / Mortgage calculator modal opens, computes, closes | @regression |
-| CP-12 | Static floorplan image(s) render | @regression |
-| CP-13 | Image carousel navigates (next/prev, indicators) | @regression |
-| CP-14 | Floorplan CTA navigates to the floorplan details page | @regression |
+> On the community page, floorplan and QMI homes share one `Card` component
+> ("View Home Details" CTA), and there's no distinct "Floorplans" heading. CP-10/14
+> are covered generically as **home/floorplan cards**. The mortgage figure is an
+> info **tooltip** (not a calculator modal), and the rich gallery/carousel live on
+> the **detail** page — so CP-11/12/13 are deferred to E5.
+
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| CP-10 | Floorplan/home cards render (name, specs, pricing) | @smoke | ✅ (`communityPage.spec.ts` Floorplan & Home Cards TC-01) |
+| CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | @regression | ✅ (Floorplan & Home Cards TC-02) |
+| CP-11 | Pricing / Mortgage calculator modal opens, computes, closes | @regression | ⬜ deferred to E5 — community-page figure is a tooltip, not a modal |
+| CP-12 | Static floorplan image(s) render | @regression | ⬜ deferred to E5 |
+| CP-13 | Image carousel navigates (next/prev, indicators) | @regression | ⬜ deferred to E5 |
 
 ### QMI (Quick Move-In) section
 | ID | Test case | Tag |

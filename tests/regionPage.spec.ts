@@ -1,26 +1,26 @@
 import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
 import { RegionPage } from "../page-objects/regionPage";
-import { CommunityDetailPage } from "../page-objects/communityDetailPage";
+import { CommunityPage } from "../page-objects/communityPage";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
 test.describe("Region Page — Community Results", () => {
   let homePage: HomePage;
   let regionPage: RegionPage;
-  let communityDetailPage: CommunityDetailPage;
+  let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
     homePage = new HomePage(page);
     regionPage = new RegionPage(page);
-    communityDetailPage = new CommunityDetailPage(page);
+    communityPage = new CommunityPage(page);
     await homePage.navigateToHome(constants.home_page.url);
   });
 
   test("TC-01 | Selecting 'Texas' suggestion then the first community opens its detail page @regression", async () => {
     // Multi-page journey on prod (home → region page → community detail);
     // give it headroom over the 30s default to absorb network variance.
-    test.setTimeout(60000);
+    test.setTimeout(90000);
 
     await homePage.searchAndSelectSuggestion(
       testData.region.term,
@@ -36,10 +36,10 @@ test.describe("Region Page — Community Results", () => {
 
     await regionPage.clickFirstCommunity();
 
-    await communityDetailPage.verifyCommunityDetailDisplayed(
+    await communityPage.verifyCommunityPageDisplayed(
       constants.region.community_detail_url_pattern,
       firstCommunity,
     );
-    console.log(`Community detail heading: ${await communityDetailPage.getHeading()}`);
+    console.log(`Community detail heading: ${await communityPage.getHeading()}`);
   });
 });

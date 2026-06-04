@@ -22,6 +22,7 @@
   },
   "community": {
     "river_ranch_trails_url": "/new-construction-homes/texas/dayton/river-ranch-trails/",
-    "river_ranch_trails_heading": "River Ranch Trails"
+    "river_ranch_trails_heading": "River Ranch Trails",
+    "home_detail_url_pattern": "new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+"
   }
 }

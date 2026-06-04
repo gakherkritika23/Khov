@@ -37,7 +37,8 @@ export class Validator {
     page: Page,
     expected: string,
     message: string,
+    timeout = 10000,
   ): Promise<void> {
-    await expect(page, message).toHaveURL(new RegExp(expected));
+    await expect(page, message).toHaveURL(new RegExp(expected), { timeout });
   }
 }
