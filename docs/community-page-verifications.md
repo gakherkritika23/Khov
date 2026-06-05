@@ -50,67 +50,27 @@ _One test covers the whole listing header._
 
 ---
 
-## Block — Floorplan Meta Data
+## Block 2 — Floorplan Section
 
-### TC-01 | Every floorplan displays complete meta data  `@regression`
-Iterates all floorplans; for each, asserts the block is displayed and parses its
-meta values, requiring none to be empty/zero/missing (baths may be decimal):
+One test covers the whole floorplan section, in order (detail navigation is last
+since it leaves the page).
 
-| Field | Rule |
-|-------|------|
-| Sq ft | numeric, > 0 |
-| Story / Stories | numeric, > 0 |
-| Beds | numeric, > 0 |
-| Baths | numeric, > 0 (decimal allowed, e.g. 2.5) |
-| Cars | numeric, > 0 |
-| Estimated payment | `$` amount, > 0 |
-| Mortgage calculation information | text present |
-| Starting price | `$` amount, > 0 |
-| "Starting price may include lot premium" | disclaimer text present |
-
-All parsed values are logged per floorplan; the floorplan blocks lazy-render, so
-each is scrolled into view before reading.
-
-## Block — Floorplan Mortgage Calculator
-
-### TC-01 | Calculator opens, fields populated, recalculates, closes  `@regression`
+### TC-01 | Cards, images, carousel, meta data, mortgage calculator, detail nav  `@regression`
 | # | Verification | How |
 |---|--------------|-----|
-| 1 | A **random floorplan's** mortgage calculator opens | Scroll a random floorplan info icon (`[class*='TitleBlock_popover-trigger']`) into view, tap it → popover "Mortgage Calculator" CTA → modal "Calculate your mortgage" |
-| 2 | **All fields populated** + estimated payment shown | Top `$` estimated payment > 0; every modal text input (Price, Down Payment %/$, Interest Rate, Mortgage Amount, …) has a non-empty value; logged |
-| 3 | **Down Payment % ↑ → payment decreases** | Capture top price, set Down Payment %, blur (Tab); assert recalculated to a new $ value that is lower |
-| 4 | **Interest Rate ↑ → payment increases** | same pattern, higher |
-| 5 | **Price ↑ → payment increases** | same pattern, higher |
-| 6 | **30→15-year term → payment increases** | toggle 15-Year Loan; assert higher |
-| 7 | **Modal closes** | click X; assert hidden |
+| 1 | Floorplan/home **cards** render (specs + pricing) | VISIBLE — `[class*='Card_specifications']` + `[class*='Card_pricing']`; card count logged |
+| 2 | Card **images** render | VISIBLE — `[class*='Card_'] picture:visible` |
+| 3 | **Image carousel** shown | VISIBLE — `[class*='FeaturedCarousel']` |
+| 4 | **Every floorplan's meta data** present & non-zero | Per floorplan (scrolled into view): Sq ft, Story/Stories, Beds, Baths (decimal ok), Cars, Estimated payment, "Mortgage calculation information", Starting price, lot-premium disclaimer — none empty/0/missing; values logged |
+| 5 | **Mortgage calculator** opens (random floorplan) | Scroll info icon (`[class*='TitleBlock_popover-trigger']`) → tap → "Mortgage Calculator" CTA → modal "Calculate your mortgage" |
+| 6 | Calculator **fields populated** | Top `$` estimated payment > 0; every text input non-empty; logged |
+| 7 | **Recalculation + direction** | Down Payment % ↑ → payment down; Interest Rate ↑ → up; Price ↑ → up; 30→15-yr → up (capture → edit → blur; assert changed + direction) |
+| 8 | Calculator **closes** | click X; assert hidden |
+| 9 | Card **CTA → detail page** (last) | click "View Home Details"; URL one level deeper (`new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+`) |
 
-> Pinned to River Ranch Trails; floorplan is chosen at random and logged. The
-> price check is "recalculates + direction" (not exact-formula, since the site
+> Pinned to River Ranch Trails. The random floorplan used for the calculator is
+> logged. Price check = "recalculates + direction" (not exact formula; the site
 > adds tax/insurance/HOA).
-
-## Block 2 — Floorplan & Home Cards
-
-### TC-01 | Floorplan/home cards render with specs and pricing  `@smoke`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | Card **specs** (name + beds/baths/sqft) render | VISIBLE — `[class*='Card_specifications']` |
-| 2 | Card **pricing** renders | VISIBLE — `[class*='Card_pricing']` |
-
-### TC-02 | Floorplan/home card images are displayed  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | A card **image** is shown | VISIBLE — `[class*='Card_'] picture:visible` (`:visible` skips lazy/hidden carousel slides) |
-
-### TC-03 | Image carousel is displayed  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | An **image carousel** is shown | VISIBLE — `[class*='FeaturedCarousel']` |
-
-### TC-04 | "View Home Details" opens a floorplan/home detail page  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | The card **CTA** is clicked | *(implicit)* — "View Home Details" link visible & clicked |
-| 2 | A **detail page** opens (one level deeper) | URL contains `new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+` |
 
 ---
 

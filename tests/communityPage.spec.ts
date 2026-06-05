@@ -49,81 +49,28 @@ test.describe("Community Page — Listing Header", () => {
   });
 });
 
-test.describe("Community Page — Floorplan & Home Cards", () => {
+test.describe("Community Page — Floorplan Section", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
+    test.setTimeout(120000);
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Floorplan/home cards render with specs and pricing @smoke", async () => {
+  test("TC-01 | Floorplan section — cards, images, carousel, meta data, mortgage calculator and detail navigation @regression", async () => {
+    // Floorplan/home cards: render with specs + pricing, images, carousel.
     await communityPage.verifyHomeCardsAreDisplayed();
     console.log(`Home/floorplan cards: ${await communityPage.getHomeCardCount()}`);
-  });
-
-  test("TC-02 | Floorplan/home card images are displayed @regression", async () => {
     await communityPage.verifyCardImagesAreDisplayed();
-  });
-
-  test("TC-03 | Image carousel is displayed @regression", async () => {
     await communityPage.verifyCarouselIsDisplayed();
-  });
 
-  test("TC-04 | 'View Home Details' opens a floorplan/home detail page @regression", async () => {
-    await communityPage.openFirstHomeDetails();
-    await communityPage.verifyHomeDetailOpened(
-      constants.community.home_detail_url_pattern,
-    );
-    console.log(`Opened detail page: ${await communityPage.getUrl()}`);
-  });
-});
+    // Every floorplan shows complete, non-empty meta data.
+    await communityPage.verifyAllFloorplanMetaData();
 
-test.describe("Community Page — Quick Move-In Homes", () => {
-  let communityPage: CommunityPage;
-
-  test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
-    communityPage = await openCommunity(page);
-  });
-
-  test("TC-01 | Quick move-in homes section shows homes with availability @smoke", async () => {
-    await communityPage.verifyQmiSectionIsDisplayed();
-  });
-
-  test("TC-02 | Quick move-in promo rate is displayed @regression", async () => {
-    await communityPage.verifyPromoRateIsDisplayed();
-  });
-
-  test("TC-03 | Quick move-in was/now (discounted) pricing is displayed @regression", async () => {
-    await communityPage.verifyWasNowPricingIsDisplayed();
-  });
-
-  test("TC-04 | Quick move-in home card opens its detail page @regression", async () => {
-    await communityPage.openFeaturedQmiHome();
-    await communityPage.verifyHomeDetailOpened(
-      constants.community.home_detail_url_pattern,
-    );
-    console.log(`Opened QMI detail: ${await communityPage.getUrl()}`);
-  });
-});
-
-test.describe("Community Page — Floorplan Mortgage Calculator", () => {
-  let communityPage: CommunityPage;
-
-  test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
-    communityPage = await openCommunity(page);
-  });
-
-  test("TC-01 | Floorplan mortgage calculator opens, validates fields, recalculates and closes @regression", async () => {
-    // Random floorplan → info icon → "Mortgage Calculator" → modal.
+    // Mortgage calculator: open a random floorplan's, validate fields,
+    // recalculate per input (direction), then close.
     await communityPage.openRandomFloorplanMortgageCalculator();
-
-    // Every field has data and the estimated payment shows at the top.
     await communityPage.verifyCalculatorFieldsHaveData();
-
-    // Edit each input; the top price recalculates in the expected direction.
     await communityPage.verifyPaymentRecalculates(
       "Down Payment % up",
       () =>
@@ -159,12 +106,18 @@ test.describe("Community Page — Floorplan Mortgage Calculator", () => {
       () => communityPage.selectLoanTerm("15"),
       "up",
     );
-
     await communityPage.closeMortgageCalculator();
+
+    // Card CTA opens a floorplan/home detail page — LAST (it leaves the page).
+    await communityPage.openFirstHomeDetails();
+    await communityPage.verifyHomeDetailOpened(
+      constants.community.home_detail_url_pattern,
+    );
+    console.log(`Opened detail page: ${await communityPage.getUrl()}`);
   });
 });
 
-test.describe("Community Page — Floorplan Meta Data", () => {
+test.describe("Community Page — Quick Move-In Homes", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
@@ -172,7 +125,23 @@ test.describe("Community Page — Floorplan Meta Data", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Every floorplan displays complete meta data (specs, payment, price) @regression", async () => {
-    await communityPage.verifyAllFloorplanMetaData();
+  test("TC-01 | Quick move-in homes section shows homes with availability @smoke", async () => {
+    await communityPage.verifyQmiSectionIsDisplayed();
+  });
+
+  test("TC-02 | Quick move-in promo rate is displayed @regression", async () => {
+    await communityPage.verifyPromoRateIsDisplayed();
+  });
+
+  test("TC-03 | Quick move-in was/now (discounted) pricing is displayed @regression", async () => {
+    await communityPage.verifyWasNowPricingIsDisplayed();
+  });
+
+  test("TC-04 | Quick move-in home card opens its detail page @regression", async () => {
+    await communityPage.openFeaturedQmiHome();
+    await communityPage.verifyHomeDetailOpened(
+      constants.community.home_detail_url_pattern,
+    );
+    console.log(`Opened QMI detail: ${await communityPage.getUrl()}`);
   });
 });
