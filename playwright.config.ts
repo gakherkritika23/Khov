@@ -24,7 +24,9 @@ export default defineConfig({
   reporter: [
     ["list"],
     ["junit", { outputFile: "results.xml" }],
-    ["allure-playwright", { outputFolder: "allure-results" }],
+    // detail: false → Allure records only named test.step() verifications,
+    // dropping low-level pw:api/expect steps (locator code, file:line, snippets).
+    ["allure-playwright", { outputFolder: "allure-results", detail: false }],
     ["html", { outputFolder: "playwright-report", open: "never" }],
   ],
   use: {
