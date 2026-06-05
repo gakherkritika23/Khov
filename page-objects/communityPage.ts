@@ -1,6 +1,7 @@
 import { Page, Locator } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
+import { dismissCookieBanner } from "../utils/cookieUtils";
 
 export class CommunityPage extends BasePage {
   readonly pageHeading: Locator;
@@ -28,6 +29,7 @@ export class CommunityPage extends BasePage {
   readonly modalHours: Locator;
   readonly consultantNames: Locator;
   readonly consultantPhotos: Locator;
+  readonly modalCloseButton: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -86,6 +88,11 @@ export class CommunityPage extends BasePage {
     this.consultantPhotos = this.salesTeamModal.locator(
       "[class*='Modal_avatar']",
     );
+    // Close (X) control lives in the modal dialog wrapper (CircleIconButton is
+    // reused across the page, so it MUST be scoped to the modal dialog).
+    this.modalCloseButton = page.locator(
+      "[class*='Modal_dialog'] [class*='CircleIconButton']",
+    );
   }
 
   // ── Navigation — Actions ───────────────────────────────
@@ -95,6 +102,7 @@ export class CommunityPage extends BasePage {
     // slow (galleries/video/maps), so cap it and proceed — assertions auto-wait
     // and click() waits for its target, so we don't need a guaranteed load.
     await this.page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
+    await dismissCookieBanner(this.page);
   }
 
   // ── Navigation — Verification ──────────────────────────
@@ -191,22 +199,29 @@ export class CommunityPage extends BasePage {
   // ── Onsite Sales Team Modal — Actions ──────────────────
   async openSalesTeamModal(): Promise<void> {
     // "Your Onsite Sales Team" is a JS-only link (no href) — it needs React
-    // hydration to open the modal. If the page wasn't hydrated when first
-    // clicked, give it time to hydrate, then retry.
-    await this.click(this.onsiteSalesTeam.first(), "Your Onsite Sales Team");
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (await this.salesTeamModal.first().isVisible().catch(() => false)) break;
-      await this.page.waitForLoadState("load", { timeout: 12000 }).catch(() => {});
-      if (await this.salesTeamModal.first().isVisible().catch(() => false)) break;
+    // hydration to open the modal. Click, then WAIT for the modal (don't poll
+    // instantly: that re-clicks while it animates in and the open overlay then
+    // intercepts the click). Only retry if it genuinely didn't open.
+    for (let attempt = 1; attempt <= 3; attempt++) {
       await this.click(
         this.onsiteSalesTeam.first(),
-        "Your Onsite Sales Team (retry)",
+        attempt === 1
+          ? "Your Onsite Sales Team"
+          : "Your Onsite Sales Team (retry)",
       );
+      const opened = await this.salesTeamModal
+        .first()
+        .waitFor({ state: "visible", timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) return;
+      // Not hydrated yet — let it hydrate, then retry the click.
+      await this.page.waitForLoadState("load", { timeout: 10000 }).catch(() => {});
     }
     await Validator.requireVisible(
       this.salesTeamModal.first(),
       "Onsite sales team modal should open",
-      12000,
+      8000,
     );
   }
 
@@ -266,6 +281,15 @@ export class CommunityPage extends BasePage {
     console.log(`Modal hours: ${hours}`);
     console.log(`Modal consultants: ${names.join(", ")}`);
     console.log(`Modal consultant photos: ${await this.consultantPhotos.count()}`);
+  }
+
+  async closeSalesTeamModal(): Promise<void> {
+    await this.click(this.modalCloseButton.first(), "Close onsite sales team modal");
+    await Validator.requireHidden(
+      this.salesTeamModal.first(),
+      "Onsite sales team modal should close",
+      10000,
+    );
   }
 
   async verifyOnsiteSalesTeamIsDisplayed(): Promise<void> {

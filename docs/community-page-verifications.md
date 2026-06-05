@@ -17,6 +17,10 @@ covered separately by SB-03 (`homePage.spec.ts`).
 
 > If River Ranch Trails is ever retired, update `constants.community.river_ranch_trails_url`.
 
+On first navigation the **cookie consent banner** ("By browsing… → OK") is
+dismissed automatically (`utils/cookieUtils.ts` `dismissCookieBanner`, called from
+`navigateToHome` / `navigateToCommunity`). It's best-effort — safe when absent.
+
 ## Verification types
 | Type | Helper | Meaning |
 |------|--------|---------|
@@ -39,7 +43,7 @@ as plain English (e.g. "Starting price should be displayed…") rather than loca
 | 3 | **Starting price** line is shown | VISIBLE — hero subtitle containing "Starting" |
 | 4 | **Community Location** block is shown | VISIBLE — "Community Location" |
 | 5 | **Sales office hours** are present & non-empty | VISIBLE schedule (`[class*='SalesCenterOperationHours']`); for each `<li>` row, day label + `<time>` are non-empty; **logs** each `day: time` (e.g. `Thursday to Saturday: 10:00 AM - 6:00 PM`) |
-| 6 | **"Your Onsite Sales Team" modal** opens and every section has a value | Clicks the CTA → modal `[class*='Modal_bottom']`. Asserts VISIBLE + non-empty (and **logs**): "Our Onsite Team" heading, phone/Call link, community address, sales hours, ≥1 consultant name, ≥1 consultant photo. Fails if any section is empty. |
+| 6 | **"Your Onsite Sales Team" modal** opens, every section has a value, then closes | Clicks the CTA → modal `[class*='Modal_bottom']`. Asserts VISIBLE + non-empty (and **logs**): "Our Onsite Team" heading, phone/Call link, community address, sales hours, ≥1 consultant name, ≥1 consultant photo. Fails if any section is empty. Then **closes the modal** (X / `CircleIconButton`) and asserts it's hidden. |
 
 ### TC-02 | Onsite sales team and office hours are displayed  `@regression`
 | # | Verification | How |

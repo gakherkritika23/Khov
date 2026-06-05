@@ -43,6 +43,7 @@ test.describe("Community Page — Listing Header", () => {
     // "Your Onsite Sales Team" opens the contact modal — every section present.
     await communityPage.openSalesTeamModal();
     await communityPage.verifySalesTeamModalDetails();
+    await communityPage.closeSalesTeamModal();
   });
 
   test("TC-02 | Onsite sales team and office hours are displayed @regression", async () => {
