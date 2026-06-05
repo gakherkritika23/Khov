@@ -80,7 +80,7 @@ test.describe("QMI Details Page — Pricing", () => {
 
   test("QD-04b | Mortgage calculator popover opens @regression", async () => {
     await qmiPage.openMortgageCalculator();
-    await qmiPage.verifyMortgageCalculatorIsDisplayed();
+    await qmiPage.verifyMortgageCalculatorValuesUpdate();
   });
 });
 

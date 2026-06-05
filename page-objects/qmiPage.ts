@@ -154,8 +154,8 @@ export class QmiPage extends BasePage {
     const fallback = hrefs[Math.floor(Math.random() * hrefs.length)];
     console.warn(
       `Pinned QMI home "${preferredSlug}" not found in the QMI section; ` +
-        `falling back to random home "${this.getLastPathSegment(fallback)}". ` +
-        `Update constants.qmi.detail_url to re-pin.`,
+      `falling back to random home "${this.getLastPathSegment(fallback)}". ` +
+      `Update constants.qmi.detail_url to re-pin.`,
     );
 
     return fallback;
@@ -368,19 +368,94 @@ export class QmiPage extends BasePage {
 
   // ── Pricing — Actions (QD-04) ──────────────────────────
   async openMortgageCalculator(): Promise<void> {
-    // The trigger and the payment share the pricing card. Wait for the payment
-    // to render first so the popover handler is hydrated before we click —
-    // otherwise an early click is a no-op and the popover never opens.
-    await this.waitForVisible(this.monthlyPayment.first(), 20000);
-    await this.scrollIntoView(this.mortgageInfoTrigger.first());
-    await this.click(
-      this.mortgageInfoTrigger.first(),
-      "Mortgage calculation information",
-    );
-    if (!(await this.isVisible(this.mortgagePopover.first(), 3000))) {
-      await this.mortgageInfoTrigger.first().hover();
-      await this.mortgageInfoTrigger.first().focus();
+    await this.page.waitForLoadState("domcontentloaded");
+
+    // Step 1: Go to Pricing section first
+    const pricingTab = this.page
+      .locator("a, button, [role='button']")
+      .filter({ hasText: /^Pricing$/i })
+      .first();
+
+    if (await this.isVisible(pricingTab, 5000)) {
+      await pricingTab.click();
+      await this.page.waitForTimeout(1000);
     }
+
+    // Step 2: Scroll monthly payment section into center of viewport
+    await this.monthlyPayment.first().scrollIntoViewIfNeeded();
+
+    await this.page.evaluate(() => {
+      window.scrollBy(0, -180);
+    });
+
+    await Validator.requireVisible(
+      this.monthlyPayment.first(),
+      "Estimated monthly payment should be visible before opening mortgage calculator",
+      20000,
+    );
+
+    // Step 3: Scroll and validate info icon near monthly payment
+    await this.mortgageInfoTrigger.first().scrollIntoViewIfNeeded();
+
+    await this.page.evaluate(() => {
+      window.scrollBy(0, -120);
+    });
+
+    await Validator.requireVisible(
+      this.mortgageInfoTrigger.first(),
+      "Mortgage information icon should be visible near estimated monthly payment",
+      10000,
+    );
+
+    // Step 4: Hover on info icon because Mortgage Calculator CTA appears only on hover
+    const infoIcon = this.mortgageInfoTrigger.first();
+
+    await infoIcon.hover({ force: true });
+
+    const iconBox = await infoIcon.boundingBox();
+
+    if (iconBox) {
+      await this.page.mouse.move(
+        iconBox.x + iconBox.width / 2,
+        iconBox.y + iconBox.height / 2,
+      );
+    }
+
+    // Step 5: Validate hover popover/CTA appears
+    const mortgageCalculatorCta = this.page
+      .locator("button, a, [role='button']")
+      .filter({
+        hasText: /Mortgage Calculator/i,
+      })
+      .first();
+
+    await Validator.requireVisible(
+      mortgageCalculatorCta,
+      "Mortgage Calculator CTA should be displayed after hovering mortgage information icon",
+      15000,
+    );
+
+    // Step 6: Click Mortgage Calculator CTA
+    await this.click(
+      mortgageCalculatorCta,
+      "Mortgage Calculator CTA",
+    );
+
+    // Step 7: Validate mortgage calculator modal opens
+    const mortgageCalculatorModal = this.page
+      .locator(
+        "[role='dialog'], [class*='MortgageCalculator'], [class*='mortgage'], [class*='Calculator']",
+      )
+      .filter({
+        hasText: /Calculate your mortgage|Estimated Payment|15 Year Loan|30 Year Loan/i,
+      })
+      .first();
+
+    await Validator.requireVisible(
+      mortgageCalculatorModal,
+      "Mortgage calculator modal should open after clicking Mortgage Calculator CTA",
+      15000,
+    );
   }
 
   // ── Pricing — Verification (QD-04) ─────────────────────
@@ -392,22 +467,145 @@ export class QmiPage extends BasePage {
     );
   }
 
-  async verifyMortgageCalculatorIsDisplayed(): Promise<void> {
-    const tooltipOrDialog = this.page
-      .locator(
-        "[role='tooltip'], [role='dialog'], [data-radix-popper-content-wrapper]",
-      )
-      .filter({ hasText: /Mortgage|APR|Principal|Interest|down payment/i });
-
-    if (await this.isVisible(tooltipOrDialog.first(), 5000)) {
-      return;
-    }
+  // ── Pricing — Verification (QD-04) ─────────────────────
+  async verifyMortgageCalculatorValuesUpdate(): Promise<void> {
+    const mortgageCalculatorModal = this.page
+      .locator("[role='dialog'], [class*='MortgageCalculator'], [class*='mortgage'], [class*='Calculator']")
+      .filter({
+        hasText: /Calculate your mortgage|Estimated Payment|15 Year Loan|30 Year Loan/i,
+      })
+      .first();
 
     await Validator.requireVisible(
-      this.mortgagePopover.first(),
-      "Mortgage calculator popover should open",
-      20000,
+      mortgageCalculatorModal,
+      "Mortgage calculator modal should be displayed before updating values",
+      15000,
     );
+
+    const estimatedPayment = mortgageCalculatorModal
+      .locator("text=/\\$[\\d,]+/")
+      .first();
+
+    await Validator.requireVisible(
+      estimatedPayment,
+      "Estimated payment should be displayed at the top of mortgage calculator modal",
+      10000,
+    );
+
+    const initialEstimatedPayment = normalizeText(
+      await this.getText(estimatedPayment),
+    );
+
+    // Validate Price field is displayed
+    const priceField = mortgageCalculatorModal
+      .locator("label", { hasText: /^Price$/i })
+      .locator("..")
+      .locator("input")
+      .first()
+      .or(
+        mortgageCalculatorModal.locator(
+          "input[name*='price' i], input[id*='price' i], input[placeholder*='price' i]",
+        ).first(),
+      );
+
+    await Validator.requireVisible(
+      priceField,
+      "Price field should be displayed in mortgage calculator modal",
+      10000,
+    );
+
+    // Change Price value
+    await priceField.click();
+    await priceField.press(
+      process.platform === "darwin" ? "Meta+A" : "Control+A",
+    );
+    await priceField.fill("450000");
+    await priceField.blur();
+
+    // Validate top estimated payment changes after price update
+    await expect
+      .poll(
+        async () => normalizeText(await this.getText(estimatedPayment)),
+        {
+          message:
+            "Estimated payment should update after changing Price value",
+          timeout: 10000,
+        },
+      )
+      .not.toBe(initialEstimatedPayment);
+
+    const paymentAfterPriceChange = normalizeText(
+      await this.getText(estimatedPayment),
+    );
+
+    expect(paymentAfterPriceChange).toMatch(/\$[\d,]+/);
+
+    // Loan term selector is a radiogroup of <label> options (each wrapping a
+    // visually-hidden radio input + a span label) — NOT buttons. The modal
+    // defaults to "30 Year Loan" (data-selected="30"), so we switch to whichever
+    // term is *not* currently selected first to guarantee the payment changes.
+    const loanTermGroup = mortgageCalculatorModal.locator(
+      "[data-testid='loan-term']",
+    );
+
+    await Validator.requireVisible(
+      loanTermGroup,
+      "Loan term selector should be displayed in mortgage calculator modal",
+      10000,
+    );
+
+    const fifteenYearLoanTab = loanTermGroup.locator("label", {
+      hasText: /15 Year Loan/i,
+    });
+    const thirtyYearLoanTab = loanTermGroup.locator("label", {
+      hasText: /30 Year Loan/i,
+    });
+
+    const initiallySelected = await loanTermGroup.getAttribute("data-selected");
+    const [firstTab, secondTab] =
+      initiallySelected === "30"
+        ? [fifteenYearLoanTab, thirtyYearLoanTab]
+        : [thirtyYearLoanTab, fifteenYearLoanTab];
+
+    // Switch to the non-selected loan term and validate the payment updates
+    await firstTab.click();
+
+    await expect
+      .poll(
+        async () => normalizeText(await this.getText(estimatedPayment)),
+        {
+          message:
+            "Estimated payment should update after switching the loan term",
+          timeout: 10000,
+        },
+      )
+      .not.toBe(paymentAfterPriceChange);
+
+    const paymentAfterFirstSwitch = normalizeText(
+      await this.getText(estimatedPayment),
+    );
+
+    expect(paymentAfterFirstSwitch).toMatch(/\$[\d,]+/);
+
+    // Switch to the other loan term and validate the payment updates again
+    await secondTab.click();
+
+    await expect
+      .poll(
+        async () => normalizeText(await this.getText(estimatedPayment)),
+        {
+          message:
+            "Estimated payment should update after switching the loan term back",
+          timeout: 10000,
+        },
+      )
+      .not.toBe(paymentAfterFirstSwitch);
+
+    const paymentAfterSecondSwitch = normalizeText(
+      await this.getText(estimatedPayment),
+    );
+
+    expect(paymentAfterSecondSwitch).toMatch(/\$[\d,]+/);
   }
 
   // ── Interactive Floor Plan (IFP) — Verification (QD-07) ─
