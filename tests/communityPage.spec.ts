@@ -27,12 +27,13 @@ test.describe("Community Page — Listing Header", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Community page loads with name, starting price and location @smoke", async () => {
+  test("TC-01 | Community page loads with name, starting price, location, sales team and office hours @smoke", async () => {
     await communityPage.verifyHeaderIsDisplayed(
       constants.community.river_ranch_trails_heading,
     );
     await communityPage.verifyStartingPriceIsDisplayed();
     await communityPage.verifyCommunityLocationIsDisplayed();
+    await communityPage.verifyOnsiteSalesTeamIsDisplayed();
     console.log(
       `Community: ${await communityPage.getHeading()} | ${await communityPage.getStartingPriceText()}`,
     );
@@ -44,10 +45,6 @@ test.describe("Community Page — Listing Header", () => {
     await communityPage.openSalesTeamModal();
     await communityPage.verifySalesTeamModalDetails();
     await communityPage.closeSalesTeamModal();
-  });
-
-  test("TC-02 | Onsite sales team and office hours are displayed @regression", async () => {
-    await communityPage.verifyOnsiteSalesTeamIsDisplayed();
   });
 });
 

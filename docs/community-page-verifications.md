@@ -35,21 +35,18 @@ as plain English (e.g. "Starting price should be displayed…") rather than loca
 
 ## Block 1 — Listing Header
 
-### TC-01 | Community page loads with name, starting price and location  `@smoke`
+### TC-01 | Community page loads with name, starting price, location, sales team and office hours  `@smoke`
+_One test covers the whole listing header._
+
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | Community **name** heading is shown | VISIBLE — level-1 heading "River Ranch Trails" |
 | 2 | Community **subtitle** is shown | VISIBLE — `[class*='Hero_subtitle']` |
 | 3 | **Starting price** line is shown | VISIBLE — hero subtitle containing "Starting" |
 | 4 | **Community Location** block is shown | VISIBLE — "Community Location" |
-| 5 | **Sales office hours** are present & non-empty | VISIBLE schedule (`[class*='SalesCenterOperationHours']`); for each `<li>` row, day label + `<time>` are non-empty; **logs** each `day: time` (e.g. `Thursday to Saturday: 10:00 AM - 6:00 PM`) |
-| 6 | **"Your Onsite Sales Team" modal** opens, every section has a value, then closes | Clicks the CTA → modal `[class*='Modal_bottom']`. Asserts VISIBLE + non-empty (and **logs**): "Our Onsite Team" heading, phone/Call link, community address, sales hours, ≥1 consultant name, ≥1 consultant photo. Fails if any section is empty. Then **closes the modal** (X / `CircleIconButton`) and asserts it's hidden. |
-
-### TC-02 | Onsite sales team and office hours are displayed  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | **Onsite sales team** label is shown | VISIBLE — "Your Onsite Sales Team" |
-| 2 | **Sales office hours** line is shown | VISIBLE — "Sales Office:" |
+| 5 | **Onsite sales team** label + sales-office line shown | VISIBLE — "Your Onsite Sales Team" and "Sales Office:" |
+| 6 | **Sales office hours** are present & non-empty | VISIBLE schedule (`[class*='SalesCenterOperationHours']`); for each `<li>` row, day label + `<time>` are non-empty; **logs** each `day: time` (e.g. `Thursday to Saturday: 10:00 AM - 6:00 PM`) |
+| 7 | **"Your Onsite Sales Team" modal** opens, every section has a value, then closes | Clicks the CTA → modal `[class*='Modal_bottom']`. Asserts VISIBLE + non-empty (and **logs**): "Our Onsite Team" heading, phone/Call link, community address, sales hours, ≥1 consultant name, ≥1 consultant photo. Fails if any section is empty. Then **closes the modal** (X / `CircleIconButton`) and asserts it's hidden. |
 
 ---
 
