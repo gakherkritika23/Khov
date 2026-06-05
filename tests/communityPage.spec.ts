@@ -2,6 +2,7 @@ import { Page } from "@playwright/test";
 import { test } from "./baseTest";
 import { CommunityPage } from "../page-objects/communityPage";
 import constants from "../utils/constants.json";
+import testData from "../utils/test_data.json";
 
 /**
  * The community spec is pinned to a specific, feature-rich community (River
@@ -104,5 +105,61 @@ test.describe("Community Page — Quick Move-In Homes", () => {
       constants.community.home_detail_url_pattern,
     );
     console.log(`Opened QMI detail: ${await communityPage.getUrl()}`);
+  });
+});
+
+test.describe("Community Page — Floorplan Mortgage Calculator", () => {
+  let communityPage: CommunityPage;
+
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(90000);
+    communityPage = await openCommunity(page);
+  });
+
+  test("TC-01 | Floorplan mortgage calculator opens, validates fields, recalculates and closes @regression", async () => {
+    // Random floorplan → info icon → "Mortgage Calculator" → modal.
+    await communityPage.openRandomFloorplanMortgageCalculator();
+
+    // Every field has data and the estimated payment shows at the top.
+    await communityPage.verifyCalculatorFieldsHaveData();
+
+    // Edit each input; the top price recalculates in the expected direction.
+    await communityPage.verifyPaymentRecalculates(
+      "Down Payment % up",
+      () =>
+        communityPage.setCalculatorField(
+          1,
+          testData.mortgage_calculator.downPaymentPercent,
+          "Down Payment %",
+        ),
+      "down",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Interest Rate up",
+      () =>
+        communityPage.setCalculatorField(
+          3,
+          testData.mortgage_calculator.interestRate,
+          "Interest Rate",
+        ),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Price up",
+      () =>
+        communityPage.setCalculatorField(
+          0,
+          testData.mortgage_calculator.price,
+          "Price",
+        ),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "15-year term",
+      () => communityPage.selectLoanTerm("15"),
+      "up",
+    );
+
+    await communityPage.closeMortgageCalculator();
   });
 });

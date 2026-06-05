@@ -50,6 +50,23 @@ _One test covers the whole listing header._
 
 ---
 
+## Block — Floorplan Mortgage Calculator
+
+### TC-01 | Calculator opens, fields populated, recalculates, closes  `@regression`
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | A **random floorplan's** mortgage calculator opens | Scroll a random floorplan info icon (`[class*='TitleBlock_popover-trigger']`) into view, tap it → popover "Mortgage Calculator" CTA → modal "Calculate your mortgage" |
+| 2 | **All fields populated** + estimated payment shown | Top `$` estimated payment > 0; every modal text input (Price, Down Payment %/$, Interest Rate, Mortgage Amount, …) has a non-empty value; logged |
+| 3 | **Down Payment % ↑ → payment decreases** | Capture top price, set Down Payment %, blur (Tab); assert recalculated to a new $ value that is lower |
+| 4 | **Interest Rate ↑ → payment increases** | same pattern, higher |
+| 5 | **Price ↑ → payment increases** | same pattern, higher |
+| 6 | **30→15-year term → payment increases** | toggle 15-Year Loan; assert higher |
+| 7 | **Modal closes** | click X; assert hidden |
+
+> Pinned to River Ranch Trails; floorplan is chosen at random and logged. The
+> price check is "recalculates + direction" (not exact-formula, since the site
+> adds tax/insurance/HOA).
+
 ## Block 2 — Floorplan & Home Cards
 
 ### TC-01 | Floorplan/home cards render with specs and pricing  `@smoke`

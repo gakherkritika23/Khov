@@ -30,6 +30,12 @@ export class CommunityPage extends BasePage {
   readonly consultantNames: Locator;
   readonly consultantPhotos: Locator;
   readonly modalCloseButton: Locator;
+  readonly floorplanCalcTriggers: Locator;
+  readonly mortgageCalculatorCta: Locator;
+  readonly calculatorHeading: Locator;
+  readonly calculatorModal: Locator;
+  readonly calculatorEstimatedPayment: Locator;
+  readonly calculatorInputs: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -93,6 +99,28 @@ export class CommunityPage extends BasePage {
     this.modalCloseButton = page.locator(
       "[class*='Modal_dialog'] [class*='CircleIconButton']",
     );
+    // Floorplan mortgage calculator: each floorplan's "Estimated payment" info
+    // icon (TitleBlock popover trigger) → tooltip "Mortgage Calculator" CTA →
+    // "Calculate your mortgage" modal.
+    this.floorplanCalcTriggers = page.locator(
+      "[class*='TitleBlock_popover-trigger']",
+    );
+    this.mortgageCalculatorCta = page.getByRole("button", {
+      name: /Mortgage Calculator/i,
+    });
+    this.calculatorHeading = page.getByRole("heading", {
+      name: /Calculate your mortgage/i,
+    });
+    this.calculatorModal = page
+      .locator("[class*='Modal_dialog']")
+      .filter({ hasText: "Calculate your mortgage" });
+    // Top "Estimated Payment" amount (e.g. $2,147) — first $-only value node.
+    this.calculatorEstimatedPayment = this.calculatorModal
+      .getByText(/^\$[\d,]+$/)
+      .first();
+    // Editable text inputs in order: 0=Price, 1=Down Payment %, 2=Down Payment $,
+    // 3=Interest Rate, then computed/display fields.
+    this.calculatorInputs = this.calculatorModal.locator("input[type='text']");
   }
 
   // ── Navigation — Actions ───────────────────────────────
@@ -396,6 +424,120 @@ export class CommunityPage extends BasePage {
       this.carousel.first(),
       "An image carousel should be displayed",
       25000,
+    );
+  }
+
+  // ── Floorplan Mortgage Calculator — Actions ────────────
+  async openRandomFloorplanMortgageCalculator(): Promise<void> {
+    const count = await this.floorplanCalcTriggers.count();
+    const index = Math.floor(Math.random() * Math.max(count, 1));
+    console.log(`Opening mortgage calculator for floorplan #${index + 1}/${count}`);
+    const trigger = this.floorplanCalcTriggers.nth(index);
+
+    // The floorplan blocks lazy-render, so the info-icon trigger can detach on
+    // scroll. Re-resolve each attempt: scroll the block into view (stabilizes
+    // it), tap the icon, and check the popover's "Mortgage Calculator" CTA.
+    let opened = false;
+    for (let attempt = 0; attempt < 4 && !opened; attempt++) {
+      await trigger.scrollIntoViewIfNeeded().catch(() => {});
+      await this.page.waitForTimeout(900);
+      await trigger.click({ timeout: 4000 }).catch(() => {});
+      await this.page.waitForTimeout(900);
+      opened = await this.mortgageCalculatorCta
+        .first()
+        .isVisible()
+        .catch(() => false);
+    }
+    await this.click(this.mortgageCalculatorCta.first(), "Mortgage Calculator");
+    await Validator.requireVisible(
+      this.calculatorHeading.first(),
+      "Mortgage calculator modal should open",
+      15000,
+    );
+  }
+
+  async setCalculatorField(
+    index: number,
+    value: string,
+    name: string,
+  ): Promise<void> {
+    const input = this.calculatorInputs.nth(index);
+    await input.click();
+    await input.fill(value);
+    await input.press("Tab"); // blur → triggers recalculation
+    console.log(`Set ${name} = ${value}`);
+  }
+
+  async selectLoanTerm(years: "15" | "30"): Promise<void> {
+    await this.click(
+      this.calculatorModal.getByText(`${years} Year Loan`).first(),
+      `${years} Year Loan`,
+    );
+  }
+
+  async closeMortgageCalculator(): Promise<void> {
+    await this.click(this.modalCloseButton.first(), "Close mortgage calculator");
+    await Validator.requireHidden(
+      this.calculatorHeading.first(),
+      "Mortgage calculator should close",
+      10000,
+    );
+  }
+
+  // ── Floorplan Mortgage Calculator — Verification ───────
+  async getEstimatedPayment(): Promise<number> {
+    const text = (await this.calculatorEstimatedPayment.innerText()).trim();
+    return Number(text.replace(/[^0-9.]/g, ""));
+  }
+
+  async verifyCalculatorFieldsHaveData(): Promise<void> {
+    await Validator.requireVisible(
+      this.calculatorEstimatedPayment,
+      "Calculator estimated payment should be shown at the top",
+      10000,
+    );
+    const payment = await this.getEstimatedPayment();
+    await Validator.requireTrue(
+      payment > 0,
+      "Estimated payment should be a positive amount",
+    );
+    const fieldCount = await this.calculatorInputs.count();
+    for (let i = 0; i < fieldCount; i++) {
+      const value = (await this.calculatorInputs.nth(i).inputValue()).trim();
+      await Validator.requireNotEmpty(
+        value,
+        `Calculator field ${i + 1} should have a value`,
+      );
+    }
+    console.log(
+      `Calculator estimated payment $${payment}; ${fieldCount} fields populated`,
+    );
+  }
+
+  /**
+   * Capture the top price, run an edit, then assert it recalculated to a new
+   * valid amount in the expected direction (after focus change).
+   */
+  async verifyPaymentRecalculates(
+    label: string,
+    edit: () => Promise<void>,
+    direction: "up" | "down",
+  ): Promise<void> {
+    const before = await this.getEstimatedPayment();
+    await edit();
+    let after = before;
+    for (let i = 0; i < 20 && after === before; i++) {
+      await this.page.waitForTimeout(400);
+      after = await this.getEstimatedPayment();
+    }
+    console.log(`${label}: $${before} → $${after}`);
+    await Validator.requireTrue(
+      after > 0 && after !== before,
+      `${label}: estimated payment should recalculate (was $${before}, now $${after})`,
+    );
+    await Validator.requireTrue(
+      direction === "up" ? after > before : after < before,
+      `${label}: estimated payment should move ${direction} ($${before} → $${after})`,
     );
   }
 

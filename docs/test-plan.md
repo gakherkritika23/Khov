@@ -102,18 +102,17 @@ to be captured during Stage 3.
 
 ### Floorplan section
 > On the community page, floorplan and QMI homes share one `Card` component
-> ("View Home Details" CTA), and there's no distinct "Floorplans" heading. CP-10/14
-> are covered generically as **home/floorplan cards**. The mortgage figure on the
-> community page is an info **tooltip** (not a calculator modal) — the real
-> calculator modal lives on the detail pages, so **CP-11 moves to E5**.
+> ("View Home Details" CTA). CP-10/14 are covered generically as **home/floorplan
+> cards**. Each floorplan's "Estimated payment" info icon opens a popover whose
+> **"Mortgage Calculator"** CTA opens the full calculator modal (CP-11).
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
 | CP-10 | Floorplan/home cards render (name, specs, pricing) | @smoke | ✅ (`communityPage.spec.ts` Floorplan & Home Cards TC-01) |
+| CP-11 | Mortgage calculator modal opens, fields populated, recalculates, closes | @regression | ✅ (Floorplan Mortgage Calculator TC-01) |
 | CP-12 | Floorplan/home card image(s) render | @regression | ✅ (Floorplan & Home Cards TC-02) |
 | CP-13 | Image carousel is displayed | @regression | ✅ baseline (Floorplan & Home Cards TC-03); next/prev navigation TBD |
 | CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | @regression | ✅ (Floorplan & Home Cards TC-04) |
-| CP-11 | Pricing / Mortgage calculator modal opens, computes, closes | @regression | ➡️ moved to **E5** — only a tooltip on the community page; real modal is on the detail page |
 
 ### QMI (Quick Move-In) section
 | ID | Test case | Tag | Status |

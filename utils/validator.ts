@@ -88,4 +88,14 @@ export class Validator {
       { box: true },
     );
   }
+
+  static async requireTrue(condition: boolean, message: string): Promise<void> {
+    await test.step(
+      message,
+      async () => {
+        expect(condition, message).toBe(true);
+      },
+      { box: true },
+    );
+  }
 }
