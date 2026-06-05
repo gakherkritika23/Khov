@@ -53,16 +53,19 @@ test.describe("Community Page — Floorplan Section", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(120000);
+    test.setTimeout(600000);
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Floorplan section — cards, images, carousel, meta data, mortgage calculator and detail navigation @regression", async () => {
-    // Floorplan/home cards: render with specs + pricing, images, carousel.
+  test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @regression", async () => {
+    // Floorplan/home cards: render with specs + pricing, images.
     await communityPage.verifyHomeCardsAreDisplayed();
     console.log(`Home/floorplan cards: ${await communityPage.getHomeCardCount()}`);
     await communityPage.verifyCardImagesAreDisplayed();
-    await communityPage.verifyCarouselIsDisplayed();
+
+    // Every floorplan's two carousels (elevation + gallery): arrow states +
+    // all image URLs return 200.
+    await communityPage.verifyFloorplanCarousels();
 
     // Every floorplan shows complete, non-empty meta data.
     await communityPage.verifyAllFloorplanMetaData();

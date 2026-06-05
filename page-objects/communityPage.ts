@@ -20,6 +20,7 @@ export class CommunityPage extends BasePage {
   readonly featuredHomeLink: Locator;
   readonly cardImage: Locator;
   readonly carousel: Locator;
+  readonly floorplanBlocks: Locator;
   readonly salesOfficeSchedule: Locator;
   readonly salesOfficeRows: Locator;
   readonly salesTeamModal: Locator;
@@ -67,6 +68,8 @@ export class CommunityPage extends BasePage {
     // Media. `:visible` avoids lazy/zero-size or hidden carousel-slide images.
     this.cardImage = page.locator("[class*='Card_'] picture:visible");
     this.carousel = page.locator("[class*='FeaturedCarousel']");
+    // Each floorplan block holds two image carousels (elevation + gallery).
+    this.floorplanBlocks = page.locator("[class*='FloorPlan_floor-plan']");
     // On-page sales office hours schedule (day labels + time values).
     this.salesOfficeSchedule = page.locator(
       "[class*='SalesCenterOperationHours']",
@@ -424,6 +427,100 @@ export class CommunityPage extends BasePage {
       this.carousel.first(),
       "An image carousel should be displayed",
       25000,
+    );
+  }
+
+  /**
+   * For every floorplan, verify both image carousels (elevation + gallery):
+   * arrow states (next active / prev inactive initially → both active after one
+   * tap → next inactive / prev active at the last image) and that every image
+   * URL returns HTTP 200. Arrow state is the `disabled` attribute (the inactive
+   * arrow is opacity:0, which Playwright still treats as "visible").
+   */
+  async verifyFloorplanCarousels(): Promise<void> {
+    const count = await this.floorplanBlocks.count();
+    console.log(`Validating carousels for ${count} floorplans`);
+    for (let i = 0; i < count; i++) {
+      const block = this.floorplanBlocks.nth(i);
+      await this.scrollIntoView(block);
+      await this.page.waitForTimeout(500);
+      const carousels = block.locator("[class*='Multiple_carousel']");
+      const carouselCount = await carousels.count();
+      for (let c = 0; c < carouselCount; c++) {
+        await this.verifyOneCarousel(
+          carousels.nth(c),
+          `Floorplan #${i + 1} carousel ${c + 1}`,
+        );
+      }
+    }
+  }
+
+  private async verifyOneCarousel(
+    carousel: Locator,
+    label: string,
+  ): Promise<void> {
+    const next = carousel.locator("[aria-label='Next slide']").first();
+    const prev = carousel.locator("[aria-label='Previous slide']").first();
+    const urls = new Set<string>();
+    const collect = async () => {
+      const srcs = await carousel
+        .locator("img")
+        .evaluateAll((imgs) =>
+          imgs
+            .map((im) => (im as HTMLImageElement).currentSrc || (im as HTMLImageElement).src)
+            .filter((s) => s && s.startsWith("http")),
+        )
+        .catch(() => [] as string[]);
+      srcs.forEach((s) => urls.add(s));
+    };
+
+    // 1. Initial: next active, prev inactive.
+    await Validator.requireTrue(
+      !(await next.isDisabled()),
+      `${label}: next arrow is active initially`,
+    );
+    await Validator.requireTrue(
+      await prev.isDisabled(),
+      `${label}: prev arrow is inactive initially`,
+    );
+    await collect();
+
+    // 2. After one tap on next: both arrows active.
+    await next.click();
+    await this.page.waitForTimeout(500);
+    await Validator.requireTrue(
+      !(await next.isDisabled()) && !(await prev.isDisabled()),
+      `${label}: both arrows active after first next`,
+    );
+    await collect();
+
+    // 3. Navigate to the last image: next inactive, prev active.
+    for (let i = 0; i < 25; i++) {
+      if (await next.isDisabled().catch(() => true)) break;
+      await next.click().catch(() => {});
+      await this.page.waitForTimeout(400);
+      await collect();
+    }
+    await Validator.requireTrue(
+      await next.isDisabled(),
+      `${label}: next arrow is inactive at the last image`,
+    );
+    await Validator.requireTrue(
+      !(await prev.isDisabled()),
+      `${label}: prev arrow is active at the last image`,
+    );
+
+    // 4. Every image URL returns 200.
+    const failures: string[] = [];
+    for (const url of urls) {
+      const resp = await this.page.request.get(url).catch(() => null);
+      if (!resp || resp.status() !== 200)
+        failures.push(`${resp ? resp.status() : "ERR"} ${url}`);
+    }
+    console.log(`${label}: ${urls.size} images, ${failures.length} non-200`);
+    await Validator.requireTrue(
+      failures.length === 0,
+      `${label}: all ${urls.size} image URLs return 200${failures.length ? ` — ${failures.slice(0, 3).join("; ")}` : ""}`,
     );
   }
 

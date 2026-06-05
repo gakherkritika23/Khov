@@ -60,7 +60,7 @@ since it leaves the page).
 |---|--------------|-----|
 | 1 | Floorplan/home **cards** render (specs + pricing) | VISIBLE — `[class*='Card_specifications']` + `[class*='Card_pricing']`; card count logged |
 | 2 | Card **images** render | VISIBLE — `[class*='Card_'] picture:visible` |
-| 3 | **Image carousel** shown | VISIBLE — `[class*='FeaturedCarousel']` |
+| 3 | **Both carousels (elevation + gallery) of every floorplan** | For each floorplan's two `[class*='Multiple_carousel']`: next arrow active + prev inactive initially → both active after one tap → next inactive + prev active at the last image (state = `disabled`; the inactive arrow is opacity:0). Every slide image URL is collected and asserted to return **HTTP 200** (`page.request.get`). |
 | 4 | **Every floorplan's meta data** present & non-zero | Per floorplan (scrolled into view): Sq ft, Story/Stories, Beds, Baths (decimal ok), Cars, Estimated payment, "Mortgage calculation information", Starting price, lot-premium disclaimer — none empty/0/missing; values logged |
 | 5 | **Mortgage calculator** opens (random floorplan) | Scroll info icon (`[class*='TitleBlock_popover-trigger']`) → tap → "Mortgage Calculator" CTA → modal "Calculate your mortgage" |
 | 6 | Calculator **fields populated** | Top `$` estimated payment > 0; every text input non-empty; logged |

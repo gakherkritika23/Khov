@@ -114,7 +114,7 @@ to be captured during Stage 3.
 | CP-10 | Floorplan/home cards render (name, specs, pricing) | ✅ |
 | CP-11 | Mortgage calculator modal opens, fields populated, recalculates, closes | ✅ |
 | CP-12 | Floorplan/home card image(s) render | ✅ |
-| CP-13 | Image carousel is displayed | ✅ baseline; next/prev navigation TBD |
+| CP-13 | Image carousels (elevation + gallery, every floorplan): arrow states (next/prev active/inactive) + all image URLs return 200 | ✅ |
 | CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | ✅ |
 | CP-15 | Every floorplan shows complete meta data (sq ft, story, beds, baths, cars, est. payment, starting price, disclaimer) — none empty/0 | ✅ |
 
