@@ -461,18 +461,7 @@ export class CommunityPage extends BasePage {
   ): Promise<void> {
     const next = carousel.locator("[aria-label='Next slide']").first();
     const prev = carousel.locator("[aria-label='Previous slide']").first();
-    const urls = new Set<string>();
-    const collect = async () => {
-      const srcs = await carousel
-        .locator("img")
-        .evaluateAll((imgs) =>
-          imgs
-            .map((im) => (im as HTMLImageElement).currentSrc || (im as HTMLImageElement).src)
-            .filter((s) => s && s.startsWith("http")),
-        )
-        .catch(() => [] as string[]);
-      srcs.forEach((s) => urls.add(s));
-    };
+    const slides = carousel.locator("li[class*='Carousel_slide']");
 
     // 1. Initial: next active, prev inactive.
     await Validator.requireTrue(
@@ -483,7 +472,6 @@ export class CommunityPage extends BasePage {
       await prev.isDisabled(),
       `${label}: prev arrow is inactive initially`,
     );
-    await collect();
 
     // 2. After one tap on next: both arrows active.
     await next.click();
@@ -492,14 +480,12 @@ export class CommunityPage extends BasePage {
       !(await next.isDisabled()) && !(await prev.isDisabled()),
       `${label}: both arrows active after first next`,
     );
-    await collect();
 
     // 3. Navigate to the last image: next inactive, prev active.
     for (let i = 0; i < 25; i++) {
       if (await next.isDisabled().catch(() => true)) break;
       await next.click().catch(() => {});
-      await this.page.waitForTimeout(400);
-      await collect();
+      await this.page.waitForTimeout(350);
     }
     await Validator.requireTrue(
       await next.isDisabled(),
@@ -510,17 +496,35 @@ export class CommunityPage extends BasePage {
       `${label}: prev arrow is active at the last image`,
     );
 
-    // 4. Every image URL returns 200.
-    const failures: string[] = [];
-    for (const url of urls) {
-      const resp = await this.page.request.get(url).catch(() => null);
-      if (!resp || resp.status() !== 200)
-        failures.push(`${resp ? resp.status() : "ERR"} ${url}`);
+    // 4. Count = number of carousel slides; collect ONE image URL per slide
+    // (skip a no-image slide, e.g. the "View Gallery" callout), then assert each
+    // returns 200 and log every URL with its status.
+    const slideCount = await slides.count();
+    const urls: string[] = [];
+    for (let i = 0; i < slideCount; i++) {
+      const img = slides.nth(i).locator("img").first();
+      if ((await img.count()) === 0) continue;
+      const url = await img
+        .evaluate(
+          (im) =>
+            (im as HTMLImageElement).currentSrc || (im as HTMLImageElement).src,
+        )
+        .catch(() => "");
+      if (url && url.startsWith("http")) urls.push(url);
     }
-    console.log(`${label}: ${urls.size} images, ${failures.length} non-200`);
+    let nonOk = 0;
+    for (let i = 0; i < urls.length; i++) {
+      const resp = await this.page.request.get(urls[i]).catch(() => null);
+      const status = resp ? resp.status() : "ERR";
+      if (status !== 200) nonOk++;
+      console.log(`${label} image ${i + 1}/${urls.length}: ${status} ${urls[i]}`);
+    }
+    console.log(
+      `${label}: ${slideCount} slides, ${urls.length} images, ${nonOk} non-200`,
+    );
     await Validator.requireTrue(
-      failures.length === 0,
-      `${label}: all ${urls.size} image URLs return 200${failures.length ? ` — ${failures.slice(0, 3).join("; ")}` : ""}`,
+      nonOk === 0,
+      `${label}: all ${urls.length} image URLs return 200`,
     );
   }
 
@@ -714,6 +718,12 @@ export class CommunityPage extends BasePage {
   }
 
   async getHomeCardCount(): Promise<number> {
+    // The cards lazy-render, so an immediate count() can race to 0; poll briefly.
+    for (let i = 0; i < 10; i++) {
+      const n = await this.homeCards.count();
+      if (n > 0) return n;
+      await this.page.waitForTimeout(500);
+    }
     return await this.homeCards.count();
   }
 
