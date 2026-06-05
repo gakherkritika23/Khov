@@ -163,3 +163,16 @@ test.describe("Community Page — Floorplan Mortgage Calculator", () => {
     await communityPage.closeMortgageCalculator();
   });
 });
+
+test.describe("Community Page — Floorplan Meta Data", () => {
+  let communityPage: CommunityPage;
+
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(90000);
+    communityPage = await openCommunity(page);
+  });
+
+  test("TC-01 | Every floorplan displays complete meta data (specs, payment, price) @regression", async () => {
+    await communityPage.verifyAllFloorplanMetaData();
+  });
+});

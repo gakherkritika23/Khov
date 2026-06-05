@@ -113,6 +113,7 @@ to be captured during Stage 3.
 | CP-12 | Floorplan/home card image(s) render | @regression | ✅ (Floorplan & Home Cards TC-02) |
 | CP-13 | Image carousel is displayed | @regression | ✅ baseline (Floorplan & Home Cards TC-03); next/prev navigation TBD |
 | CP-14 | Card CTA ("View Home Details") opens a floorplan/home detail page | @regression | ✅ (Floorplan & Home Cards TC-04) |
+| CP-15 | Every floorplan shows complete meta data (sq ft, story, beds, baths, cars, est. payment, starting price, disclaimer) — none empty/0 | @regression | ✅ (Floorplan Meta Data TC-01) |
 
 ### QMI (Quick Move-In) section
 | ID | Test case | Tag | Status |

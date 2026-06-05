@@ -50,6 +50,27 @@ _One test covers the whole listing header._
 
 ---
 
+## Block — Floorplan Meta Data
+
+### TC-01 | Every floorplan displays complete meta data  `@regression`
+Iterates all floorplans; for each, asserts the block is displayed and parses its
+meta values, requiring none to be empty/zero/missing (baths may be decimal):
+
+| Field | Rule |
+|-------|------|
+| Sq ft | numeric, > 0 |
+| Story / Stories | numeric, > 0 |
+| Beds | numeric, > 0 |
+| Baths | numeric, > 0 (decimal allowed, e.g. 2.5) |
+| Cars | numeric, > 0 |
+| Estimated payment | `$` amount, > 0 |
+| Mortgage calculation information | text present |
+| Starting price | `$` amount, > 0 |
+| "Starting price may include lot premium" | disclaimer text present |
+
+All parsed values are logged per floorplan; the floorplan blocks lazy-render, so
+each is scrolled into view before reading.
+
 ## Block — Floorplan Mortgage Calculator
 
 ### TC-01 | Calculator opens, fields populated, recalculates, closes  `@regression`

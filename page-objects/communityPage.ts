@@ -541,6 +541,76 @@ export class CommunityPage extends BasePage {
     );
   }
 
+  // ── Floorplan Meta Data — Verification ─────────────────
+  /**
+   * For every floorplan, validate the meta data is displayed with real values:
+   * Sq ft, Story, Beds, Baths (may be decimal), Cars, Estimated payment,
+   * Mortgage-calc info, Starting price, and the lot-premium disclaimer — none
+   * empty, zero, or missing. Values are parsed from each floorplan block (the
+   * blocks lazy-render, so we scroll each into view) and logged.
+   */
+  async verifyAllFloorplanMetaData(): Promise<void> {
+    const count = await this.floorplanCalcTriggers.count();
+    console.log(`Validating meta data for ${count} floorplans`);
+    for (let i = 0; i < count; i++) {
+      const trigger = this.floorplanCalcTriggers.nth(i);
+      let text = "";
+      for (let attempt = 0; attempt < 3 && !text; attempt++) {
+        await trigger.scrollIntoViewIfNeeded().catch(() => {});
+        await this.page.waitForTimeout(400);
+        text = await trigger
+          .evaluate((el) => {
+            let block = el as HTMLElement;
+            for (let k = 0; k < 6 && block.parentElement; k++) {
+              block = block.parentElement;
+              if (
+                /Sq ?ft/i.test(block.textContent || "") &&
+                /Starting price/i.test(block.textContent || "")
+              )
+                break;
+            }
+            return (block.textContent || "").replace(/\s+/g, " ").trim();
+          })
+          .catch(() => "");
+      }
+      await Validator.requireVisible(
+        trigger,
+        `Floorplan #${i + 1} meta block should be displayed`,
+        15000,
+      );
+
+      const name = (text.match(/^(.+?)(?=[\d,]+\s*Sq)/) || [, `#${i + 1}`])[1].trim();
+      const numeric: Record<string, RegExpMatchArray | null> = {
+        "Sq ft": text.match(/([\d,]+)\s*Sq ?ft/i),
+        Story: text.match(/(\d+)\s*Stor(?:y|ies)/i),
+        Beds: text.match(/(\d+(?:\.\d+)?)\s*Beds?/i),
+        Baths: text.match(/(\d+(?:\.\d+)?)\s*Baths?/i),
+        Cars: text.match(/(\d+)\s*Cars?/i),
+        "Estimated payment": text.match(/Estimated payment\s*\$([\d,]+)/i),
+        "Starting price": text.match(/Starting price\s*\$([\d,]+)/i),
+      };
+      const issues: string[] = [];
+      for (const [label, match] of Object.entries(numeric)) {
+        const value = match ? Number(match[1].replace(/,/g, "")) : NaN;
+        if (!match || !(value > 0)) issues.push(`${label}=${match ? match[1] : "missing"}`);
+      }
+      if (!/Mortgage calculation information/i.test(text))
+        issues.push("Mortgage calculation information missing");
+      if (!/Starting price may include lot premium/i.test(text))
+        issues.push("lot-premium disclaimer missing");
+
+      console.log(
+        `${name}: ${Object.entries(numeric)
+          .map(([k, m]) => `${k}=${m ? m[1] : "?"}`)
+          .join(", ")}`,
+      );
+      await Validator.requireTrue(
+        issues.length === 0,
+        `${name}: all meta data present & non-zero${issues.length ? ` — issues: ${issues.join("; ")}` : ""}`,
+      );
+    }
+  }
+
   // ── Data Getters ───────────────────────────────────────
   async getHeading(): Promise<string> {
     return await this.getText(this.pageHeading.first());
