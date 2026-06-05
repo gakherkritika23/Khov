@@ -23,7 +23,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
 | E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | 🟡 (header ✅) |
-| E4 | QMI details page | `qmiDetailPage.ts` _(new)_ | `qmiDetailPage.spec.ts` _(new)_ | ⬜ |
+| E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09 ✅; QD-05/08 deferred) |
 | E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
 | E6 | Contact form (site-wide) | `contactForm.ts` _(new, shared)_ | `contactForm.spec.ts` _(new)_ | ⬜ |
 
@@ -131,22 +131,29 @@ consultant modal** (CP-03).
 
 ---
 
-## E4 — QMI details page ⬜
+## E4 — QMI details page 🟡
 
 > "Media Gallery modal (hero gallery 2.0 section nav). Pricing — monthly
 > payment/calculator; was/now. Availability date. IFP. QMI sticker breakdown. CTAs."
 
-| ID | Test case | Tag |
-|----|-----------|-----|
-| QD-01 | QMI details page loads (address/heading, key facts) | @smoke |
-| QD-02 | Media gallery modal opens and navigates between images | @regression |
-| QD-03 | Hero Gallery 2.0 — jump to a specific section _(if in use)_ | @regression |
-| QD-04 | Pricing: monthly payment + calculator modal | @regression |
-| QD-05 | Was/Now pricing displayed _(if applicable)_ | @regression |
-| QD-06 | Availability date shown | @regression |
-| QD-07 | Interactive Floor Plan (IFP) loads / is interactive | @regression |
-| QD-08 | QMI sticker breakdown _(if applicable)_ | @regression |
-| QD-09 | CTAs (Request Info, Schedule a Tour, etc.) present / functional | @regression |
+> The QMI spec is **pinned to a deterministic QMI home** at River Ranch Trails
+> (Passionflower II, 526 Samuel Ridge Dr — `constants.qmi.detail_url`) so the
+> gallery / pricing / IFP / CTA checks are stable. Hero gallery 2.0 is confirmed
+> in use (`GalleryTwoModal` with section nav). The "calculator" on this page is a
+> mortgage-info **popover** (loan terms), not a full calculator modal — QD-04
+> verifies the monthly payment + that popover.
+
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| QD-01 | QMI details page loads (address/heading, key facts) | @smoke | ✅ (`qmiPage.spec.ts` Overview TC-01) |
+| QD-02 | Media gallery modal opens and navigates between images | @regression | ✅ (Media Gallery TC-01) |
+| QD-03 | Hero Gallery 2.0 — jump to a specific section _(if in use)_ | @regression | ✅ (Media Gallery TC-02) |
+| QD-04 | Pricing: monthly payment + calculator modal | @regression | ✅ (Pricing TC-01/02 — payment + mortgage popover) |
+| QD-05 | Was/Now pricing displayed _(if applicable)_ | @regression | ⬜ deferred — this QMI home shows only a current total price; needs a home with discounted was/now |
+| QD-06 | Availability date shown | @regression | ✅ (Overview TC-02 — "Available Now") |
+| QD-07 | Interactive Floor Plan (IFP) loads / is interactive | @regression | ✅ (Interactive Floor Plan TC-01) |
+| QD-08 | QMI sticker breakdown _(if applicable)_ | @regression | ⬜ deferred — no itemized "window sticker" element present in the DOM for this home |
+| QD-09 | CTAs (Request Info, Schedule a Tour, etc.) present / functional | @regression | ✅ (Overview TC-03 — Request a Tour / Request Information) |
 
 ---
 

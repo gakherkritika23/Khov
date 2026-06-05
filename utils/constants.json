@@ -24,5 +24,9 @@
     "river_ranch_trails_url": "/new-construction-homes/texas/dayton/river-ranch-trails/",
     "river_ranch_trails_heading": "River Ranch Trails",
     "home_detail_url_pattern": "new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+"
+  },
+  "qmi": {
+    "community_url": "/new-construction-homes/texas/dayton/river-ranch-trails/",
+    "detail_url": "/new-construction-homes/texas/dayton/river-ranch-trails/passionflower-ii-526-samuel-ridge-dr-0024/"
   }
 }

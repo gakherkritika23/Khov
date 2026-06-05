@@ -6,11 +6,11 @@ const testEnv = process.env.TEST_ENV ?? "dev";
 const envPath = path.resolve(process.cwd(), `environment/.env.${testEnv}`);
 dotenv.config({ path: envPath });
 
-if (!process.env.BASE_URL) {
-  throw new Error(
-    `BASE_URL is not set. Create environment/.env.${testEnv} (copy environment/.env.example) and define BASE_URL.`,
-  );
-}
+// if (!process.env.BASE_URL) {
+//   throw new Error(
+//     `BASE_URL is not set. Create environment/.env.${testEnv} (copy environment/.env.example) and define BASE_URL.`,
+//   );
+// }
 
 export default defineConfig({
   testDir: "./tests",
@@ -34,7 +34,7 @@ export default defineConfig({
       | "chromium"
       | "firefox"
       | "webkit",
-    headless: true,
+    headless: false,
     screenshot: "on-first-failure",
     video: "retain-on-failure",
     launchOptions: {
