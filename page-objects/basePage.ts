@@ -10,10 +10,8 @@ export class BasePage {
 
   /* ================= NAVIGATION ================= */
   async navigate(url: string): Promise<void> {
-    await this.page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
+    await this.gotoWithRetry(url);
+    await this.handlePagePopups();
   }
 
   async getTitle(): Promise<string> {
@@ -105,5 +103,74 @@ export class BasePage {
 
   async isEnabled(locator: Locator): Promise<boolean> {
     return locator.isEnabled();
+  }
+
+  /* ================= POPUP HANDLERS ================= */
+  async handlePagePopups(timeout = 3000): Promise<void> {
+    await this.handleConsentPopup(timeout);
+    await this.handleOneTrustPopup(timeout);
+  }
+
+  async handleConsentPopup(timeout = 3000): Promise<void> {
+    const consentButtons = [
+      this.page.locator("button.dg-button.accept_all").first(),
+      this.page.locator("aside.dg-consent-banner button.dg-button.accept_all").first(),
+      this.page.getByRole("button", { name: /^OK$/i }).first(),
+      this.page.getByRole("button", { name: /Accept All|Accept|I Accept|Agree/i }).first(),
+    ];
+
+    const deadline = Date.now() + timeout;
+
+    for (const button of consentButtons) {
+      const remaining = Math.max(deadline - Date.now(), 0);
+
+      if (remaining === 0) return;
+
+      if (await this.isVisible(button, Math.min(remaining, 1000))) {
+        await button.click({ force: true });
+        return;
+      }
+    }
+  }
+
+  async handleOneTrustPopup(timeout = 3000): Promise<void> {
+    const acceptButton = this.page.locator("#onetrust-accept-btn-handler").first();
+
+    if (await this.isVisible(acceptButton, timeout)) {
+      await acceptButton.click({ force: true });
+    }
+  }
+
+  private async gotoWithRetry(url: string): Promise<void> {
+    const attempts = 2;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await this.page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: 60000,
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt === attempts || !this.isRetryableNavigationError(error)) {
+          throw error;
+        }
+
+        await this.page.waitForTimeout(2000);
+      }
+    }
+
+    throw lastError;
+  }
+
+  private isRetryableNavigationError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return /ERR_CONNECTION_RESET|ERR_CONNECTION_CLOSED|ERR_TIMED_OUT|Timeout/i.test(
+      message,
+    );
   }
 }

@@ -53,8 +53,11 @@ test.describe("QMI Details Page — Overview", () => {
     await qmiPage.verifyAvailabilityIsDisplayed();
   });
 
-  test("QD-09 | Request a Tour and Request Information CTAs are present @regression", async () => {
+  test("QD-09 | Request Information CTA opens modal with required fields @regression", async () => {
     await qmiPage.verifyCtasAreDisplayed();
+    await qmiPage.openRequestInformationModal();
+    await qmiPage.verifyRequestInformationModalIsDisplayed();
+    await qmiPage.verifyRequestInformationModalFields();
   });
 });
 

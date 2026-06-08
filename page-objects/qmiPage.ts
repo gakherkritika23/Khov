@@ -44,6 +44,8 @@ export class QmiPage extends BasePage {
   readonly qmiDetailNavBar: Locator;
   readonly requestTourCta: Locator;
   readonly requestInfoCta: Locator;
+  readonly requestInformationModal: Locator;
+  readonly requestInformationModalHeading: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -107,6 +109,17 @@ export class QmiPage extends BasePage {
     this.requestInfoCta = this.qmiDetailNavBar.getByRole("button", {
       name: "Request Information",
     });
+    this.requestInformationModal = page
+      .locator("[class*='request-information_modal']")
+      .or(page.locator("[class*='Modal_modal']").filter({
+        hasText: /Request Information/i,
+      }))
+      .first();
+    this.requestInformationModalHeading = this.requestInformationModal
+      .getByRole("heading", {
+        name: /Request Information for/i,
+      })
+      .first();
   }
 
   // ── Navigation — Actions ───────────────────────────────
@@ -126,7 +139,7 @@ export class QmiPage extends BasePage {
     this.selectedCardData = await this.getQmiCardData(detailUrl);
     await this.openQmiCard(detailUrl);
     await this.page.waitForLoadState("domcontentloaded");
-    await this.dismissCookies();
+    await this.handlePagePopups();
     await this.verifyCardDataMatchesDetailPage(this.selectedCardData);
   }
 
@@ -164,7 +177,7 @@ export class QmiPage extends BasePage {
   async navigateToCommunity(url: string): Promise<void> {
     await this.navigate(this.resolveUrl(url));
     await this.page.waitForLoadState("domcontentloaded");
-    await this.dismissCookies();
+    await this.handlePagePopups();
   }
 
   async openQuickMoveInTabFromNavBar(): Promise<void> {
@@ -197,20 +210,6 @@ export class QmiPage extends BasePage {
     }
 
     return [];
-  }
-
-  // Detail pages occasionally surface the OneTrust banner over the hero CTAs;
-  // dismiss it if present (non-fatal — most prod loads have no banner).
-  private async dismissCookies(): Promise<void> {
-    const accept = this.page.locator("#onetrust-accept-btn-handler");
-    if (await this.isVisible(accept, 3000)) {
-      await accept.click();
-    }
-
-    const ok = this.page.getByRole("button", { name: "OK" });
-    if (await this.isVisible(ok.first(), 3000)) {
-      await ok.first().click();
-    }
   }
 
   // ── Navigation — Verification ──────────────────────────
@@ -318,7 +317,7 @@ export class QmiPage extends BasePage {
     await this.scrollIntoView(this.viewGalleryButton.first());
     await this.click(this.viewGalleryButton.first(), "View Gallery");
     if (!(await this.isVisible(this.galleryModal.first(), 3000))) {
-      await this.dismissCookies();
+      await this.handlePagePopups();
       await this.click(this.viewGalleryButton.first(), "View Gallery");
     }
   }
@@ -638,6 +637,69 @@ export class QmiPage extends BasePage {
     );
   }
 
+  async openRequestInformationModal(): Promise<void> {
+    await this.handlePagePopups();
+    await this.scrollIntoView(this.requestInfoCta.first());
+    await this.click(this.requestInfoCta.first(), "Request Information CTA");
+  }
+
+  async verifyRequestInformationModalIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.requestInformationModal,
+      "Request Information modal should be displayed",
+      20000,
+    );
+    await Validator.requireVisible(
+      this.requestInformationModalHeading,
+      "Request Information modal heading should be visible",
+      20000,
+    );
+    await expect(this.requestInformationModalHeading).toContainText(
+      /Request Information for/i,
+    );
+  }
+
+  async verifyRequestInformationModalFields(): Promise<void> {
+    const requiredFields = [
+      { name: "First Name", locator: this.requestInformationField(/First Name/i) },
+      { name: "Last Name", locator: this.requestInformationField(/Last Name/i) },
+      { name: "Email Address", locator: this.requestInformationField(/Email Address/i) },
+      { name: "Mobile Number", locator: this.requestInformationField(/Mobile Number/i) },
+      {
+        name: "Preferred Method of Contact",
+        locator: this.requestInformationModal
+          .locator("select, [role='combobox'], input")
+          .filter({ hasText: /Preferred Method of Contact/i })
+          .or(this.requestInformationModal.getByText(/Preferred Method of Contact/i))
+          .first(),
+      },
+    ];
+
+    for (const field of requiredFields) {
+      await Validator.requireVisible(
+        field.locator,
+        `${field.name} field should be visible in Request Information modal`,
+        10000,
+      );
+    }
+
+    await Validator.requireVisible(
+      this.requestInformationModal.getByText(/Real Estate Professional/i).first(),
+      "Real Estate Professional checkbox should be visible",
+      10000,
+    );
+    await Validator.requireVisible(
+      this.requestInformationModal.getByText(/Terms and Conditions/i).first(),
+      "Terms and Conditions consent text should be visible",
+      10000,
+    );
+    await Validator.requireVisible(
+      this.requestInformationModal.getByText(/Read Full Disclaimer/i).first(),
+      "Read Full Disclaimer link should be visible",
+      10000,
+    );
+  }
+
   // ── Data Getters ───────────────────────────────────────
   async getHeading(): Promise<string> {
     return await this.getText(this.pageHeading.first());
@@ -674,6 +736,18 @@ export class QmiPage extends BasePage {
     return this.qmiSectionHeading.locator(
       "xpath=following::a[contains(@class, 'stretched-link') and contains(@href, '/new-construction-homes/')]",
     );
+  }
+
+  private requestInformationField(name: RegExp): Locator {
+    return this.requestInformationModal
+      .getByPlaceholder(name)
+      .or(this.requestInformationModal.getByLabel(name))
+      .or(
+        this.requestInformationModal
+          .locator("input, select, textarea, [role='combobox']")
+          .filter({ hasText: name }),
+      )
+      .first();
   }
 
   private async getQmiCardData(targetDetailUrl?: string): Promise<QmiCardData> {
