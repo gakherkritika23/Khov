@@ -1,6 +1,7 @@
 import { Page } from "@playwright/test";
 import { test } from "./baseTest";
 import { CommunityPage } from "../page-objects/communityPage";
+import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
@@ -35,7 +36,7 @@ test.describe("Community Page — Listing Header", () => {
     await communityPage.verifyStartingPriceIsDisplayed();
     await communityPage.verifyCommunityLocationIsDisplayed();
     await communityPage.verifyOnsiteSalesTeamIsDisplayed();
-    console.log(
+    await reportValue(
       `Community: ${await communityPage.getHeading()} | ${await communityPage.getStartingPriceText()}`,
     );
 
@@ -60,7 +61,9 @@ test.describe("Community Page — Floorplan Section", () => {
   test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @regression", async () => {
     // Floorplan/home cards: render with specs + pricing, images.
     await communityPage.verifyHomeCardsAreDisplayed();
-    console.log(`Home/floorplan cards: ${await communityPage.getHomeCardCount()}`);
+    await reportValue(
+      `Home/floorplan cards: ${await communityPage.getHomeCardCount()}`,
+    );
     await communityPage.verifyCardImagesAreDisplayed();
 
     // Every floorplan's two carousels (elevation + gallery): arrow states +
@@ -116,7 +119,7 @@ test.describe("Community Page — Floorplan Section", () => {
     await communityPage.verifyHomeDetailOpened(
       constants.community.home_detail_url_pattern,
     );
-    console.log(`Opened detail page: ${await communityPage.getUrl()}`);
+    await reportValue(`Opened detail page: ${await communityPage.getUrl()}`);
   });
 });
 
@@ -124,27 +127,57 @@ test.describe("Community Page — Quick Move-In Homes", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
+    // All 12 QMI cards are walked (images, meta, calculator), so allow headroom.
+    test.setTimeout(600000);
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Quick move-in homes section shows homes with availability @smoke", async () => {
+  test("TC-01 | Quick move-in homes — cards, images, meta data, promo rate, mortgage calculator and detail navigation @regression", async () => {
+    // Section + availability.
     await communityPage.verifyQmiSectionIsDisplayed();
-  });
 
-  test("TC-02 | Quick move-in promo rate is displayed @regression", async () => {
-    await communityPage.verifyPromoRateIsDisplayed();
-  });
+    // Load all quick move-in homes (paginated via "Load More").
+    await communityPage.loadAllQmiHomes();
 
-  test("TC-03 | Quick move-in was/now (discounted) pricing is displayed @regression", async () => {
+    // Every QMI card's single image renders and returns 200.
+    await communityPage.verifyQmiCardImages();
+
+    // Every QMI card shows complete, non-empty meta data (+ promo rate if shown).
+    await communityPage.verifyAllQmiMetaData();
+
+    // At least one QMI card shows was/now (discounted) pricing.
     await communityPage.verifyWasNowPricingIsDisplayed();
-  });
 
-  test("TC-04 | Quick move-in home card opens its detail page @regression", async () => {
+    // Mortgage calculator (random QMI card): opens, fields populated, recalculates.
+    await communityPage.openRandomQmiMortgageCalculator();
+    await communityPage.verifyCalculatorFieldsHaveData();
+    await communityPage.verifyPaymentRecalculates(
+      "Down Payment % up",
+      () => communityPage.setCalculatorField(1, "60", "Down Payment %"),
+      "down",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Interest Rate up",
+      () => communityPage.setCalculatorField(3, "9", "Interest Rate"),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Price up",
+      () => communityPage.setCalculatorField(0, "400000", "Price"),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "15-year term",
+      () => communityPage.selectLoanTerm("15"),
+      "up",
+    );
+    await communityPage.closeMortgageCalculator();
+
+    // QMI card CTA opens its detail page — LAST (it leaves the page).
     await communityPage.openFeaturedQmiHome();
     await communityPage.verifyHomeDetailOpened(
       constants.community.home_detail_url_pattern,
     );
-    console.log(`Opened QMI detail: ${await communityPage.getUrl()}`);
+    await reportValue(`Opened QMI detail: ${await communityPage.getUrl()}`);
   });
 });

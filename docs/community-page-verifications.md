@@ -1,6 +1,6 @@
 # Community Page — Verification Coverage
 
-_Last updated: 2026-06-04_
+_Last updated: 2026-06-08_
 
 What the **community page** automated tests verify today. Source files:
 - Spec: `tests/communityPage.spec.ts`
@@ -76,27 +76,25 @@ since it leaves the page).
 
 ## Block 3 — Quick Move-In Homes
 
-### TC-01 | Quick move-in homes section shows homes with availability  `@smoke`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | **QMI section** heading is shown | VISIBLE — "Quick Move-in Homes Available" |
-| 2 | **Availability** badge is shown | VISIBLE — "Available Now" |
+One consolidated test covers the whole QMI section, in order (detail navigation
+is last since it leaves the page). QMI cards are at floorplan-section parity for
+meta data, images, and the mortgage calculator — minus the carousel/gallery
+(each QMI card has a single static image).
 
-### TC-02 | Quick move-in promo rate is displayed  `@regression`
+### TC-01 | QMI cards, images, meta data, promo rate, mortgage calculator and detail nav  `@regression`
 | # | Verification | How |
 |---|--------------|-----|
-| 1 | **Promo rate** badge is shown | VISIBLE — "Promo Rate" |
+| 1 | **QMI section + availability** are shown | VISIBLE — "Quick Move-in Homes Available" heading + an "Available Now" badge |
+| 2 | **All quick move-in homes loaded** | Best-effort "Load More" (the list is paginated), then poll until the card count is stable; count logged (12 on River Ranch Trails) |
+| 3 | **Single card image** (every card) | Per card (scrolled into view): the one static image is VISIBLE and its URL returns **HTTP 200** (`page.request.get`); every URL + status logged. No carousel/gallery — QMI cards have a single image. |
+| 4 | **Meta data** (every card) present & non-zero | Per card: Sq ft, Story/Stories, Beds, Baths (decimal ok), Cars, Estimated payment, **Current total price** — none empty/0/missing; values logged |
+| 5 | **Promo rate** (where present) | If a card shows a "Promo Rate X% (Y% APR)" badge, it's asserted non-empty and logged. Conditional — only some cards carry it. |
+| 6 | **Was/now (discounted) pricing** shown | VISIBLE — `[class*='Card_old-price']` (struck-through original price; at least one card) |
+| 7 | **Mortgage calculator** (random QMI card) | Estimated-payment info icon (`[class*='Card_tooltip-trigger']`, distinct from the floorplan `TitleBlock_popover-trigger`) → "Mortgage Calculator" CTA → the **shared** "Calculate your mortgage" modal; fields populated; recalculates in all 4 directions (down-payment ↑→down, interest ↑→up, price ↑→up, 30→15-yr→up); closes |
+| 8 | Card **CTA → detail page** (last) | Featured QMI card clicked (stretched-link via DOM); URL one level deeper (`new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+`) |
 
-### TC-03 | Quick move-in was/now (discounted) pricing is displayed  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | **Discounted (was) price** is shown | VISIBLE — `[class*='Card_old-price']` (struck-through original price) |
-
-### TC-04 | Quick move-in home card opens its detail page  `@regression`
-| # | Verification | How |
-|---|--------------|-----|
-| 1 | The featured **QMI card** is clicked | *(implicit)* — stretched-link card clicked via DOM |
-| 2 | A **detail page** opens (one level deeper) | URL contains `new-construction-homes/[^/]+/[^/]+/[^/]+/[^/]+` |
+> Pinned to River Ranch Trails. The QMI calculator reuses the same modal and
+> verification helpers as the floorplan calculator. The random card used is logged.
 
 ---
 
@@ -112,9 +110,19 @@ These tests are intentionally a **presence/visibility + navigation baseline**. T
 | Images | image `src` / actually loaded (`naturalWidth > 0`), per-card coverage |
 | Carousel | next/prev navigation, slide change, indicators |
 | CTAs | whether the target is a *floorplan* (clean slug) vs *QMI* (homesite slug); detail-page heading text |
-| QMI | availability **date**, number of QMI homes, exact promo rate/APR text |
+| QMI | availability **date**; exact was/now currency formatting (now < was) |
 | Pricing | the now-price (with was), that now < was, currency formatting |
 
-## Not yet built (per test plan)
-- **CP-03** — sales-consultant modal: River Ranch Trails has no consultant modal (only a generic help/contact modal). Needs a community that has one.
-- **CP-11** — mortgage **calculator modal**: reclassified to **E5 (detail pages)** — the community page shows only a tooltip.
+## Modals exercised on the community page
+Both modals the community page exposes are opened and validated here:
+
+- **Onsite Sales Team modal** *(the sales-consultant modal for this community)* —
+  opened from "Your Onsite Sales Team" and validated in **Block 1** (heading,
+  phone, address, hours, ≥1 consultant **name**, ≥1 consultant **photo**), then
+  closed. River Ranch Trails has **no separate per-consultant detail modal**, so
+  **CP-03** is covered by this modal (not deferred).
+- **Mortgage calculator modal** — opened **on the community page** (not just a
+  tooltip) from both the **floorplan** section (Block 2) and the **QMI** section
+  (Block 3), via the estimated-payment info icon → "Mortgage Calculator" CTA.
+  Fields, recalculation (4 directions), and close are all asserted. This
+  supersedes the earlier note that **CP-11** was tooltip-only / deferred to E5.

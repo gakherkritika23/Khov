@@ -1,6 +1,7 @@
 import { Page, Locator } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
+import { reportValue } from "../utils/reporter";
 import { dismissCookieBanner } from "../utils/cookieUtils";
 
 export class CommunityPage extends BasePage {
@@ -18,6 +19,10 @@ export class CommunityPage extends BasePage {
   readonly promoRateBadge: Locator;
   readonly wasPrice: Locator;
   readonly featuredHomeLink: Locator;
+  readonly qmiSection: Locator;
+  readonly qmiCards: Locator;
+  readonly qmiCalcTriggers: Locator;
+  readonly qmiLoadMore: Locator;
   readonly cardImage: Locator;
   readonly carousel: Locator;
   readonly floorplanBlocks: Locator;
@@ -65,6 +70,19 @@ export class CommunityPage extends BasePage {
     this.wasPrice = page.locator("[class*='Card_old-price']");
     // The featured "Home of the Week" QMI card navigates via a stretched link.
     this.featuredHomeLink = page.locator("[class*='stretched-link']");
+    // Quick Move-In section + its cards (scoped to avoid the floorplan section).
+    // Each QMI card is a `Card_contents` block with one static image, a specs
+    // row, pricing, and an estimated-payment info icon (`Card_tooltip-trigger`,
+    // distinct from the floorplan `TitleBlock_popover-trigger`) whose popover
+    // opens the SAME "Calculate your mortgage" modal as the floorplans.
+    this.qmiSection = page.locator("section[class*='quick-move-in-container']");
+    this.qmiCards = this.qmiSection.locator("[class*='Card_contents']");
+    this.qmiCalcTriggers = this.qmiSection.locator(
+      "[class*='Card_tooltip-trigger']",
+    );
+    this.qmiLoadMore = this.qmiSection.getByRole("button", {
+      name: /load more/i,
+    });
     // Media. `:visible` avoids lazy/zero-size or hidden carousel-slide images.
     this.cardImage = page.locator("[class*='Card_'] picture:visible");
     this.carousel = page.locator("[class*='FeaturedCarousel']");
@@ -223,7 +241,7 @@ export class CommunityPage extends BasePage {
         time,
         `Sales office timing (row ${i + 1}) should not be empty`,
       );
-      console.log(`Sales office hours — ${day}: ${time}`);
+      await reportValue(`Sales office hours — ${day}: ${time}`);
     }
   }
 
@@ -307,11 +325,13 @@ export class CommunityPage extends BasePage {
       "Modal consultant names should not be empty",
     );
 
-    console.log(`Modal phone: ${phone}`);
-    console.log(`Modal address: ${address}`);
-    console.log(`Modal hours: ${hours}`);
-    console.log(`Modal consultants: ${names.join(", ")}`);
-    console.log(`Modal consultant photos: ${await this.consultantPhotos.count()}`);
+    await reportValue(`Modal phone: ${phone}`);
+    await reportValue(`Modal address: ${address}`);
+    await reportValue(`Modal hours: ${hours}`);
+    await reportValue(`Modal consultants: ${names.join(", ")}`);
+    await reportValue(
+      `Modal consultant photos: ${await this.consultantPhotos.count()}`,
+    );
   }
 
   async closeSalesTeamModal(): Promise<void> {
@@ -412,6 +432,169 @@ export class CommunityPage extends BasePage {
     );
   }
 
+  // Scroll the QMI section into view and poll until the card count settles (the
+  // cards lazy-render, so an immediate count can race to 0).
+  private async ensureQmiCardsRendered(): Promise<number> {
+    await this.scrollIntoView(this.qmiSectionHeading.first());
+    await this.page.waitForTimeout(800);
+    let last = -1;
+    let count = 0;
+    for (let i = 0; i < 12; i++) {
+      count = await this.qmiCards.count();
+      if (count > 0 && count === last) break; // stable
+      last = count;
+      await this.page.waitForTimeout(500);
+    }
+    return count;
+  }
+
+  /**
+   * Render all quick move-in homes. The list is paginated on the live site via a
+   * "Load More" control; click it until it's gone (best-effort — in automation
+   * all cards are often already present), then poll until the card count is
+   * stable and report it.
+   */
+  async loadAllQmiHomes(): Promise<number> {
+    await this.scrollIntoView(this.qmiSectionHeading.first());
+    await this.page.waitForTimeout(800);
+    for (let i = 0; i < 6; i++) {
+      const more = this.qmiLoadMore.first();
+      if (!(await more.isVisible().catch(() => false))) break;
+      await more.scrollIntoViewIfNeeded().catch(() => {});
+      await more.click().catch(() => {});
+      await this.page.waitForTimeout(900);
+    }
+    const count = await this.ensureQmiCardsRendered();
+    await reportValue(`Quick move-in homes loaded: ${count}`);
+    return count;
+  }
+
+  // ── Quick Move-In (QMI) — Verification ─────────────────
+  /**
+   * Each QMI card shows a single static image (no carousel). For every card:
+   * scroll it into view, assert the image is visible, then assert its URL
+   * returns HTTP 200 and log every URL + status.
+   */
+  async verifyQmiCardImages(): Promise<void> {
+    const count = await this.qmiCards.count();
+    await Validator.requireTrue(
+      count > 0,
+      "Quick move-in homes should render at least one card",
+    );
+    let nonOk = 0;
+    for (let i = 0; i < count; i++) {
+      const card = this.qmiCards.nth(i);
+      await this.scrollIntoView(card);
+      await this.page.waitForTimeout(150);
+      const img = card.locator("img").first();
+      await Validator.requireVisible(
+        img,
+        `QMI card ${i + 1} image should be visible`,
+        15000,
+      );
+      const url = await img
+        .evaluate(
+          (im) =>
+            (im as HTMLImageElement).currentSrc || (im as HTMLImageElement).src,
+        )
+        .catch(() => "");
+      const resp = url.startsWith("http")
+        ? await this.page.request.get(url).catch(() => null)
+        : null;
+      const status = resp ? resp.status() : "ERR";
+      if (status !== 200) nonOk++;
+      await reportValue(`QMI card ${i + 1} image: ${status} ${url}`);
+    }
+    await Validator.requireTrue(
+      nonOk === 0,
+      `All ${count} QMI card images should return 200`,
+    );
+  }
+
+  /**
+   * For every QMI card, validate the meta data carries real values: Sq ft,
+   * Story/Stories, Beds, Baths (decimal ok), Cars, Estimated payment, Current
+   * total price — none empty/zero/missing. If a promo-rate badge is present on a
+   * card, assert it's non-empty too. Values are parsed from each card's text
+   * (cards lazy-render, so each is scrolled into view) and logged.
+   */
+  async verifyAllQmiMetaData(): Promise<void> {
+    const count = await this.qmiCards.count();
+    await reportValue(`Validating meta data for ${count} quick move-in homes`);
+    for (let i = 0; i < count; i++) {
+      const card = this.qmiCards.nth(i);
+      await this.scrollIntoView(card);
+      await this.page.waitForTimeout(150);
+      const text = (await card.innerText().catch(() => ""))
+        .replace(/\s+/g, " ")
+        .trim();
+      const label = `QMI #${i + 1}`;
+      const numeric: Record<string, RegExpMatchArray | null> = {
+        "Sq ft": text.match(/([\d,]+)\s*Sq ?ft/i),
+        Story: text.match(/(\d+)\s*Stor(?:y|ies)/i),
+        Beds: text.match(/(\d+(?:\.\d+)?)\s*Beds?/i),
+        Baths: text.match(/(\d+(?:\.\d+)?)\s*Baths?/i),
+        Cars: text.match(/(\d+)\s*Cars?/i),
+        "Estimated payment": text.match(/Estimated payment\s*\$([\d,]+)/i),
+        "Current total price": text.match(/Current total price\s*\$([\d,]+)/i),
+      };
+      const issues: string[] = [];
+      for (const [key, match] of Object.entries(numeric)) {
+        const value = match ? Number(match[1].replace(/,/g, "")) : NaN;
+        if (!match || !(value > 0))
+          issues.push(`${key}=${match ? match[1] : "missing"}`);
+      }
+      const promo = text.match(/Promo Rate[^*]*\*/i);
+      await reportValue(
+        `${label}: ${Object.entries(numeric)
+          .map(([k, m]) => `${k}=${m ? m[1] : "?"}`)
+          .join(", ")}${promo ? ` | ${promo[0]}` : ""}`,
+      );
+      if (promo)
+        await Validator.requireNotEmpty(
+          promo[0],
+          `${label}: promo rate should not be empty`,
+        );
+      await Validator.requireTrue(
+        issues.length === 0,
+        `${label}: all meta data present & non-zero${issues.length ? ` — issues: ${issues.join("; ")}` : ""}`,
+      );
+    }
+  }
+
+  // ── Quick Move-In (QMI) Mortgage Calculator — Actions ──
+  /**
+   * Open the mortgage calculator for a random QMI card via its estimated-payment
+   * info icon → "Mortgage Calculator" CTA → shared "Calculate your mortgage"
+   * modal (same modal as the floorplan calculator, so the calculator
+   * verification helpers are reused).
+   */
+  async openRandomQmiMortgageCalculator(): Promise<void> {
+    const count = await this.qmiCalcTriggers.count();
+    const index = Math.floor(Math.random() * Math.max(count, 1));
+    await reportValue(
+      `Opening mortgage calculator for quick move-in home #${index + 1}/${count}`,
+    );
+    const trigger = this.qmiCalcTriggers.nth(index);
+    let opened = false;
+    for (let attempt = 0; attempt < 4 && !opened; attempt++) {
+      await trigger.scrollIntoViewIfNeeded().catch(() => {});
+      await this.page.waitForTimeout(700);
+      await trigger.click({ timeout: 4000 }).catch(() => {});
+      await this.page.waitForTimeout(700);
+      opened = await this.mortgageCalculatorCta
+        .first()
+        .isVisible()
+        .catch(() => false);
+    }
+    await this.click(this.mortgageCalculatorCta.first(), "Mortgage Calculator");
+    await Validator.requireVisible(
+      this.calculatorHeading.first(),
+      "Mortgage calculator modal should open",
+      15000,
+    );
+  }
+
   // ── Media (images / carousel) — Verification ───────────
   async verifyCardImagesAreDisplayed(): Promise<void> {
     await this.scrollIntoView(this.cardImage.first());
@@ -439,7 +622,7 @@ export class CommunityPage extends BasePage {
    */
   async verifyFloorplanCarousels(): Promise<void> {
     const count = await this.floorplanBlocks.count();
-    console.log(`Validating carousels for ${count} floorplans`);
+    await reportValue(`Validating carousels for ${count} floorplans`);
     for (let i = 0; i < count; i++) {
       const block = this.floorplanBlocks.nth(i);
       await this.scrollIntoView(block);
@@ -517,9 +700,11 @@ export class CommunityPage extends BasePage {
       const resp = await this.page.request.get(urls[i]).catch(() => null);
       const status = resp ? resp.status() : "ERR";
       if (status !== 200) nonOk++;
-      console.log(`${label} image ${i + 1}/${urls.length}: ${status} ${urls[i]}`);
+      await reportValue(
+        `${label} image ${i + 1}/${urls.length}: ${status} ${urls[i]}`,
+      );
     }
-    console.log(
+    await reportValue(
       `${label}: ${slideCount} slides, ${urls.length} images, ${nonOk} non-200`,
     );
     await Validator.requireTrue(
@@ -532,7 +717,9 @@ export class CommunityPage extends BasePage {
   async openRandomFloorplanMortgageCalculator(): Promise<void> {
     const count = await this.floorplanCalcTriggers.count();
     const index = Math.floor(Math.random() * Math.max(count, 1));
-    console.log(`Opening mortgage calculator for floorplan #${index + 1}/${count}`);
+    await reportValue(
+      `Opening mortgage calculator for floorplan #${index + 1}/${count}`,
+    );
     const trigger = this.floorplanCalcTriggers.nth(index);
 
     // The floorplan blocks lazy-render, so the info-icon trigger can detach on
@@ -566,7 +753,7 @@ export class CommunityPage extends BasePage {
     await input.click();
     await input.fill(value);
     await input.press("Tab"); // blur → triggers recalculation
-    console.log(`Set ${name} = ${value}`);
+    await reportValue(`Set ${name} = ${value}`);
   }
 
   async selectLoanTerm(years: "15" | "30"): Promise<void> {
@@ -607,10 +794,10 @@ export class CommunityPage extends BasePage {
       const value = (await this.calculatorInputs.nth(i).inputValue()).trim();
       await Validator.requireNotEmpty(
         value,
-        `Calculator field ${i + 1} should have a value`,
+        `Calculator field ${i + 1} should have a value (got "${value}")`,
       );
     }
-    console.log(
+    await reportValue(
       `Calculator estimated payment $${payment}; ${fieldCount} fields populated`,
     );
   }
@@ -631,7 +818,7 @@ export class CommunityPage extends BasePage {
       await this.page.waitForTimeout(400);
       after = await this.getEstimatedPayment();
     }
-    console.log(`${label}: $${before} → $${after}`);
+    await reportValue(`${label}: $${before} → $${after}`);
     await Validator.requireTrue(
       after > 0 && after !== before,
       `${label}: estimated payment should recalculate (was $${before}, now $${after})`,
@@ -652,7 +839,7 @@ export class CommunityPage extends BasePage {
    */
   async verifyAllFloorplanMetaData(): Promise<void> {
     const count = await this.floorplanCalcTriggers.count();
-    console.log(`Validating meta data for ${count} floorplans`);
+    await reportValue(`Validating meta data for ${count} floorplans`);
     for (let i = 0; i < count; i++) {
       const trigger = this.floorplanCalcTriggers.nth(i);
       let text = "";
@@ -700,7 +887,7 @@ export class CommunityPage extends BasePage {
       if (!/Starting price may include lot premium/i.test(text))
         issues.push("lot-premium disclaimer missing");
 
-      console.log(
+      await reportValue(
         `${name}: ${Object.entries(numeric)
           .map(([k, m]) => `${k}=${m ? m[1] : "?"}`)
           .join(", ")}`,

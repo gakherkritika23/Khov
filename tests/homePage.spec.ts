@@ -1,6 +1,7 @@
 import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
 import { CommunityPage } from "../page-objects/communityPage";
+import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
@@ -29,7 +30,7 @@ test.describe("Home Page — Hero Search", () => {
     );
 
     const heading = await homePage.getResultsHeading();
-    console.log(`Destination Heading: ${heading}`);
+    await reportValue(`Destination Heading: ${heading}`);
   });
 
   test("TC-02 | Searching a community name and selecting it opens the community page @smoke", async () => {
@@ -45,6 +46,6 @@ test.describe("Home Page — Hero Search", () => {
       constants.community.river_ranch_trails_url,
       constants.community.river_ranch_trails_heading,
     );
-    console.log(`Community heading: ${await communityPage.getHeading()}`);
+    await reportValue(`Community heading: ${await communityPage.getHeading()}`);
   });
 });

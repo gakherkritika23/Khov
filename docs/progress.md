@@ -33,7 +33,7 @@ Tracks delivered work, current status per epic, and key decisions. See
 | E0 | Framework / helpers | ✅ Done | `typeSequentially`, `clickViaScript`, `waitForApi` timeout |
 | E1 | Search bar | 🟡 Partial | SB-01, SB-02, SB-03 done; SB-04 (suggestion grouping) / SB-05 (no-match) pending |
 | E2 | Region page | 🟡 Partial | RG-01, RG-02 done; maps/filters/sort (RG-03…RG-11) pending |
-| E3 | Community page | 🟡 Nearly done | Header (CP-01/02) ✅; floorplan/home cards + images + carousel (CP-10/12/13/14) ✅; QMI section (CP-20–23) ✅. Remaining: CP-03 (consultant modal — need a community that has it); CP-11 (calculator modal → moved to E5) |
+| E3 | Community page | ✅ Done | Header + sales-consultant (Onsite Sales Team) modal (CP-01/02/03) ✅; floorplan section — cards/images/carousel/meta/calculator (CP-10–15) ✅; QMI section — cards/images/meta/promo/calculator/detail (CP-20–26) ✅ |
 | E4 | QMI details page | ⬜ Not started | Gallery, pricing, IFP, sticker, CTAs |
 | E5 | Floorplan details page | ⬜ Not started | Gallery, pricing, IFP, CTAs |
 | E6 | Contact form (site-wide) | ⬜ Not started | Shared component, `@form` tests |
@@ -47,9 +47,9 @@ Tracks delivered work, current status per epic, and key decisions. See
 | `tests/homePage.spec.ts` | TC-01 — search 'Texas' → select 'Dallas' → Dallas homes page | @smoke | Home / search bar → market results |
 | `tests/homePage.spec.ts` | TC-02 — search 'River Ranch Trails' → select community → community page | @smoke | Home / search bar → community page |
 | `tests/regionPage.spec.ts` | TC-01 — search 'Texas' → select 'Texas' → first community → detail | @regression | Home → region page → community detail |
-| `tests/communityPage.spec.ts` | Listing Header TC-01/02 — loads (name/price/location); sales team + hours | @smoke / @regression | Community page header |
-| `tests/communityPage.spec.ts` | Floorplan & Home Cards TC-01–04 — cards render; images; carousel; "View Home Details" → detail | @smoke / @regression | Community floorplan/home cards |
-| `tests/communityPage.spec.ts` | Quick Move-In Homes TC-01–04 — availability; promo rate; was/now; card → QMI detail | @smoke / @regression | Community QMI section |
+| `tests/communityPage.spec.ts` | Listing Header TC-01 — loads (name/price/location); sales-office hours; Onsite Sales Team (consultant) modal | @smoke | Community page header + sales-consultant modal |
+| `tests/communityPage.spec.ts` | Floorplan Section TC-01 — cards; images; carousels; meta data; mortgage calculator; "View Home Details" → detail | @regression | Community floorplan section |
+| `tests/communityPage.spec.ts` | Quick Move-In Homes TC-01 — load all; single image (+200); meta data; promo rate; was/now; mortgage calculator; card → QMI detail | @regression | Community QMI section |
 
 All community-page tests are pinned to **River Ranch Trails** (navigated directly).
 POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
@@ -58,14 +58,19 @@ POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
 
 ## Next up
 
-1. **CP-03** — find a community with a sales-consultant modal, then add the test pinned to it.
-2. **Verification enrichment** — the user will provide the detailed verifications to layer onto the community-page baseline tests.
-3. **E4 / E5** — QMI & floorplan details pages (reached from E3). Includes CP-11 (calculator modal) which lives on the detail pages.
+1. **E4 / E5** — QMI & floorplan details pages (reached from E3).
+2. **E2 RG-03…RG-11** — region page maps / filters / sort.
+3. **E6** — contact form (shared component, `@form`).
+4. **SB-04 / SB-05** — search-bar suggestion grouping / no-match state.
 
 ---
 
 ## Decisions & log
 
+- **2026-06-08** — QMI section brought to floorplan parity, merged into ONE consolidated test (`communityPage.spec.ts` "Quick Move-In Homes" TC-01): load all 12 homes, every card's single static image (visible + HTTP 200), every card's meta data (Sq ft/Story/Beds/Baths/Cars/Estimated payment/**Current total price** — none empty/0), promo rate where present, was/now, mortgage calculator on a **random** card (open/fields/recalc/close), and card → detail (last). QMI-scoped locators: `section[class*='quick-move-in-container']`, cards `[class*='Card_contents']` (12), info icon `[class*='Card_tooltip-trigger']` (distinct from the floorplan `TitleBlock_popover-trigger`) → the **same** "Calculate your mortgage" modal (calculator helpers reused). Cards lazy-render (count races 0→12) → scroll + poll. No carousel/gallery (single image). Replaces the old QMI TC-01..04. Class 3/3 green.
+- **2026-06-08** — Confirmed both community-page modals are exercised → corrected the docs: **CP-03** (sales-consultant modal) is covered by the **Onsite Sales Team** modal (no separate per-consultant modal on River Ranch Trails; was wrongly marked deferred); **CP-11** (mortgage calculator modal) IS opened on the community page from both the floorplan and QMI sections (supersedes the "tooltip-only / moved to E5" note).
+- **2026-06-08** — Allure value logging: `console.log` is not a `test.step`, so logged values (image URLs+status, sales hours, modal phone/address/consultants, floorplan/QMI meta, calculator fields) never showed in the report. Added `utils/reporter.ts` `reportValue(message)` — a boxed `test.step` that also mirrors to stdout — and routed all value logs through it across `communityPage.ts` + the three specs. Verified values now render as report steps.
+- **2026-06-08** — Run-scope policy refined (Stage 6 skill + memory): at finalization run only the **corresponding class** (spec file), not the full suite; shared-file change (validator/basePage/config) runs the full class + one representative test per other spec.
 - **2026-06-03** — Scope for the first two tests was Stages 1→6 (no worktree, no commit); ran against **prod** (`https://www.khov.com`).
 - **2026-06-03** — Search input is a react-aria `searchbox` (aria-label "Search input"; dynamic `id`). The "Search by market, city, state, community" text is a label, not the placeholder attribute. Suggestions need real keystrokes + survive a React hydration reset (retry logic in `searchAndSelectSuggestion`).
 - **2026-06-03** — Region community cards navigate via a zero-size "stretched link" anchor whose overlay paints behind content; click handled by `clickViaScript` (programmatic DOM click).

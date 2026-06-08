@@ -1,6 +1,6 @@
 # khov.com — Test Automation Plan
 
-_Last updated: 2026-06-03_
+_Last updated: 2026-06-08_
 
 This is the master backlog for automating khov.com end-to-end coverage. Each
 epic below maps to one Page Object (`page-objects/*.ts`) and one spec
@@ -22,7 +22,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
-| E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | 🟡 (header ✅) |
+| E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | 🟡 (header, floorplan, QMI ✅) |
 | E4 | QMI details page | `qmiDetailPage.ts` _(new)_ | `qmiDetailPage.spec.ts` _(new)_ | ⬜ |
 | E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
 | E6 | Contact form (site-wide) | `contactForm.ts` _(new, shared)_ | `contactForm.spec.ts` _(new)_ | ⬜ |
@@ -98,7 +98,7 @@ to be captured during Stage 3.
 |----|-----------|-----|--------|
 | CP-01 | Community page loads (name heading, starting price, location) | @smoke | ✅ (`communityPage.spec.ts` TC-01) |
 | CP-02 | Onsite sales team + sales office hours displayed | @regression | ✅ (`communityPage.spec.ts` TC-02) |
-| CP-03 | Sales consultant modal opens / closes with expected content | @regression | ⬜ deferred — no distinct consultant modal on River Ranch Trails (only Call / Request a Tour / Self Tour / Contact Us). Needs a community that has one. |
+| CP-03 | Sales consultant modal opens / closes with expected content | @regression | ✅ (`communityPage.spec.ts` Listing Header TC-01) — the "Your Onsite Sales Team" → "Our Onsite Team" modal is the sales-consultant modal for this community; validated (heading, phone, address, hours, ≥1 consultant name + photo) and closed. River Ranch Trails has no separate per-consultant detail modal. |
 
 ### Floorplan section
 > On the community page, floorplan and QMI homes share one `Card` component
@@ -119,18 +119,26 @@ to be captured during Stage 3.
 | CP-15 | Every floorplan shows complete meta data (sq ft, story, beds, baths, cars, est. payment, starting price, disclaimer) — none empty/0 | ✅ |
 
 ### QMI (Quick Move-In) section
-| ID | Test case | Tag | Status |
-|----|-----------|-----|--------|
-| CP-20 | QMI section shows homes with availability ("Available Now") | @smoke | ✅ (`communityPage.spec.ts` Quick Move-In Homes TC-01) |
-| CP-21 | Promo rate badge shown | @regression | ✅ (Quick Move-In Homes TC-02) |
-| CP-22 | Was/now (discounted) pricing on QMI card | @regression | ✅ (Quick Move-In Homes TC-03) |
-| CP-23 | Clickable QMI card / CTA → QMI details page | @regression | ✅ (Quick Move-In Homes TC-04) |
+> All QMI checks below are covered by a **single** consolidated test:
+> `communityPage.spec.ts` → **"Quick Move-In Homes" TC-01** `@regression` (cards,
+> images, meta data, promo rate, mortgage calculator, detail nav).
+
+| ID | Test case | Status |
+|----|-----------|--------|
+| CP-20 | QMI section shows homes with availability ("Available Now") | ✅ |
+| CP-21 | Promo rate badge shown (per card, where present) | ✅ |
+| CP-22 | Was/now (discounted) pricing on QMI card | ✅ |
+| CP-23 | Clickable QMI card / CTA → QMI details page | ✅ |
+| CP-24 | Every QMI card's single static image renders + returns 200 | ✅ |
+| CP-25 | Every QMI card shows complete meta data (sq ft, story, beds, baths, cars, est. payment, current total price) — none empty/0 | ✅ |
+| CP-26 | Mortgage calculator (random QMI card) opens, fields populated, recalculates, closes | ✅ |
 
 > The community spec is **pinned to River Ranch Trails** (navigated directly) so
 > the conditional features (promo rate, was/now, QMI homes) are deterministic.
 
-**Open data questions:** still need a community that reliably has a **sales
-consultant modal** (CP-03).
+**Open data questions:** none outstanding for the community page — CP-03 is
+covered by the Onsite Sales Team modal (River Ranch Trails has no separate
+per-consultant detail modal).
 
 ---
 
