@@ -220,4 +220,4 @@ detail-page epics and the contact form.
 - Whether map **zoom/pan** is assertable via DOM or only via control clicks.
 - Contact form **submit endpoint(s)** and whether prod submissions are safe to
   fire (may need a non-prod env or a test-mode flag).
-- Which environment(s) to certify against (currently prod; no real `.env.dev/uat`).
+- Which environment(s) to certify against. Env files now exist for `dev`/`uat`/`stage`/`prod` (`environment/{env}.env`), pointing to `www-dev`/`www-uat`/`www-stg`/`www` respectively. Community-page specs are pinned to a **prod**-only community (River Ranch Trails).

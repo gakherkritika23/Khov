@@ -59,16 +59,19 @@ Both files are read from the worktree copy.
 
 ## Step 4 — Environment Selection
 
-Default: `TEST_ENV=dev` (points to `https://www.khov.com/` per `environment/.env.dev`)
+Env files live at `environment/{env}.env` (`dev`, `uat`, `stage`, `prod`). Config
+falls back to `dev` if `TEST_ENV` is unset. Base URLs: dev `www-dev.khov.com`,
+uat `www-uat.khov.com`, stage `www-stg.khov.com`, prod `www.khov.com`.
 
 ```
-Use dev:  standard — live production-equivalent content
-Use uat:  if dev is unreachable or returns unexpected content
-Never use prod for automated smoke/regression runs
+Use prod: REQUIRED for specs pinned to prod-only data (e.g. the community-page
+          specs are pinned to River Ranch Trails, which exists only on prod)
+Use dev:  default for environment-agnostic specs
+Use uat/stage: if dev is unreachable or for env-specific certification
 ```
 
-Switch to UAT only if `dev` shows infrastructure errors (`ERR_CONNECTION_REFUSED`,
-SSL errors, maintenance page). Do not switch environments to mask test failures.
+Switch envs only for infrastructure errors (`ERR_CONNECTION_REFUSED`, SSL errors,
+maintenance page) — not to mask test failures.
 
 ---
 
@@ -95,13 +98,13 @@ npm run regression:dev -- tests/{pageName}.spec.ts --reporter=list
 ### Run a Single Spec (All Tests)
 
 ```powershell
-npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list
+npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome --reporter=list
 ```
 
 ### Run Specific Test Cases by grep
 
 ```powershell
-npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list --grep "TC-01|TC-02"
+npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome --reporter=list --grep "TC-01|TC-02"
 ```
 
 ### Available npm scripts (reference)
@@ -125,14 +128,14 @@ class (the spec file you worked on) — NOT the whole suite.**
 - **Iterate:** after editing a test body, or a locator/method used **only** by that
   test, run just that test:
   ```
-  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --grep "TC-01"
+  npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome --grep "TC-01"
   # or pin by line:
-  npm run test:dev -- tests/{pageName}.spec.ts:42 --project=chromium
+  npm run test:dev -- tests/{pageName}.spec.ts:42 --project=Chrome
   ```
 - **Finalize (default) — run the full corresponding class only**, right before
   Stage 7 (commit), as the regression gate for that page:
   ```
-  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium
+  npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome
   ```
 - **Shared-file exception:** if you touched a file used by **every** spec —
   `utils/validator.ts`, base-page / navigation helpers (`navigateToHome` /
@@ -141,9 +144,9 @@ class (the spec file you worked on) — NOT the whole suite.**
   spec** as a per-file sanity check, instead of the whole suite:
   ```
   # full class you worked on
-  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium
+  npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome
   # one representative test per OTHER spec
-  npm run test:dev -- tests/{otherSpec}.spec.ts --project=chromium --grep "TC-01"
+  npm run test:dev -- tests/{otherSpec}.spec.ts --project=Chrome --grep "TC-01"
   ```
 - **Never** run the complete suite (all tests of all classes) as the routine
   finalization gate.
@@ -186,7 +189,7 @@ For each failing test, determine which category applies:
 
 2. **Rerun only the failing tests:**
    ```powershell
-   npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --reporter=list --grep "TC-XX|TC-YY"
+   npm run test:dev -- tests/{pageName}.spec.ts --project=Chrome --reporter=list --grep "TC-XX|TC-YY"
    ```
 
 3. **If still failing — re-inspect the live site** using Playwright MCP browser tools.

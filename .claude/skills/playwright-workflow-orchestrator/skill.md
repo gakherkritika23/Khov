@@ -127,7 +127,7 @@ project-root/             ← D:\Khov
 ├── playwright.config.ts
 ├── tsconfig.json
 ├── package.json
-├── environment/            ← .env.dev / .env.uat / .env.prod
+├── environment/            ← dev.env / uat.env / stage.env / prod.env (per-env BASE_URL)
 ├── page-objects/           ← Page Object Model classes
 │   ├── basePage.ts         ← Base class with click(), type(), navigate(), getText(), etc.
 │   └── ...                 ← One POM per page
