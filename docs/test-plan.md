@@ -22,7 +22,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
-| E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | 🟡 (header, floorplan, QMI ✅) |
+| E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | ✅ (header, floorplan, QMI) |
 | E4 | QMI details page | `qmiDetailPage.ts` _(new)_ | `qmiDetailPage.spec.ts` _(new)_ | ⬜ |
 | E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
 | E6 | Contact form (site-wide) | `contactForm.ts` _(new, shared)_ | `contactForm.spec.ts` _(new)_ | ⬜ |
@@ -88,7 +88,7 @@ to be captured during Stage 3.
 
 ---
 
-## E3 — Community page ⬜
+## E3 — Community page ✅
 
 > "Community listings load correctly (Starting Price, address, Sales office Hours,
 > sales consultant modals). Floorplan section. QMI section."
