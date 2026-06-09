@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ### Running Tests
 
-All test commands use `cross-env` to set `TEST_ENV`, which determines which `.env` file is loaded:
+All test commands use `cross-env` to set `TEST_ENV`, which determines which environment file (`environment/{TEST_ENV}.env`) is loaded. Supported envs: `dev`, `uat`, `stage`, `prod` (config falls back to `dev` if `TEST_ENV` is unset/unknown):
 
 ```bash
 # Run full suite against an environment
@@ -25,24 +25,43 @@ npm run regression:uat
 npm run regression:prod
 ```
 
+> Note: there are npm scripts for `dev`/`uat`/`prod` only. For `stage`, set
+> `TEST_ENV=stage` directly (see below).
+
+### Projects
+
+`playwright.config.ts` defines three projects:
+- **`Chrome`** — Chromium, runs every test (use this to run a whole spec).
+- **`smoke`** — `grep` `@smoke` only.
+- **`regression`** — `grep` `@regression` only.
+
+There is no `chromium` project — use `--project=Chrome`.
+
 ### Running a Single Test File
 
 ```bash
-npx playwright test tests/homePage.spec.ts
-npx playwright test tests/homePage.spec.ts --project=chromium
+npx playwright test tests/homePage.spec.ts --project=Chrome
+# one test by tag/title or line:
+npx playwright test tests/homePage.spec.ts --project=Chrome --grep "TC-01"
+npx playwright test tests/homePage.spec.ts:42 --project=Chrome
 ```
 
 ### Running Tests with a Specific Tag
 
 ```bash
-npx playwright test --grep @smoke
-npx playwright test --grep @regression
+npx playwright test --project=smoke
+npx playwright test --project=regression
 ```
 
 ### Running with a Specific Environment
 
 ```bash
-cross-env TEST_ENV=uat npx playwright test tests/homePage.spec.ts
+# via npm script (uses cross-env from node_modules):
+npm run test:prod -- tests/homePage.spec.ts --project=Chrome
+
+# or set TEST_ENV inline (macOS/Linux). `cross-env` is NOT installed globally,
+# so prefix the variable directly rather than calling `cross-env`:
+TEST_ENV=stage npx playwright test tests/homePage.spec.ts --project=Chrome
 ```
 
 ### Viewing Allure Reports
@@ -60,12 +79,15 @@ npx allure open
 tests/          → Test specs (.spec.ts), consume page objects and utils
 page-objects/   → Page Object Model classes
 utils/          → Shared helpers (validation, API, string, constants)
-environment/    → .env.dev / .env.uat / .env.prod (base URLs, browser, timeout)
+scripts/        → Tooling (e.g. generate-client-report.ts)
+environment/    → dev.env / uat.env / stage.env / prod.env (per-env BASE_URL)
 ```
 
 ### Environment Configuration
 
-`playwright.config.ts` reads `process.env.TEST_ENV` (set via npm scripts, defaults to `dev` when unset) and loads `environment/.env.{TEST_ENV}`. The env files expose `BASE_URL`, `BROWSER`, and `DEFAULT_TIMEOUT` into the Playwright config. Tests run headed locally and headless on CI.
+`playwright.config.ts` reads `process.env.TEST_ENV` (set via npm scripts; falls back to `dev` if unset/unknown, with a warning) and loads `environment/{TEST_ENV}.env`. Supported envs: `dev`, `uat`, `stage`, `prod`. Each env file defines `ENV` and `BASE_URL`; `baseURL` comes **only** from `BASE_URL` (the config throws fail-fast if it's unset). Base URLs: dev `www-dev`, uat `www-uat`, stage `www-stg`, prod `www.khov.com`. Tests run **headed** (`headless: false` in config).
+
+> The community-page specs are pinned to a **prod**-only community (River Ranch Trails), so run them with `TEST_ENV=prod`.
 
 ### Allure Integration
 
