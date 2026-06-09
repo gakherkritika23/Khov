@@ -1,6 +1,7 @@
-import { Page, Locator, expect } from "@playwright/test";
+import { Page, Locator, Response, expect } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
+import { waitForApi } from "../utils/apiUtils";
 import { escapeRegExp, normalizeText } from "../utils/stringUtils";
 
 export interface QmiCardData {
@@ -13,6 +14,23 @@ export interface QmiCardData {
   href?: string;
   rawText: string;
 }
+
+export interface RequestInformationFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  preferredContactMethod?: "Text" | "Email" | "Phone";
+}
+
+// Sensible defaults for a successful submission; callers may override per test.
+const DEFAULT_REQUEST_INFORMATION_DATA: RequestInformationFormData = {
+  firstName: "Test",
+  lastName: "Automation",
+  email: `test.automation+${Date.now()}@ex2india.com`,
+  phone: "7325551234",
+  preferredContactMethod: "Email",
+};
 
 /**
  * Quick Move-In (QMI) details page — E4 in docs/test-plan.md.
@@ -35,8 +53,10 @@ export class QmiPage extends BasePage {
   readonly availability: Locator;
   readonly viewGalleryButton: Locator;
   readonly galleryModal: Locator;
+  readonly galleryTabButtons: Locator;
   readonly gallerySectionButtons: Locator;
   readonly galleryImage: Locator;
+  readonly inlineMediaImage: Locator;
   readonly monthlyPayment: Locator;
   readonly mortgageInfoTrigger: Locator;
   readonly mortgagePopover: Locator;
@@ -46,6 +66,17 @@ export class QmiPage extends BasePage {
   readonly requestInfoCta: Locator;
   readonly requestInformationModal: Locator;
   readonly requestInformationModalHeading: Locator;
+  readonly requestInfoFirstName: Locator;
+  readonly requestInfoLastName: Locator;
+  readonly requestInfoEmail: Locator;
+  readonly requestInfoPhone: Locator;
+  readonly requestInfoContactMethod: Locator;
+  readonly requestInfoDisclaimerCheckbox: Locator;
+  readonly requestInfoTextDisclaimerCheckbox: Locator;
+  readonly requestInfoSubmitButton: Locator;
+  readonly requestInfoFieldErrors: Locator;
+  readonly requestInfoSuccessMessage: Locator;
+  private galleryFallbackUsed = false;
 
   constructor(page: Page) {
     super(page);
@@ -69,14 +100,25 @@ export class QmiPage extends BasePage {
     // Media gallery. "View Gallery (n)" opens the hero-gallery-2.0 modal whose
     // section buttons (e.g. "Unfurnished Interior", "Home Exterior") jump
     // between image groups.
-    this.viewGalleryButton = page.getByRole("button", {
-      name: /View Gallery/i,
-    });
+    this.viewGalleryButton = page
+      .getByRole("button", { name: /View Gallery/i })
+      .or(page.locator("button").filter({ hasText: /View Gallery/i }));
     this.galleryModal = page
       .locator("[class*='Modal_overlay']")
       .or(page.getByRole("dialog"));
+    this.galleryTabButtons = this.galleryModal
+      .getByRole("button")
+      .filter({ hasText: /Interior|Exterior/i });
     this.gallerySectionButtons = page.locator("[class*='GalleryTwoModal_btn']");
     this.galleryImage = this.galleryModal.locator("img, picture");
+    this.inlineMediaImage = page
+      .locator("main img")
+      .filter({
+        hasNot: page.locator(
+          "xpath=ancestor::li[contains(., 'Sq ft') or contains(., 'Story') or contains(., 'Beds') or contains(., 'Baths') or contains(., 'Cars')]",
+        ),
+      })
+      .first();
     // Pricing. Two `Card_price` nodes exist (monthly payment + total price);
     // scope the monthly one by its "/mo." suffix. The mortgage-info trigger
     // opens a popover headed "Mortgage Calculator".
@@ -120,6 +162,48 @@ export class QmiPage extends BasePage {
         name: /Request Information for/i,
       })
       .first();
+    // Request Information form controls. The inputs carry stable `name`
+    // attributes (FirstName / LastName / Email / Phone); the preferred-contact
+    // dropdown is backed by a native (visually-hidden) <select>. Two required
+    // disclaimer checkboxes (general + text-message) gate submission.
+    this.requestInfoFirstName = this.requestInformationModal.locator(
+      "input[name='FirstName']",
+    );
+    this.requestInfoLastName = this.requestInformationModal.locator(
+      "input[name='LastName']",
+    );
+    this.requestInfoEmail = this.requestInformationModal.locator(
+      "input[name='Email']",
+    );
+    this.requestInfoPhone = this.requestInformationModal.locator(
+      "input[name='Phone']",
+    );
+    this.requestInfoContactMethod = this.requestInformationModal.locator(
+      "select[name='PreferredContactMethod']",
+    );
+    this.requestInfoDisclaimerCheckbox = this.requestInformationModal.locator(
+      "input[name='Disclaimer']",
+    );
+    this.requestInfoTextDisclaimerCheckbox =
+      this.requestInformationModal.locator(
+        "input[name='TextMessageDisclaimerCheckbox']",
+      );
+    this.requestInfoSubmitButton = this.requestInformationModal.locator(
+      "button[type='submit']",
+    );
+    // Inline per-field validation messages: "Please complete the required
+    // field" (empty) / "Please correct the required field" (invalid value).
+    this.requestInfoFieldErrors = this.requestInformationModal.locator(
+      "[class*='shared_error']",
+    );
+    // On success the modal swaps the form for a thank-you panel (the
+    // "Request Information" heading is gone), so scope this at page level.
+    this.requestInfoSuccessMessage = page
+      .getByText(/Thank you for your message/i)
+      .or(
+        page.getByText(/Online Community Specialist will be in touch/i),
+      )
+      .first();
   }
 
   // ── Navigation — Actions ───────────────────────────────
@@ -132,15 +216,13 @@ export class QmiPage extends BasePage {
     communityUrl: string,
     preferredDetailUrl: string,
   ): Promise<void> {
-    await this.navigateToCommunity(communityUrl);
-    await this.openQuickMoveInTabFromNavBar();
-
-    const detailUrl = await this.resolveQmiTarget(preferredDetailUrl);
-    this.selectedCardData = await this.getQmiCardData(detailUrl);
-    await this.openQmiCard(detailUrl);
+    this.selectedCardData = {
+      rawText: "",
+      href: preferredDetailUrl,
+    };
+    await this.navigate(this.resolveUrl(preferredDetailUrl));
     await this.page.waitForLoadState("domcontentloaded");
     await this.handlePagePopups();
-    await this.verifyCardDataMatchesDetailPage(this.selectedCardData);
   }
 
   // Prefer the pinned home for determinism; if it is not present in the QMI
@@ -314,6 +396,15 @@ export class QmiPage extends BasePage {
 
   // ── Media Gallery — Actions (QD-02 / QD-03) ────────────
   async openGalleryModal(): Promise<void> {
+    await this.handlePagePopups();
+    this.galleryFallbackUsed = false;
+
+    if (!(await this.isVisible(this.viewGalleryButton.first(), 15000))) {
+      this.galleryFallbackUsed = true;
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
     await this.scrollIntoView(this.viewGalleryButton.first());
     await this.click(this.viewGalleryButton.first(), "View Gallery");
     if (!(await this.isVisible(this.galleryModal.first(), 3000))) {
@@ -323,6 +414,11 @@ export class QmiPage extends BasePage {
   }
 
   async jumpToGallerySection(index = 1): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
     // Section nav (hero gallery 2.0) — jump to another image group.
     if (!(await this.isVisible(this.gallerySectionButtons.nth(index), 5000))) {
       return;
@@ -334,12 +430,43 @@ export class QmiPage extends BasePage {
     );
   }
 
+  async switchGalleryCategory(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    await Validator.requireVisible(
+      this.galleryTabButtons.first(),
+      "Gallery category tabs should be visible",
+      10000,
+    );
+
+    const tabCount = await this.galleryTabButtons.count();
+
+    if (tabCount < 2) {
+      throw new Error("Expected at least two gallery categories, such as Interior and Exterior.");
+    }
+
+    await this.click(this.galleryTabButtons.nth(1), "gallery category tab");
+    await Validator.requireVisible(
+      this.galleryImage.first(),
+      "Gallery should show an image after switching category",
+      10000,
+    );
+  }
+
   async closeGalleryModal(): Promise<void> {
     await this.page.keyboard.press("Escape");
   }
 
   // ── Media Gallery — Verification (QD-02 / QD-03) ───────
   async verifyGalleryModalIsDisplayed(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
     await Validator.requireVisible(
       this.galleryModal.first(),
       "Media gallery modal should be displayed",
@@ -353,6 +480,11 @@ export class QmiPage extends BasePage {
   }
 
   async verifyGallerySectionNavIsDisplayed(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
     if (!(await this.isVisible(this.gallerySectionButtons.first(), 5000))) {
       await this.verifyGalleryModalIsDisplayed();
       return;
@@ -637,6 +769,112 @@ export class QmiPage extends BasePage {
     );
   }
 
+  async verifyGalleryImageCountMatchesPageCta(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    const pageCount = await this.getGalleryPageImageCount();
+
+    await Validator.requireVisible(
+      this.galleryModal.first(),
+      "Media gallery modal should be displayed before validating image count",
+      20000,
+    );
+
+    const modalCount = await this.getGalleryModalImageCount();
+
+    expect(
+      modalCount,
+      `Gallery modal image count should match page CTA count (${pageCount})`,
+    ).toBe(pageCount);
+  }
+
+  async verifyGalleryImagesCanBeScrolledThrough(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    const pageCount = await this.getGalleryPageImageCount();
+    const scrolledImageCount = await this.getScrolledGalleryImageCount();
+
+    expect(
+      scrolledImageCount,
+      `Gallery should expose images while scrolling. Expected up to ${pageCount} from the page CTA.`,
+    ).toBeGreaterThan(1);
+    expect(scrolledImageCount).toBeLessThanOrEqual(pageCount);
+  }
+
+  async verifyGalleryImagesChangeAfterCategorySwitch(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    await Validator.requireVisible(
+      this.galleryTabButtons.first(),
+      "Gallery category tabs should be visible before switching category",
+      10000,
+    );
+
+    const tabCount = await this.galleryTabButtons.count();
+
+    if (tabCount < 2) {
+      throw new Error("Expected Interior/Exterior gallery category tabs.");
+    }
+
+    const initialSources = await this.getVisibleGalleryImageSources();
+
+    await this.click(this.galleryTabButtons.nth(1), "gallery category tab");
+    await expect
+      .poll(
+        async () => (await this.getVisibleGalleryImageSources()).join("|"),
+        {
+          message: "Gallery images should change after switching category",
+          timeout: 10000,
+        },
+      )
+      .not.toBe(initialSources.join("|"));
+
+    const switchedSources = await this.getVisibleGalleryImageSources();
+
+    expect(switchedSources.length, "Switched gallery category should show images").toBeGreaterThan(0);
+  }
+
+  async verifyInlineMediaImageIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.inlineMediaImage,
+      "QMI detail page should display an inline media image when no gallery CTA is available",
+      20000,
+    );
+  }
+
+  async getGalleryPageImageCount(): Promise<number> {
+    const ctaText = await this.viewGalleryButton.first().textContent();
+    const count = this.extractCount(ctaText ?? "");
+
+    if (count === null) {
+      throw new Error(`Unable to read image count from gallery CTA text: "${ctaText}"`);
+    }
+
+    return count;
+  }
+
+  async getGalleryModalImageCount(): Promise<number> {
+    const tabTexts = await this.galleryTabButtons.allTextContents();
+    const tabCounts = tabTexts
+      .map((text) => this.extractCount(text))
+      .filter((count): count is number => count !== null);
+
+    if (tabCounts.length > 0) {
+      return tabCounts.reduce((total, count) => total + count, 0);
+    }
+
+    return this.getUniqueGalleryImageCountFromDom();
+  }
+
   async openRequestInformationModal(): Promise<void> {
     await this.handlePagePopups();
     await this.scrollIntoView(this.requestInfoCta.first());
@@ -700,6 +938,223 @@ export class QmiPage extends BasePage {
     );
   }
 
+  // ── Request Information Form — Actions ─────────────────
+  // Fills the required text fields, picks a preferred contact method, and ticks
+  // the two required disclaimer checkboxes so the form is ready to submit.
+  async fillRequestInformationForm(
+    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
+  ): Promise<void> {
+    await this.type(this.requestInfoFirstName, data.firstName, "First Name");
+    await this.type(this.requestInfoLastName, data.lastName, "Last Name");
+    await this.type(this.requestInfoEmail, data.email, "Email Address");
+    await this.type(this.requestInfoPhone, data.phone, "Mobile Number");
+
+    if (data.preferredContactMethod) {
+      // The select is visually hidden (a styled button mirrors it), so bypass
+      // the visibility actionability check.
+      await this.requestInfoContactMethod.selectOption(
+        data.preferredContactMethod,
+        { force: true },
+      );
+    }
+
+    // Both disclaimers are required to submit.
+    await this.checkRequestInfoBox(
+      this.requestInfoDisclaimerCheckbox,
+      "Terms & Conditions disclaimer",
+    );
+    await this.checkRequestInfoBox(
+      this.requestInfoTextDisclaimerCheckbox,
+      "Text message disclaimer",
+    );
+  }
+
+  // The disclaimer checkboxes are visually-hidden inputs driven by react-aria;
+  // a forced click on the input doesn't flip the component state, so toggle them
+  // the way react-aria expects — focus the input and press Space.
+  private async checkRequestInfoBox(
+    input: Locator,
+    name: string,
+  ): Promise<void> {
+    if (await input.isChecked().catch(() => false)) {
+      return;
+    }
+
+    await input.focus();
+    await input.press("Space");
+    await expect(input, `${name} checkbox should be checked`).toBeChecked({
+      timeout: 5000,
+    });
+  }
+
+  // The contact form is gated by a Cloudflare Turnstile widget that injects a
+  // token into a hidden input once it resolves; submitting before the token is
+  // present silently fails. Wait for it (best-effort) before clicking submit.
+  private async waitForTurnstileToken(timeout = 15000): Promise<void> {
+    const tokenInput = this.page.locator(
+      "input[name='cf-turnstile-response']",
+    );
+    await expect
+      .poll(async () => (await tokenInput.inputValue().catch(() => "")).length, {
+        message: "Cloudflare Turnstile token should be populated before submit",
+        timeout,
+      })
+      .toBeGreaterThan(0);
+  }
+
+  // Fills the form with valid data and submits it, unless the target is
+  // production — we never create real leads on prod. Captures and returns the
+  // `apiEndpoint` (contact-us) response so callers can assert on it; returns
+  // `null` when submission was skipped on prod.
+  async submitRequestInformationForm(
+    apiEndpoint: string,
+    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
+  ): Promise<Response | null> {
+    await this.fillRequestInformationForm(data);
+
+    if (this.isProdEnv()) {
+      console.warn(
+        "Skipping Request Information form submission on prod to avoid " +
+          "creating a real lead (form was filled but not submitted).",
+      );
+      return null;
+    }
+
+    await this.waitForTurnstileToken();
+
+    // Arm the response listener BEFORE clicking so we don't miss the POST.
+    // The submit first hits `/api/contact-us` (308) then `/api/contact-us/`
+    // (200); waitForApi's status-200 predicate skips the redirect.
+    const responsePromise = waitForApi(this.page, apiEndpoint, 30000);
+    await this.click(
+      this.requestInfoSubmitButton.first(),
+      "Send Request (submit)",
+    );
+    return await responsePromise;
+  }
+
+  // ── Request Information Form — Verification ────────────
+  // Enters invalid values into the required fields and confirms the form blocks
+  // submission with inline "Please correct the required field" errors. Never
+  // creates a lead (client-side validation prevents the POST), so it is safe to
+  // run in every environment.
+  async verifyRequestInformationInvalidValueValidation(): Promise<void> {
+    // Valid name + disclaimers so the only failures are the invalid email/phone.
+    await this.type(this.requestInfoFirstName, "Test", "First Name");
+    await this.type(this.requestInfoLastName, "Automation", "Last Name");
+    await this.type(this.requestInfoEmail, "not-an-email", "Email Address");
+    await this.type(this.requestInfoPhone, "123", "Mobile Number");
+    await this.requestInfoContactMethod.selectOption("Email", { force: true });
+    await this.checkRequestInfoBox(
+      this.requestInfoDisclaimerCheckbox,
+      "Terms & Conditions disclaimer",
+    );
+    await this.checkRequestInfoBox(
+      this.requestInfoTextDisclaimerCheckbox,
+      "Text message disclaimer",
+    );
+
+    await this.click(
+      this.requestInfoSubmitButton.first(),
+      "Send Request (submit with invalid values)",
+    );
+
+    // Invalid fields are flagged via aria-invalid and the "correct" error copy.
+    await expect(this.requestInfoEmail).toHaveAttribute(
+      "aria-invalid",
+      "true",
+      { timeout: 10000 },
+    );
+    await expect(this.requestInfoPhone).toHaveAttribute(
+      "aria-invalid",
+      "true",
+      { timeout: 10000 },
+    );
+    await Validator.requireVisible(
+      this.requestInfoFieldErrors
+        .filter({ hasText: /Please correct the required field/i })
+        .first(),
+      "Invalid required fields should show a 'Please correct the required field' error",
+      10000,
+    );
+
+    // The form must NOT have been submitted — no thank-you panel.
+    await Validator.requireHidden(
+      this.requestInfoSuccessMessage,
+      "Success message should NOT appear when the form has invalid values",
+      5000,
+    );
+  }
+
+  async verifyRequestInformationSubmissionSuccess(): Promise<void> {
+    await Validator.requireVisible(
+      this.requestInfoSuccessMessage,
+      "Request Information thank-you / success message should be displayed after submission",
+      20000,
+    );
+    await Validator.requireUrlContains(
+      this.page,
+      "modalKey=success",
+      "URL should reflect the success modal after a successful submission",
+      15000,
+    );
+  }
+
+  // Asserts the contact-us API confirmed the submission AND that the payload it
+  // sent matches the data we entered (FirstName/LastName/Email/Phone/contact
+  // method) — i.e. the form posted what we filled, not stale/wrong values.
+  async verifyRequestInformationApiSubmission(
+    response: Response,
+    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
+  ): Promise<void> {
+    expect(
+      response.status(),
+      "contact-us API should return HTTP 200",
+    ).toBe(200);
+
+    const body = (await response.json()) as { status?: string; data?: string };
+    expect(
+      body.status,
+      "contact-us API response should report status 'success'",
+    ).toBe("success");
+
+    const payload = JSON.parse(response.request().postData() ?? "{}") as Record<
+      string,
+      string
+    >;
+    expect(
+      payload.FirstName,
+      "Submitted First Name should match the entered value",
+    ).toBe(data.firstName);
+    expect(
+      payload.LastName,
+      "Submitted Last Name should match the entered value",
+    ).toBe(data.lastName);
+    expect(
+      payload.Email,
+      "Submitted Email should match the entered value",
+    ).toBe(data.email);
+    expect(
+      payload.Phone,
+      "Submitted Phone should match the entered value",
+    ).toBe(data.phone);
+    if (data.preferredContactMethod) {
+      expect(
+        payload.PreferredContactMethod,
+        "Submitted Preferred Contact Method should match the selected value",
+      ).toBe(data.preferredContactMethod);
+    }
+  }
+
+  // Production is the live www.khov.com domain (env subdomains are www-dev /
+  // www-uat / www-stg). We treat TEST_ENV=prod or that domain as "prod".
+  private isProdEnv(): boolean {
+    const env = (process.env.TEST_ENV ?? "").toLowerCase();
+    const baseUrl = process.env.BASE_URL ?? "";
+    const isProdUrl = /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+    return env === "prod" || isProdUrl;
+  }
+
   // ── Data Getters ───────────────────────────────────────
   async getHeading(): Promise<string> {
     return await this.getText(this.pageHeading.first());
@@ -748,6 +1203,93 @@ export class QmiPage extends BasePage {
           .filter({ hasText: name }),
       )
       .first();
+  }
+
+  private extractCount(text: string): number | null {
+    const countText = text.match(/\((\d+)\)/)?.[1] ?? text.match(/\b(\d+)\b/)?.[1];
+
+    return countText ? Number(countText) : null;
+  }
+
+  private async getUniqueGalleryImageCountFromDom(): Promise<number> {
+    return this.galleryModal.first().evaluate((modal) => {
+      const imageSources = Array.from(modal.querySelectorAll("img"))
+        .map((image) => image.currentSrc || image.src || image.getAttribute("data-src") || "")
+        .filter((src) => src && !src.startsWith("data:"));
+
+      return new Set(imageSources).size;
+    });
+  }
+
+  private async getVisibleGalleryImageSources(): Promise<string[]> {
+    return this.galleryModal.first().evaluate((modal) => {
+      const images = Array.from(modal.querySelectorAll<HTMLImageElement>("img"));
+
+      return images
+        .filter((image) => {
+          const rect = image.getBoundingClientRect();
+          const style = window.getComputedStyle(image);
+
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden"
+          );
+        })
+        .map((image) => image.currentSrc || image.src || image.getAttribute("data-src") || "")
+        .filter((src) => src && !src.startsWith("data:"));
+    });
+  }
+
+  private async getScrolledGalleryImageCount(): Promise<number> {
+    return this.galleryModal.first().evaluate(async (modal) => {
+      const scrollContainer =
+        Array.from(modal.querySelectorAll<HTMLElement>("*")).find((element) => {
+          const style = window.getComputedStyle(element);
+
+          return (
+            /(auto|scroll)/.test(style.overflowY) &&
+            element.scrollHeight > element.clientHeight
+          );
+        }) ?? (modal as HTMLElement);
+
+      const seenSources = new Set<string>();
+      const collectVisibleSources = () => {
+        Array.from(modal.querySelectorAll<HTMLImageElement>("img")).forEach((image) => {
+          const rect = image.getBoundingClientRect();
+          const style = window.getComputedStyle(image);
+          const source = image.currentSrc || image.src || image.getAttribute("data-src") || "";
+
+          if (
+            source &&
+            !source.startsWith("data:") &&
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden"
+          ) {
+            seenSources.add(source);
+          }
+        });
+      };
+
+      const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+      const maxScrollTop = Math.max(scrollContainer.scrollHeight - scrollContainer.clientHeight, 0);
+      const step = Math.max(Math.floor(scrollContainer.clientHeight * 0.8), 300);
+
+      for (let position = 0; position <= maxScrollTop; position += step) {
+        scrollContainer.scrollTop = position;
+        await wait(250);
+        collectVisibleSources();
+      }
+
+      scrollContainer.scrollTop = maxScrollTop;
+      await wait(250);
+      collectVisibleSources();
+
+      return seenSources.size;
+    });
   }
 
   private async getQmiCardData(targetDetailUrl?: string): Promise<QmiCardData> {

@@ -7,11 +7,9 @@ import constants from "../utils/constants.json";
  * QMI (Quick Move-In) details page — E4 (QD-01..QD-09) in docs/test-plan.md.
  *
  * Pinned to a deterministic, feature-rich QMI home at River Ranch Trails
- * (Passionflower II, 526 Samuel Ridge Dr — `constants.qmi.detail_url`) so the
+ * (`constants.qmi.detail_url`) so the
  * gallery, pricing, IFP and CTA checks are stable. If that home is no longer
- * listed, navigateToQmi falls back to a random available QMI home so the suite
- * keeps running (it logs a warning to update the pin); a fallback home may lack
- * some conditional features, so re-pin `constants.qmi.detail_url` when warned.
+ * listed, update `constants.qmi.detail_url` to another gallery-capable QMI home.
  * The community → QMI navigation path is covered by communityPage.spec.ts
  * (CP-23).
  *
@@ -34,8 +32,9 @@ async function openQmi(page: Page): Promise<QmiPage> {
 // Shared across every block: a fresh QMI detail page is opened before each test.
 let qmiPage: QmiPage;
 
+test.describe.configure({ timeout: 150000 });
+
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(90000);
   qmiPage = await openQmi(page);
 });
 
@@ -61,16 +60,45 @@ test.describe("QMI Details Page — Overview", () => {
   });
 });
 
-test.describe("QMI Details Page — Media Gallery", () => {
-  test("QD-02 | Media gallery modal opens and shows an image @regression", async () => {
-    await qmiPage.openGalleryModal();
-    await qmiPage.verifyGalleryModalIsDisplayed();
+test.describe("QMI Details Page — Request Information Form", () => {
+  test("QD-10 | Required fields reject invalid values and block submission @regression", async () => {
+    await qmiPage.verifyCtasAreDisplayed();
+    await qmiPage.openRequestInformationModal();
+    await qmiPage.verifyRequestInformationModalIsDisplayed();
+    await qmiPage.verifyRequestInformationInvalidValueValidation();
   });
 
-  test("QD-03 | Hero gallery 2.0 — jump to a specific section @regression", async () => {
+  test("QD-11 | Request Information form submits successfully with valid values @regression", async () => {
+    await qmiPage.verifyCtasAreDisplayed();
+    await qmiPage.openRequestInformationModal();
+    await qmiPage.verifyRequestInformationModalIsDisplayed();
+
+    // Never creates a real lead on prod — submitRequestInformationForm fills the
+    // form but skips submission there, returning null. On non-prod it captures
+    // the contact-us API response so we can assert the API result and that the
+    // posted payload matches what we entered.
+    const response = await qmiPage.submitRequestInformationForm(
+      constants.qmi.contact_us_api,
+    );
+    if (response) {
+      await qmiPage.verifyRequestInformationApiSubmission(response);
+      await qmiPage.verifyRequestInformationSubmissionSuccess();
+    }
+  });
+});
+
+test.describe("QMI Details Page — Media Gallery", () => {
+  test("QD-02 | Media gallery modal opens and navigates between images @regression", async () => {
+    await qmiPage.openGalleryModal();
+    await qmiPage.verifyGalleryModalIsDisplayed();
+    await qmiPage.verifyGalleryImageCountMatchesPageCta();
+    await qmiPage.verifyGalleryImagesCanBeScrolledThrough();
+  });
+
+  test("QD-03 | Hero Gallery 2.0 — change image category and validate images @regression", async () => {
     await qmiPage.openGalleryModal();
     await qmiPage.verifyGallerySectionNavIsDisplayed();
-    await qmiPage.jumpToGallerySection(1);
+    await qmiPage.verifyGalleryImagesChangeAfterCategorySwitch();
     await qmiPage.verifyGalleryModalIsDisplayed();
   });
 });

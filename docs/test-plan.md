@@ -154,6 +154,8 @@ consultant modal** (CP-03).
 | QD-07 | Interactive Floor Plan (IFP) loads / is interactive | @regression | ✅ (Interactive Floor Plan TC-01) |
 | QD-08 | QMI sticker breakdown _(if applicable)_ | @regression | ⬜ deferred — no itemized "window sticker" element present in the DOM for this home |
 | QD-09 | CTAs (Request Info, Schedule a Tour, etc.) present / functional | @regression | ✅ (Overview TC-03 — Request a Tour / Request Information) |
+| QD-10 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (Request Information Form TC-01 — invalid email/phone → "Please correct the required field", no submit) |
+| QD-11 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (Request Information Form TC-02 — submission **skipped on prod** to avoid real leads) |
 
 ---
 
