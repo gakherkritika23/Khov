@@ -170,19 +170,31 @@ per-consultant detail modal).
 
 ---
 
-## E5 — Floorplan details page ⬜
+## E5 — Floorplan details page 🟢
 
 > "Media Gallery modal. Pricing — monthly payment/calculator; Starting Price.
 > IFP. CTAs."
 
-| ID | Test case | Tag |
-|----|-----------|-----|
-| FD-01 | Floorplan details page loads (name heading, starting price) | @smoke |
-| FD-02 | Media gallery modal opens and navigates | @regression |
-| FD-03 | Pricing: monthly payment + calculator modal | @regression |
-| FD-04 | Starting price displayed | @regression |
-| FD-05 | Interactive Floor Plan (IFP) loads / is interactive | @regression |
-| FD-06 | CTAs present / functional | @regression |
+> The floorplan spec is **pinned to a deterministic floorplan** — Clyde II at
+> River Ranch Trails (`constants.floorplan.detail_url`). Unlike a QMI home it
+> shows a floorplan-level **Starting price** (not a fixed home price) and uses a
+> plain media gallery (no hero-gallery-2.0 section nav / Interior-Exterior tabs).
+> It otherwise reuses the same design-system components as the QMI page
+> (`qmiPage.ts`): the mortgage-calculator popover, the `/floorplan/` IFP iframe,
+> the ContentNavigation CTAs, and the identical Request Information form
+> (same fields + contact-us API).
+
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| FD-01 | Floorplan details page loads (name heading, starting price) | @smoke | ✅ (`planDetailPage.spec.ts` Overview TC-01) |
+| FD-02 | Media gallery modal opens and navigates | @regression | ✅ (Media Gallery TC-01 — plain gallery; navigation verified by scroll-through image count) |
+| FD-03 | Pricing: monthly payment + calculator modal | @regression | ✅ (Pricing TC-01/02 — payment displayed + mortgage calculator modal opens) |
+| FD-04 | Starting price displayed | @regression | ✅ (Overview TC-02) |
+| FD-05 | Interactive Floor Plan (IFP) loads / is interactive | @regression | ✅ (Interactive Floor Plan TC-01) |
+| FD-06 | CTAs present / functional | @regression | ✅ (Overview TC-03 — Request a Tour / Request Information) |
+| FD-07 | Request Information CTA opens modal with required fields | @regression | ✅ (Request Information Form TC-01) |
+| FD-08 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (Request Information Form TC-02 — invalid email/phone → "Please correct the required field", no submit) |
+| FD-09 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (Request Information Form TC-03 — submission **skipped on prod** to avoid real leads) |
 
 ---
 
