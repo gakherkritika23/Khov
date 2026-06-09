@@ -115,6 +115,41 @@ npm run regression:dev  # @regression tests, dev
 
 ---
 
+## Step 5b — Execution Scope (iterate narrow, finalize on the class)
+
+**While iterating on a scenario, run ONLY the test you are editing.** Re-running
+more than that after every edit is slow and, against a live site, throttles it,
+which itself causes flaky failures. **At finalization, run only the corresponding
+class (the spec file you worked on) — NOT the whole suite.**
+
+- **Iterate:** after editing a test body, or a locator/method used **only** by that
+  test, run just that test:
+  ```
+  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium --grep "TC-01"
+  # or pin by line:
+  npm run test:dev -- tests/{pageName}.spec.ts:42 --project=chromium
+  ```
+- **Finalize (default) — run the full corresponding class only**, right before
+  Stage 7 (commit), as the regression gate for that page:
+  ```
+  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium
+  ```
+- **Shared-file exception:** if you touched a file used by **every** spec —
+  `utils/validator.ts`, base-page / navigation helpers (`navigateToHome` /
+  `navigateToCommunity`), or `playwright.config.ts` — run the full corresponding
+  class **plus one representative test (first `@smoke` / TC-01) from each other
+  spec** as a per-file sanity check, instead of the whole suite:
+  ```
+  # full class you worked on
+  npm run test:dev -- tests/{pageName}.spec.ts --project=chromium
+  # one representative test per OTHER spec
+  npm run test:dev -- tests/{otherSpec}.spec.ts --project=chromium --grep "TC-01"
+  ```
+- **Never** run the complete suite (all tests of all classes) as the routine
+  finalization gate.
+
+---
+
 ## Result Analysis
 
 ### Identify Failure Source

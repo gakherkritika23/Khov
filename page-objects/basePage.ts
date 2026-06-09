@@ -83,9 +83,18 @@ export class BasePage {
   }
 
   /* ================= UTILITIES ================= */
-  async scrollIntoView(locator: Locator, timeout = 15000): Promise<void> {
-    await locator.waitFor({ state: "visible", timeout });
-    await locator.scrollIntoViewIfNeeded({ timeout });
+  // Best-effort: pages lazy-render, so the target can detach mid-scroll. Retry
+  // (re-resolving the locator) and don't throw — callers follow with an
+  // auto-waiting assertion/action.
+  async scrollIntoView(locator: Locator): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await locator.scrollIntoViewIfNeeded({ timeout: 5000 });
+        return;
+      } catch {
+        await this.page.waitForTimeout(500);
+      }
+    }
   }
 
   async getText(locator: Locator): Promise<string> {

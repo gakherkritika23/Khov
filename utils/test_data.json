@@ -11,6 +11,11 @@
     "term": "River Ranch Trails",
     "suggestion": "River Ranch Trails"
   },
+  "mortgage_calculator": {
+    "downPaymentPercent": "60",
+    "interestRate": "9",
+    "price": "400000"
+  },
   "endpoint": {
     "search": "/api/search"
   }

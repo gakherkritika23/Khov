@@ -2,6 +2,7 @@ import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
 import { RegionPage } from "../page-objects/regionPage";
 import { CommunityPage } from "../page-objects/communityPage";
+import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
@@ -32,7 +33,7 @@ test.describe("Region Page — Community Results", () => {
     await regionPage.verifyCommunitiesSectionIsDisplayed();
 
     const firstCommunity = await regionPage.getFirstCommunityName();
-    console.log(`First community: ${firstCommunity}`);
+    await reportValue(`First community: ${firstCommunity}`);
 
     await regionPage.clickFirstCommunity();
 
@@ -40,6 +41,8 @@ test.describe("Region Page — Community Results", () => {
       constants.region.community_detail_url_pattern,
       firstCommunity,
     );
-    console.log(`Community detail heading: ${await communityPage.getHeading()}`);
+    await reportValue(
+      `Community detail heading: ${await communityPage.getHeading()}`,
+    );
   });
 });

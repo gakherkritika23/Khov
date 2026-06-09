@@ -1,7 +1,9 @@
 import { Page } from "@playwright/test";
 import { test } from "./baseTest";
 import { CommunityPage } from "../page-objects/communityPage";
+import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
+import testData from "../utils/test_data.json";
 
 /**
  * The community spec is pinned to a specific, feature-rich community (River
@@ -27,49 +29,97 @@ test.describe("Community Page — Listing Header", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Community page loads with name, starting price and location @smoke", async () => {
+  test("TC-01 | Community page loads with name, starting price, location, sales team and office hours @smoke", async () => {
     await communityPage.verifyHeaderIsDisplayed(
       constants.community.river_ranch_trails_heading,
     );
     await communityPage.verifyStartingPriceIsDisplayed();
     await communityPage.verifyCommunityLocationIsDisplayed();
-    console.log(
+    await communityPage.verifyOnsiteSalesTeamIsDisplayed();
+    await reportValue(
       `Community: ${await communityPage.getHeading()} | ${await communityPage.getStartingPriceText()}`,
     );
-  });
 
-  test("TC-02 | Onsite sales team and office hours are displayed @regression", async () => {
-    await communityPage.verifyOnsiteSalesTeamIsDisplayed();
+    // Sales office hours are present (days + timings) and logged.
+    await communityPage.verifySalesOfficeHoursNotEmpty();
+
+    // "Your Onsite Sales Team" opens the contact modal — every section present.
+    await communityPage.openSalesTeamModal();
+    await communityPage.verifySalesTeamModalDetails();
+    await communityPage.closeSalesTeamModal();
   });
 });
 
-test.describe("Community Page — Floorplan & Home Cards", () => {
+test.describe("Community Page — Floorplan Section", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
+    test.setTimeout(600000);
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Floorplan/home cards render with specs and pricing @smoke", async () => {
+  test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @regression", async () => {
+    // Floorplan/home cards: render with specs + pricing, images.
     await communityPage.verifyHomeCardsAreDisplayed();
-    console.log(`Home/floorplan cards: ${await communityPage.getHomeCardCount()}`);
-  });
-
-  test("TC-02 | Floorplan/home card images are displayed @regression", async () => {
+    await reportValue(
+      `Home/floorplan cards: ${await communityPage.getHomeCardCount()}`,
+    );
     await communityPage.verifyCardImagesAreDisplayed();
-  });
 
-  test("TC-03 | Image carousel is displayed @regression", async () => {
-    await communityPage.verifyCarouselIsDisplayed();
-  });
+    // Every floorplan's two carousels (elevation + gallery): arrow states +
+    // all image URLs return 200.
+    await communityPage.verifyFloorplanCarousels();
 
-  test("TC-04 | 'View Home Details' opens a floorplan/home detail page @regression", async () => {
+    // Every floorplan shows complete, non-empty meta data.
+    await communityPage.verifyAllFloorplanMetaData();
+
+    // Mortgage calculator: open a random floorplan's, validate fields,
+    // recalculate per input (direction), then close.
+    await communityPage.openRandomFloorplanMortgageCalculator();
+    await communityPage.verifyCalculatorFieldsHaveData();
+    await communityPage.verifyPaymentRecalculates(
+      "Down Payment % up",
+      () =>
+        communityPage.setCalculatorField(
+          1,
+          testData.mortgage_calculator.downPaymentPercent,
+          "Down Payment %",
+        ),
+      "down",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Interest Rate up",
+      () =>
+        communityPage.setCalculatorField(
+          3,
+          testData.mortgage_calculator.interestRate,
+          "Interest Rate",
+        ),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Price up",
+      () =>
+        communityPage.setCalculatorField(
+          0,
+          testData.mortgage_calculator.price,
+          "Price",
+        ),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "15-year term",
+      () => communityPage.selectLoanTerm("15"),
+      "up",
+    );
+    await communityPage.closeMortgageCalculator();
+
+    // Card CTA opens a floorplan/home detail page — LAST (it leaves the page).
     await communityPage.openFirstHomeDetails();
     await communityPage.verifyHomeDetailOpened(
       constants.community.home_detail_url_pattern,
     );
-    console.log(`Opened detail page: ${await communityPage.getUrl()}`);
+    await reportValue(`Opened detail page: ${await communityPage.getUrl()}`);
   });
 });
 
@@ -77,27 +127,57 @@ test.describe("Community Page — Quick Move-In Homes", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
+    // All 12 QMI cards are walked (images, meta, calculator), so allow headroom.
+    test.setTimeout(600000);
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Quick move-in homes section shows homes with availability @smoke", async () => {
+  test("TC-01 | Quick move-in homes — cards, images, meta data, promo rate, mortgage calculator and detail navigation @regression", async () => {
+    // Section + availability.
     await communityPage.verifyQmiSectionIsDisplayed();
-  });
 
-  test("TC-02 | Quick move-in promo rate is displayed @regression", async () => {
-    await communityPage.verifyPromoRateIsDisplayed();
-  });
+    // Load all quick move-in homes (paginated via "Load More").
+    await communityPage.loadAllQmiHomes();
 
-  test("TC-03 | Quick move-in was/now (discounted) pricing is displayed @regression", async () => {
+    // Every QMI card's single image renders and returns 200.
+    await communityPage.verifyQmiCardImages();
+
+    // Every QMI card shows complete, non-empty meta data (+ promo rate if shown).
+    await communityPage.verifyAllQmiMetaData();
+
+    // At least one QMI card shows was/now (discounted) pricing.
     await communityPage.verifyWasNowPricingIsDisplayed();
-  });
 
-  test("TC-04 | Quick move-in home card opens its detail page @regression", async () => {
+    // Mortgage calculator (random QMI card): opens, fields populated, recalculates.
+    await communityPage.openRandomQmiMortgageCalculator();
+    await communityPage.verifyCalculatorFieldsHaveData();
+    await communityPage.verifyPaymentRecalculates(
+      "Down Payment % up",
+      () => communityPage.setCalculatorField(1, "60", "Down Payment %"),
+      "down",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Interest Rate up",
+      () => communityPage.setCalculatorField(3, "9", "Interest Rate"),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "Price up",
+      () => communityPage.setCalculatorField(0, "400000", "Price"),
+      "up",
+    );
+    await communityPage.verifyPaymentRecalculates(
+      "15-year term",
+      () => communityPage.selectLoanTerm("15"),
+      "up",
+    );
+    await communityPage.closeMortgageCalculator();
+
+    // QMI card CTA opens its detail page — LAST (it leaves the page).
     await communityPage.openFeaturedQmiHome();
     await communityPage.verifyHomeDetailOpened(
       constants.community.home_detail_url_pattern,
     );
-    console.log(`Opened QMI detail: ${await communityPage.getUrl()}`);
+    await reportValue(`Opened QMI detail: ${await communityPage.getUrl()}`);
   });
 });
