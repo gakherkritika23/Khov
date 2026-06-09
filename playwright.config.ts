@@ -31,6 +31,8 @@ if (!process.env.BASE_URL) {
 
 export default defineConfig({
   testDir: "./tests",
+  // Clears allure-results/ once before the run so the report shows only this run.
+  globalSetup: "./global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -52,7 +54,7 @@ export default defineConfig({
     headless: false,
     viewport: null,
     screenshot: "on-first-failure",
-    video: "retain-on-failure",
+    video: "off",
     launchOptions: {
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],
     },
