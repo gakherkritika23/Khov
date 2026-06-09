@@ -34,13 +34,16 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // Serial execution: this suite drives one live external site (khov.com).
+  // Running spec files in parallel makes multiple browsers contend for the same
+  // prod pages, causing timeouts and worker crashes. One worker = reliable.
   workers: 1,
   reporter: [
     ["list"],
     ["junit", { outputFile: "results.xml" }],
-    ["json", { outputFile: "test-results/playwright-results.json" }],
-    ["./scripts/generate-client-report.ts"],
-    ["allure-playwright", { outputFolder: "allure-results" }],
+    // detail: false → Allure records only named test.step() verifications,
+    // dropping low-level pw:api/expect steps (locator code, file:line, snippets).
+    ["allure-playwright", { outputFolder: "allure-results", detail: false }],
     ["html", { outputFolder: "playwright-report", open: "never" }],
   ],
   use: {
