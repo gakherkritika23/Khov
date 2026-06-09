@@ -30,6 +30,7 @@ test.describe("Community Page — Listing Header", () => {
   });
 
   test("TC-01 | Community page loads with name, starting price, location, sales team and office hours @smoke", async () => {
+    await reportValue(`Page URL: ${await communityPage.getUrl()}`);
     await communityPage.verifyHeaderIsDisplayed(
       constants.community.river_ranch_trails_heading,
     );
@@ -59,6 +60,7 @@ test.describe("Community Page — Floorplan Section", () => {
   });
 
   test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @regression", async () => {
+    await reportValue(`Page URL: ${await communityPage.getUrl()}`);
     // Floorplan/home cards: render with specs + pricing, images.
     await communityPage.verifyHomeCardsAreDisplayed();
     await reportValue(
@@ -132,7 +134,8 @@ test.describe("Community Page — Quick Move-In Homes", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Quick move-in homes — cards, images, meta data, promo rate, mortgage calculator and detail navigation @regression", async () => {
+  test("TC-01 | Quick move-in homes — cards, images, meta data, promo rate, mortgage calculator and detail navigation @smoke", async () => {
+    await reportValue(`Page URL: ${await communityPage.getUrl()}`);
     // Section + availability.
     await communityPage.verifyQmiSectionIsDisplayed();
 
