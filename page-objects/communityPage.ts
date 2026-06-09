@@ -48,7 +48,9 @@ export class CommunityPage extends BasePage {
     this.pageHeading = page.locator("h1");
     // "Single Family Homes • Starting from $X/mo. • City, State"
     this.heroSubtitle = page.locator("[class*='Hero_subtitle']");
-    this.startingPrice = this.heroSubtitle.filter({ hasText: /Starting/i });
+    // Hero pricing copy varies by environment — prod: "Starting from $X/mo.",
+    // dev: "from the mid $200s" — so match the $ amount, not the word "Starting".
+    this.startingPrice = this.heroSubtitle.filter({ hasText: /\$\s?\d/ });
     // Community Location / address block (InfoBlock).
     this.communityLocation = page.getByText("Community Location");
     this.onsiteSalesTeam = page.getByText("Your Onsite Sales Team", {
@@ -630,9 +632,13 @@ export class CommunityPage extends BasePage {
       const carousels = block.locator("[class*='Multiple_carousel']");
       const carouselCount = await carousels.count();
       for (let c = 0; c < carouselCount; c++) {
+        // Each floorplan has two carousels in order: elevation (exterior) then
+        // gallery (interior/lifestyle, whose last slide is the "View Gallery"
+        // callout). Label them so the report clearly shows BOTH are verified.
+        const kind = c === 0 ? "elevation" : c === 1 ? "gallery" : `gallery ${c}`;
         await this.verifyOneCarousel(
           carousels.nth(c),
-          `Floorplan #${i + 1} carousel ${c + 1}`,
+          `Floorplan #${i + 1} ${kind}`,
         );
       }
     }

@@ -3,7 +3,7 @@ import { description, attachment } from "allure-js-commons";
 import fs from "fs";
 import path from "path";
 
-function createEnvFile() {
+function createEnvFile(browser: string) {
   const resultsDir = path.join(process.cwd(), "allure-results");
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir);
@@ -12,11 +12,10 @@ function createEnvFile() {
   const envData = `
 Project=K. Hovnanian Homes Automation
 Environment=${process.env.TEST_ENV}
-Browser=${process.env.BROWSER}
+Browser=${browser}
 BaseURL=${process.env.BASE_URL}
 OS=${process.platform}
 Node=${process.version}
-timeout=${process.env.TEST_TIMEOUT}
 `;
   fs.writeFileSync(
     path.join(resultsDir, "environment.properties"),
@@ -26,8 +25,8 @@ timeout=${process.env.TEST_TIMEOUT}
 
 export const test = base.extend({});
 
-test.beforeAll(() => {
-  createEnvFile();
+test.beforeAll(async ({ browserName }) => {
+  createEnvFile(browserName);
 });
 
 test.beforeEach(async ({}, testInfo) => {
