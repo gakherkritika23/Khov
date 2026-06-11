@@ -1,7 +1,8 @@
-import { Page, Locator, expect } from "@playwright/test";
+import { Page, Locator, Response, expect } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 import { reportValue } from "../utils/reporter";
+import { waitForApi } from "../utils/apiUtils";
 
 /**
  * The five "What are you interested in?" options on the Contact Us page. Each
@@ -19,6 +20,10 @@ interface FieldSpec {
   label: string;
   name: string; // the element's `name` attribute (stable)
   kind: "input" | "select" | "textarea" | "checkbox";
+  // Valid value used when filling the form for a successful submit. For inputs/
+  // textareas it's the text; for selects it's the option label. Email/Phone are
+  // filled with dynamic/override values, so they omit this. Checkboxes omit it.
+  value?: string;
 }
 
 /**
@@ -37,6 +42,9 @@ export class ContactUsPage extends BasePage {
   readonly form: Locator;
   readonly nativeSelects: Locator;
   readonly submitButton: Locator;
+  readonly fieldErrors: Locator;
+  readonly successMessage: Locator;
+  readonly turnstileToken: Locator;
 
   // Per-interest expected fields (from Stage 3 discovery). Hidden plumbing
   // inputs (cf-turnstile-response, IsDesignPriceLead) are intentionally omitted.
@@ -56,30 +64,40 @@ export class ContactUsPage extends BasePage {
       .first();
     this.nativeSelects = this.form.locator("select");
     this.submitButton = this.form.locator("button[type='submit']");
+    // Inline per-field validation messages: "Please complete the required field"
+    // (empty) / "Please correct the required field" (invalid value).
+    this.fieldErrors = this.form.locator("[class*='shared_error']");
+    // On success the form swaps for a thank-you panel — scope at page level.
+    this.successMessage = page
+      .getByText(/Thank you for your message/i)
+      .or(page.getByText(/Online Community Specialist will be in touch/i))
+      .first();
+    // Cloudflare Turnstile token (must be populated before a real submit).
+    this.turnstileToken = page.locator("input[name='cf-turnstile-response']");
 
-    // Common to every form.
+    // Common to every form. Email/Phone are filled dynamically in fillForm.
     const contact: FieldSpec[] = [
-      { label: "First Name", name: "FirstName", kind: "input" },
-      { label: "Last Name", name: "LastName", kind: "input" },
+      { label: "First Name", name: "FirstName", kind: "input", value: "Test" },
+      { label: "Last Name", name: "LastName", kind: "input", value: "Automation" },
       { label: "Email", name: "Email", kind: "input" },
       { label: "Phone", name: "Phone", kind: "input" },
     ];
     const address: FieldSpec[] = [
-      { label: "Address 1", name: "Address1", kind: "input" },
-      { label: "Address 2", name: "Address2", kind: "input" },
-      { label: "City", name: "City", kind: "input" },
-      { label: "Zip", name: "Zip", kind: "input" },
+      { label: "Address 1", name: "Address1", kind: "input", value: "123 Test Street" },
+      { label: "Address 2", name: "Address2", kind: "input", value: "Suite 100" },
+      { label: "City", name: "City", kind: "input", value: "Dayton" },
+      { label: "Zip", name: "Zip", kind: "input", value: "77535" },
     ];
-    const comments: FieldSpec = { label: "Comments / Questions", name: "CommentsQuestions", kind: "textarea" };
+    const comments: FieldSpec = { label: "Comments / Questions", name: "CommentsQuestions", kind: "textarea", value: "Automated test — please ignore." };
     const disclaimer: FieldSpec = { label: "Disclaimer checkbox", name: "Disclaimer", kind: "checkbox" };
-    const state: FieldSpec = { label: "State", name: "State", kind: "select" };
-    const stateOfInterest: FieldSpec = { label: "State of Interest", name: "StateOfInterest", kind: "select" };
+    const state: FieldSpec = { label: "State", name: "State", kind: "select", value: "Texas" };
+    const stateOfInterest: FieldSpec = { label: "State of Interest", name: "StateOfInterest", kind: "select", value: "Texas" };
 
     // Field sets confirmed identical on prod and dev (Stage 3 discovery v2).
     this.fieldMap = {
       "I am shopping for a new home": [
         ...contact,
-        { label: "Preferred Contact Method", name: "PreferredContactMethod", kind: "select" },
+        { label: "Preferred Contact Method", name: "PreferredContactMethod", kind: "select", value: "Email" },
         stateOfInterest,
         comments,
         disclaimer,
@@ -96,8 +114,8 @@ export class ContactUsPage extends BasePage {
       "I am a real estate professional": [
         ...contact,
         ...address,
-        { label: "Company Name", name: "CompanyName", kind: "input" },
-        { label: "Company Position", name: "CompanyPosition", kind: "input" },
+        { label: "Company Name", name: "CompanyName", kind: "input", value: "Test Automation Co" },
+        { label: "Company Position", name: "CompanyPosition", kind: "input", value: "QA Engineer" },
         state, // NOTE: real-estate has State only — no State of Interest
         comments,
         disclaimer,
@@ -105,26 +123,26 @@ export class ContactUsPage extends BasePage {
       "I am a subcontractor": [
         ...contact,
         ...address,
-        { label: "Company Name", name: "CompanyName", kind: "input" },
+        { label: "Company Name", name: "CompanyName", kind: "input", value: "Test Automation Co" },
         state,
-        { label: "Service / Trade", name: "ServiceTrade", kind: "select" },
-        { label: "Years in Business", name: "YearsInBusiness", kind: "select" },
+        { label: "Service / Trade", name: "ServiceTrade", kind: "select", value: "Plumbing" },
+        { label: "Years in Business", name: "YearsInBusiness", kind: "select", value: "5 to 10 years" },
         stateOfInterest,
         comments,
         disclaimer,
       ],
       "I am selling land": [
         ...contact,
-        { label: "Lot Acres", name: "LotAcres", kind: "input" },
-        { label: "Lot City", name: "LotCity", kind: "input" },
-        { label: "Lot County", name: "LotCounty", kind: "input" },
-        { label: "Price", name: "Price", kind: "input" },
-        { label: "Zoning", name: "Zoning", kind: "input" },
-        { label: "Entitlements", name: "Entitlements", kind: "input" },
-        { label: "Owner Name", name: "OwnerName", kind: "input" },
-        { label: "Owner Phone", name: "OwnerPhone", kind: "input" },
+        { label: "Lot Acres", name: "LotAcres", kind: "input", value: "5" },
+        { label: "Lot City", name: "LotCity", kind: "input", value: "Dayton" },
+        { label: "Lot County", name: "LotCounty", kind: "input", value: "Liberty" },
+        { label: "Price", name: "Price", kind: "input", value: "100000" },
+        { label: "Zoning", name: "Zoning", kind: "input", value: "Residential" },
+        { label: "Entitlements", name: "Entitlements", kind: "input", value: "None" },
+        { label: "Owner Name", name: "OwnerName", kind: "input", value: "Test Owner" },
+        { label: "Owner Phone", name: "OwnerPhone", kind: "input", value: "7325551234" },
         state,
-        { label: "Lot Description", name: "LotDescription", kind: "textarea" },
+        { label: "Lot Description", name: "LotDescription", kind: "textarea", value: "Automated test land listing — please ignore." },
         disclaimer,
       ],
     };
@@ -254,5 +272,156 @@ export class ContactUsPage extends BasePage {
       );
       await reportValue(`${interest} | ${name} options: ${options.join(", ")}`);
     }
+  }
+
+  // ── Form fill + submit (Step 2) ────────────────────────
+  private fieldLocator(field: FieldSpec): Locator {
+    const selector =
+      field.kind === "select"
+        ? `select[name='${field.name}']`
+        : field.kind === "textarea"
+          ? `textarea[name='${field.name}']`
+          : `input[name='${field.name}']`;
+    return this.form.locator(selector).first();
+  }
+
+  /**
+   * Fill every field of the given interest's form with valid values. Email/Phone
+   * use a unique synthetic value unless overridden (used to inject invalid values
+   * for validation). Selects are set with selectOption (force — native select is
+   * visually hidden); disclaimers are toggled the react-aria way.
+   */
+  private async fillForm(
+    interest: ContactInterest,
+    overrides: { email?: string; phone?: string } = {},
+  ): Promise<void> {
+    const email = overrides.email ?? `test.automation+${Date.now()}@ex2india.com`;
+    const phone = overrides.phone ?? "7325551234";
+    for (const field of this.fieldMap[interest]) {
+      const locator = this.fieldLocator(field);
+      if (field.kind === "checkbox") {
+        await this.checkBox(locator, field.label);
+      } else if (field.name === "Email") {
+        await this.type(locator, email, "Email");
+      } else if (field.name === "Phone" || field.name === "OwnerPhone") {
+        await this.type(locator, phone, field.label);
+      } else if (field.kind === "select") {
+        await locator.selectOption(field.value ?? "", { force: true });
+      } else {
+        await this.type(locator, field.value ?? "Test", field.label);
+      }
+    }
+  }
+
+  // react-aria checkbox: a forced click doesn't flip state — focus + Space.
+  private async checkBox(input: Locator, name: string): Promise<void> {
+    if (await input.isChecked().catch(() => false)) return;
+    await input.focus();
+    await input.press("Space");
+    await expect(input, `${name} should be checked`).toBeChecked({ timeout: 5000 });
+  }
+
+  // Cloudflare Turnstile injects a token into a hidden input once it resolves;
+  // submitting before it's present silently fails. Wait for it (non-prod).
+  private async waitForTurnstileToken(timeout = 20000): Promise<void> {
+    await expect
+      .poll(
+        async () => (await this.turnstileToken.inputValue().catch(() => "")).length,
+        { message: "Cloudflare Turnstile token should populate before submit", timeout },
+      )
+      .toBeGreaterThan(0);
+  }
+
+  private isProdEnv(): boolean {
+    const env = (process.env.TEST_ENV ?? "").toLowerCase();
+    const baseUrl = process.env.BASE_URL ?? "";
+    return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+  }
+
+  /**
+   * Required-field validation (safe on all envs — client-side, no POST):
+   * submit the empty form and assert a "Please complete the required field"
+   * error appears and the success panel does not.
+   */
+  async verifyRequiredFieldValidation(interest: ContactInterest): Promise<void> {
+    await this.click(this.submitButton.first(), "Submit (empty form)");
+    await Validator.requireVisible(
+      this.fieldErrors.filter({ hasText: /Required field/i }).first(),
+      `${interest} — empty submit should show a 'Required field' error`,
+      10000,
+    );
+    await Validator.requireHidden(
+      this.successMessage,
+      `${interest} — no success panel should appear for an empty submit`,
+      4000,
+    );
+  }
+
+  /**
+   * Invalid email/phone validation (safe on all envs — client-side blocks the
+   * POST): fill the form valid except an invalid email + phone, submit, and
+   * assert both are flagged aria-invalid with a "correct the required field"
+   * error and no success panel.
+   */
+  async verifyInvalidEmailPhoneValidation(interest: ContactInterest): Promise<void> {
+    await this.fillForm(interest, { email: "not-an-email", phone: "123" });
+    await this.click(this.submitButton.first(), "Submit (invalid email/phone)");
+    await expect(this.fieldLocator({ label: "Email", name: "Email", kind: "input" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+      { timeout: 10000 },
+    );
+    await expect(this.fieldLocator({ label: "Phone", name: "Phone", kind: "input" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+      { timeout: 10000 },
+    );
+    await Validator.requireVisible(
+      this.fieldErrors.filter({ hasText: /Invalid format/i }).first(),
+      `${interest} — invalid email/phone should show an 'Invalid format' error`,
+      10000,
+    );
+    await Validator.requireHidden(
+      this.successMessage,
+      `${interest} — no success panel should appear with invalid values`,
+      4000,
+    );
+  }
+
+  /**
+   * Fill the form with valid data and submit it — UNLESS on prod, where we fill
+   * but never submit (no real lead). Returns the contact-us API Response on
+   * non-prod, or null when submission was skipped on prod.
+   */
+  async submitForm(
+    interest: ContactInterest,
+    apiEndpoint: string,
+  ): Promise<Response | null> {
+    await this.fillForm(interest);
+
+    if (this.isProdEnv()) {
+      await reportValue(
+        `${interest}: prod — form filled but NOT submitted (no lead created)`,
+      );
+      await Validator.requireTrue(
+        await this.submitButton.first().isEnabled(),
+        `${interest} — form should be filled & ready (submit not clicked on prod)`,
+      );
+      return null;
+    }
+
+    await this.waitForTurnstileToken();
+    // Arm the listener before clicking so the POST isn't missed (308 → 200).
+    const responsePromise = waitForApi(this.page, apiEndpoint, 30000);
+    await this.click(this.submitButton.first(), `${interest} — Submit (valid)`);
+    return await responsePromise;
+  }
+
+  async verifySubmissionSuccess(interest: ContactInterest): Promise<void> {
+    await Validator.requireVisible(
+      this.successMessage,
+      `${interest} — success / thank-you panel should be displayed after submit`,
+      20000,
+    );
   }
 }

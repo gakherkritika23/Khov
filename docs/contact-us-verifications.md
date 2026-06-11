@@ -2,8 +2,8 @@
 
 _Last updated: 2026-06-11_
 
-What the **Contact Us** automated tests verify today (Step 1 — read-only field &
-dropdown audit). Source files:
+What the **Contact Us** automated tests verify today (Step 1 — field & dropdown
+audit; Step 2 — validation + fill + submit). Source files:
 - Spec: `tests/contactUsPage.spec.ts`
 - Page Object: `page-objects/contactUsPage.ts`
 - Assertions: `utils/validator.ts` (`Validator`); value logging: `utils/reporter.ts`
@@ -20,8 +20,13 @@ visually-hidden `<select>`s; react-aria visually-hidden disclaimer checkboxes).
 
 ## Environments & submission
 Tests are **env-agnostic** (relative `/contact-us/` + config `BASE_URL`) and run on
-dev/uat/stage/prod. **Step 1 performs NO form submission**, so it is safe on prod.
-(Future submission steps must skip the actual submit on prod via `isProdEnv()`.)
+dev/uat/stage/prod. Validation steps are **client-side** (no POST) so they run on
+every env. The **successful submit** runs only on **non-prod** — on prod the form is
+filled but **not submitted** (`isProdEnv()` guard) so no real lead is created. Synthetic
+data is used: First "Test", Last "Automation", timestamped
+`test.automation+<ts>@ex2india.com`, phone `7325551234`. The submit is gated by a
+Cloudflare **Turnstile** token (`input[name='cf-turnstile-response']`), awaited before
+clicking submit on non-prod.
 
 ## Verification types
 | Type | Helper | Meaning |
@@ -72,13 +77,25 @@ its fields exist, and logs every dropdown's options.
 
 ---
 
-## Currently NOT asserted (later E6 steps)
-Step 1 is a presence/existence + dropdown-option baseline. It does **not** yet:
-- fill or **submit** any form (and must never submit on prod);
-- assert **required-field validation** messages (`[class*='shared_error']`);
-- assert **invalid email/phone** rejection;
-- assert the **success** panel / `waitForApi` on the submit endpoint;
-- handle the Cloudflare **Turnstile** token (only needed for submission).
+## Form validation & submission (Step 2 — appended to every TC above)
+After the field/dropdown audit, each of TC-01..TC-05 runs the same form flow on its
+interest's form:
+
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | **Required-field validation** (all envs) | Submit the empty form → a "**Required field**" inline error (`[class*='shared_error']`) is shown; success panel is NOT shown (client-side, no POST) |
+| 2 | **Invalid email/phone validation** (all envs) | Fill valid data except Email=`not-an-email`, Phone=`123` → submit → Email & Phone get `aria-invalid="true"` + an "**Invalid format**" error; success panel NOT shown |
+| 3 | **Successful submit** (non-prod) | Correct Email/Phone, await the Turnstile token, submit → **success / thank-you panel** visible + **`/api/contact-us/` returns 200** (`waitForApi`) |
+| 3p | **Prod — fill only** | The form is filled with valid data but **not submitted** (no lead); logged "filled but NOT submitted" |
+
+All fields for each form are filled with valid synthetic values (selects:
+State/StateOfInterest "Texas", PreferredContactMethod "Email", ServiceTrade
+"Plumbing", YearsInBusiness "5 to 10 years"; disclaimers toggled via react-aria
+focus+Space).
+
+## Currently NOT asserted (later steps)
+- multi-surface contact (QMI / floorplan detail "Request Information") — covered by `qmiPage`;
+- exact success-panel copy beyond the thank-you match; resend/duplicate handling.
 
 ## Notes
 - All dropdowns are **native `<select>`** (no custom comboboxes), so options are
