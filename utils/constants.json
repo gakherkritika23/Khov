@@ -35,5 +35,31 @@
     "detail_url": "/new-construction-homes/texas/dayton/river-ranch-trails/clyde-ii/",
     "heading": "Clyde II",
     "contact_us_api": "/api/contact-us/"
+  },
+  "contact_us": {
+    "url": "/contact-us/",
+    "heading": "Contact Us",
+    "interests": {
+      "new_home": "I am shopping for a new home",
+      "mortgage": "I would like mortgage information",
+      "real_estate": "I am a real estate professional",
+      "subcontractor": "I am a subcontractor",
+      "selling_land": "I am selling land"
+    },
+    "state_of_interest_options": [
+      "Arizona",
+      "California",
+      "Delaware",
+      "Florida",
+      "Georgia",
+      "Maryland",
+      "New Jersey",
+      "Ohio",
+      "Pennsylvania",
+      "South Carolina",
+      "Texas",
+      "Virginia",
+      "West Virginia"
+    ]
   }
 }

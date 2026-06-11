@@ -36,7 +36,7 @@ Tracks delivered work, current status per epic, and key decisions. See
 | E3 | Community page | ✅ Done | Header + sales-consultant (Onsite Sales Team) modal (CP-01/02/03) ✅; floorplan section — cards/images/carousel/meta/calculator (CP-10–15) ✅; QMI section — cards/images/meta/promo/calculator/detail (CP-20–26) ✅ |
 | E4 | QMI details page | ⬜ Not started | Gallery, pricing, IFP, sticker, CTAs |
 | E5 | Floorplan details page | ⬜ Not started | Gallery, pricing, IFP, CTAs |
-| E6 | Contact form (site-wide) | ⬜ Not started | Shared component, `@form` tests |
+| E6 | Contact form (site-wide) | 🟡 In progress | Contact Us page Step 1 (field + dropdown audit, 5 forms via footer) ✅; submission/validation/success pending |
 
 ---
 
@@ -50,6 +50,7 @@ Tracks delivered work, current status per epic, and key decisions. See
 | `tests/communityPage.spec.ts` | Listing Header TC-01 — loads (name/price/location); sales-office hours; Onsite Sales Team (consultant) modal | @smoke | Community page header + sales-consultant modal |
 | `tests/communityPage.spec.ts` | Floorplan Section TC-01 — cards; images; carousels; meta data; mortgage calculator; "View Home Details" → detail | @regression | Community floorplan section |
 | `tests/communityPage.spec.ts` | Quick Move-In Homes TC-01 — load all; single image (+200); meta data; promo rate; was/now; mortgage calculator; card → QMI detail | @regression | Community QMI section |
+| `tests/contactUsPage.spec.ts` | TC-01..TC-05 — per interest (new home / mortgage / real-estate / subcontractor / selling land): footer → Contact Us, verify fields exist, log dropdown options | @form @smoke/@regression | Contact Us page (5 forms) |
 
 All community-page tests are pinned to **River Ranch Trails** (navigated directly).
 POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
@@ -58,15 +59,16 @@ POMs: `basePage`, `homePage`, `regionPage`, `communityPage`.
 
 ## Next up
 
-1. **E4 / E5** — QMI & floorplan details pages (reached from E3).
-2. **E2 RG-03…RG-11** — region page maps / filters / sort.
-3. **E6** — contact form (shared component, `@form`).
+1. **E6 Step 2** — Contact Us submission: fill each form, required-field + invalid email/phone validation, success panel via `waitForApi` — **skip actual submit on prod** (`isProdEnv()` + Turnstile).
+2. **E4 / E5** — QMI & floorplan details pages (reached from E3).
+3. **E2 RG-03…RG-11** — region page maps / filters / sort.
 4. **SB-04 / SB-05** — search-bar suggestion grouping / no-match state.
 
 ---
 
 ## Decisions & log
 
+- **2026-06-11** — E6 Contact Us **Step 1** (read-only field + dropdown audit): new `contactUsPage.ts` POM + `contactUsPage.spec.ts`, reached via the **footer "Contact Us"** link (proves the footer route each test). `/contact-us/` has a "What are you interested in?" radio group (react-aria native radios — select via label click, confirm `toBeChecked`) with **5 options that each render a DIFFERENT form**. 5 TCs (one per interest): verify each form's fields **exist** (visible for inputs/selects/textarea; **EXISTS/attached** for the visually-hidden react-aria `Disclaimer`/`TextMessageDisclaimerCheckbox`) + Submit, and **log every native `<select>`'s options**. Field sets (stable `name` attrs, shared with the QMI Request-Info form): new-home → +PreferredContactMethod/StateOfInterest/Comments/TextMsgDisclaimer; mortgage/real-estate/subcontractor → +Address1/2/City/Zip/State(full US)/StateOfInterest/Comments; selling-land → +LotAcres/LotCity/LotCounty/Price/Zoning/Entitlements/OwnerName/OwnerPhone/LotDescription/State(13). All dropdowns are native `<select>` (no custom combos). Env-agnostic (relative `/contact-us/`); **no submission** in Step 1 → prod-safe (kept `isProdEnv()` reuse note for Step 2). Hidden `cf-turnstile-response`/`IsDesignPriceLead` excluded. Verification doc: `docs/contact-us-verifications.md`.
 - **2026-06-08** — QMI section brought to floorplan parity, merged into ONE consolidated test (`communityPage.spec.ts` "Quick Move-In Homes" TC-01): load all 12 homes, every card's single static image (visible + HTTP 200), every card's meta data (Sq ft/Story/Beds/Baths/Cars/Estimated payment/**Current total price** — none empty/0), promo rate where present, was/now, mortgage calculator on a **random** card (open/fields/recalc/close), and card → detail (last). QMI-scoped locators: `section[class*='quick-move-in-container']`, cards `[class*='Card_contents']` (12), info icon `[class*='Card_tooltip-trigger']` (distinct from the floorplan `TitleBlock_popover-trigger`) → the **same** "Calculate your mortgage" modal (calculator helpers reused). Cards lazy-render (count races 0→12) → scroll + poll. No carousel/gallery (single image). Replaces the old QMI TC-01..04. Class 3/3 green.
 - **2026-06-08** — Confirmed both community-page modals are exercised → corrected the docs: **CP-03** (sales-consultant modal) is covered by the **Onsite Sales Team** modal (no separate per-consultant modal on River Ranch Trails; was wrongly marked deferred); **CP-11** (mortgage calculator modal) IS opened on the community page from both the floorplan and QMI sections (supersedes the "tooltip-only / moved to E5" note).
 - **2026-06-08** — Allure value logging: `console.log` is not a `test.step`, so logged values (image URLs+status, sales hours, modal phone/address/consultants, floorplan/QMI meta, calculator fields) never showed in the report. Added `utils/reporter.ts` `reportValue(message)` — a boxed `test.step` that also mirrors to stdout — and routed all value logs through it across `communityPage.ts` + the three specs. Verified values now render as report steps.
