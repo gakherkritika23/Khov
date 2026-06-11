@@ -497,6 +497,28 @@ export class PlanDetailPage extends BasePage {
     // Enters invalid values into the required fields and confirms the form blocks
     // submission with inline "Please correct the required field" errors. Never
     // creates a lead (client-side validation prevents the POST).
+    // Submits the EMPTY form and confirms it is blocked with an inline required-
+    // field error and no submission. Client-side only (no POST) — safe on every
+    // environment.
+    async verifyRequestInformationRequiredFieldValidation(): Promise<void> {
+        await this.click(
+            this.requestInfoSubmitButton.first(),
+            "Send Request (submit empty form)",
+        );
+        await Validator.requireVisible(
+            this.requestInfoFieldErrors
+                .filter({ hasText: /complete the required field|Required field/i })
+                .first(),
+            "Empty submit should show a required-field error",
+            10000,
+        );
+        await Validator.requireHidden(
+            this.requestInfoSuccessMessage,
+            "Success message should NOT appear when submitting an empty form",
+            4000,
+        );
+    }
+
     async verifyRequestInformationInvalidValueValidation(): Promise<void> {
         const valid = DEFAULT_REQUEST_INFORMATION_DATA;
         const invalid = testData.request_information.invalid;

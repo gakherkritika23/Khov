@@ -538,21 +538,11 @@ export class QmiPage extends BasePage {
       10000,
     );
 
-    // Step 4: Hover on info icon because Mortgage Calculator CTA appears only on hover
+    // Step 4: Reveal the Mortgage Calculator CTA. It surfaces from the info-icon
+    // popover, which is hover- (and sometimes tap-) triggered and lazy, so a
+    // single hover is flaky (esp. headed/dev). Retry: hover (keep the cursor on
+    // the icon), and fall back to a tap, until the CTA appears.
     const infoIcon = this.mortgageInfoTrigger.first();
-
-    await infoIcon.hover({ force: true });
-
-    const iconBox = await infoIcon.boundingBox();
-
-    if (iconBox) {
-      await this.page.mouse.move(
-        iconBox.x + iconBox.width / 2,
-        iconBox.y + iconBox.height / 2,
-      );
-    }
-
-    // Step 5: Validate hover popover/CTA appears
     const mortgageCalculatorCta = this.page
       .locator("button, a, [role='button']")
       .filter({
@@ -560,9 +550,29 @@ export class QmiPage extends BasePage {
       })
       .first();
 
+    let ctaVisible = false;
+    for (let attempt = 0; attempt < 4 && !ctaVisible; attempt++) {
+      await infoIcon.scrollIntoViewIfNeeded().catch(() => {});
+      await infoIcon.hover({ force: true }).catch(() => {});
+      const iconBox = await infoIcon.boundingBox();
+      if (iconBox) {
+        await this.page.mouse
+          .move(iconBox.x + iconBox.width / 2, iconBox.y + iconBox.height / 2)
+          .catch(() => {});
+      }
+      ctaVisible = await mortgageCalculatorCta.isVisible().catch(() => false);
+      if (!ctaVisible) {
+        // Some surfaces open the popover on tap rather than hover.
+        await infoIcon.click({ force: true }).catch(() => {});
+        ctaVisible = await mortgageCalculatorCta.isVisible().catch(() => false);
+      }
+      if (!ctaVisible) await this.page.waitForTimeout(700);
+    }
+
+    // Step 5: Validate the CTA appeared.
     await Validator.requireVisible(
       mortgageCalculatorCta,
-      "Mortgage Calculator CTA should be displayed after hovering mortgage information icon",
+      "Mortgage Calculator CTA should be displayed after opening the mortgage information popover",
       15000,
     );
 
@@ -1034,6 +1044,28 @@ export class QmiPage extends BasePage {
   }
 
   // ── Request Information Form — Verification ────────────
+  // Submits the EMPTY form and confirms it is blocked with an inline required-
+  // field error and no submission. Client-side only (no POST) — safe on every
+  // environment.
+  async verifyRequestInformationRequiredFieldValidation(): Promise<void> {
+    await this.click(
+      this.requestInfoSubmitButton.first(),
+      "Send Request (submit empty form)",
+    );
+    await Validator.requireVisible(
+      this.requestInfoFieldErrors
+        .filter({ hasText: /complete the required field|Required field/i })
+        .first(),
+      "Empty submit should show a required-field error",
+      10000,
+    );
+    await Validator.requireHidden(
+      this.requestInfoSuccessMessage,
+      "Success message should NOT appear when submitting an empty form",
+      4000,
+    );
+  }
+
   // Enters invalid values into the required fields and confirms the form blocks
   // submission with inline "Please correct the required field" errors. Never
   // creates a lead (client-side validation prevents the POST), so it is safe to
