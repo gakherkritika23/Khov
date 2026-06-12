@@ -6,6 +6,10 @@ import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
+// Multi-page journey (home → region → community detail) on a heavy site; raise
+// the timeout at the describe level so it covers the beforeEach navigation too.
+test.describe.configure({ timeout: 90000 });
+
 test.describe("Region Page — Community Results", () => {
   let homePage: HomePage;
   let regionPage: RegionPage;
@@ -19,10 +23,6 @@ test.describe("Region Page — Community Results", () => {
   });
 
   test("TC-01 | Selecting 'Texas' suggestion then the first community opens its detail page @regression", async () => {
-    // Multi-page journey on prod (home → region page → community detail);
-    // give it headroom over the 30s default to absorb network variance.
-    test.setTimeout(90000);
-
     await homePage.searchAndSelectSuggestion(
       testData.region.term,
       testData.region.suggestion,

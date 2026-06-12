@@ -11,10 +11,14 @@ export class RegionPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    // "New Home Communities" section heading on the region page.
-    this.communitiesHeading = page.getByRole("heading", {
-      name: "New Home Communities",
-    });
+    // "New Home Communities" section heading on the region page. The page can
+    // render more than one matching heading (e.g. a visually-hidden + visible
+    // one), so scope to the first to avoid a strict-mode violation.
+    this.communitiesHeading = page
+      .getByRole("heading", {
+        name: "New Home Communities",
+      })
+      .first();
     // Each result is a Community card (CSS-module class — match by stable prefix).
     this.communityCards = page.locator("[class*='Community_card']");
     this.firstCommunityCard = this.communityCards.first();

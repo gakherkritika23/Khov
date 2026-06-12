@@ -25,7 +25,9 @@ test.describe("Community Page — Listing Header", () => {
   let communityPage: CommunityPage;
 
   test.beforeEach(async ({ page }) => {
-    test.setTimeout(90000);
+    // Headroom for slow dev/full-suite load: navigation can take ~50s and the
+    // lazy "Community Location" InfoBlock ~20s, before the sales-team modal steps.
+    test.setTimeout(150000);
     communityPage = await openCommunity(page);
   });
 
