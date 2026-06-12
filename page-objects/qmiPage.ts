@@ -355,7 +355,7 @@ export class QmiPage extends BasePage {
     }
   }
 
-  // ── Header / Key Facts — Verification (QD-01) ──────────
+  // ── Header / Key Facts — Verification ──────────────────
   async verifyHeaderIsDisplayed(): Promise<void> {
     await Validator.requireVisible(
       this.pageHeading.first(),
@@ -377,7 +377,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── Availability — Verification (QD-06) ────────────────
+  // ── Availability — Verification ────────────────────────
   async verifyAvailabilityIsDisplayed(): Promise<void> {
     if (this.selectedCardData?.availability) {
       await expect(this.page.locator("body")).toContainText(
@@ -394,7 +394,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── Media Gallery — Actions (QD-02 / QD-03) ────────────
+  // ── Media Gallery — Actions ────────────────────────────
   async openGalleryModal(): Promise<void> {
     await this.handlePagePopups();
     this.galleryFallbackUsed = false;
@@ -460,7 +460,7 @@ export class QmiPage extends BasePage {
     await this.page.keyboard.press("Escape");
   }
 
-  // ── Media Gallery — Verification (QD-02 / QD-03) ───────
+  // ── Media Gallery — Verification ───────────────────────
   async verifyGalleryModalIsDisplayed(): Promise<void> {
     if (this.galleryFallbackUsed) {
       await this.verifyInlineMediaImageIsDisplayed();
@@ -497,7 +497,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── Pricing — Actions (QD-04) ──────────────────────────
+  // ── Pricing — Actions ──────────────────────────────────
   async openMortgageCalculator(): Promise<void> {
     await this.page.waitForLoadState("domcontentloaded");
 
@@ -599,7 +599,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── Pricing — Verification (QD-04) ─────────────────────
+  // ── Pricing — Verification ─────────────────────────────
   async verifyMonthlyPaymentIsDisplayed(): Promise<void> {
     await Validator.requireVisible(
       this.monthlyPayment.first(),
@@ -608,7 +608,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── Pricing — Verification (QD-04) ─────────────────────
+  // ── Pricing — Verification ─────────────────────────────
   async verifyMortgageCalculatorValuesUpdate(): Promise<void> {
     const mortgageCalculatorModal = this.page
       .locator("[role='dialog'], [class*='MortgageCalculator'], [class*='mortgage'], [class*='Calculator']")
@@ -749,7 +749,7 @@ export class QmiPage extends BasePage {
     expect(paymentAfterSecondSwitch).toMatch(/\$[\d,]+/);
   }
 
-  // ── Interactive Floor Plan (IFP) — Verification (QD-07) ─
+  // ── Interactive Floor Plan (IFP) — Verification ─────────
   async verifyFloorplanIfpIsDisplayed(): Promise<void> {
     await this.scrollIntoView(this.floorplanIframe.first());
     await Validator.requireVisible(
@@ -759,7 +759,7 @@ export class QmiPage extends BasePage {
     );
   }
 
-  // ── CTAs — Verification (QD-09) ────────────────────────
+  // ── CTAs — Verification ────────────────────────────────
   async verifyCtasAreDisplayed(): Promise<void> {
     await this.page.waitForLoadState("load");
     await Validator.requireVisible(

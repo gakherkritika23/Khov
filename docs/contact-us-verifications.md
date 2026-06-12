@@ -1,10 +1,11 @@
 # Contact Us — Verification Coverage
 
-_Last updated: 2026-06-11_
+_Last updated: 2026-06-12_
 
 What the **Contact Us** automated tests verify today (Step 1 — field & dropdown
 audit; Step 2 — validation + fill + submit). Source files:
-- Spec: `tests/contactUsPage.spec.ts`
+- Spec: `tests/contactForms.spec.ts` (houses **all** contact-form surfaces —
+  the Contact Us page plus the QMI / Floorplan "Request Information" forms)
 - Page Object: `page-objects/contactUsPage.ts`
 - Assertions: `utils/validator.ts` (`Validator`); value logging: `utils/reporter.ts`
 

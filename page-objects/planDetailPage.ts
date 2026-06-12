@@ -21,7 +21,7 @@ const DEFAULT_REQUEST_INFORMATION_DATA: RequestInformationFormData = {
 };
 
 /**
- * Floorplan details page — E5 (FD-01..FD-06) in docs/test-plan.md.
+ * Floorplan details page — E5 in docs/test-plan.md.
  *
  * Pinned (via the spec) to a deterministic floorplan — Clyde II at River Ranch
  * Trails (`constants.floorplan.detail_url`). Unlike a QMI home, this page shows
@@ -167,7 +167,7 @@ export class PlanDetailPage extends BasePage {
         await this.handlePagePopups();
     }
 
-    // ── Overview — Verification (FD-01) ────────────────────
+    // ── Overview — Verification ────────────────────────────
     async verifyPageLoaded(): Promise<void> {
         await Validator.requireVisible(
             this.pageHeading.first(),
@@ -181,7 +181,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── Starting Price — Verification (FD-04) ──────────────
+    // ── Starting Price — Verification ──────────────────────
     async verifyStartingPriceDisplayed(): Promise<void> {
         await Validator.requireVisible(
             this.startingPriceTitle,
@@ -199,7 +199,7 @@ export class PlanDetailPage extends BasePage {
         ).toHaveText(/\$[\d,]+/);
     }
 
-    // ── Media Gallery — Actions / Verification (FD-02) ─────
+    // ── Media Gallery — Actions / Verification ─────────────
     async openGalleryModal(): Promise<void> {
         await this.handlePagePopups();
         await this.scrollIntoView(this.viewGalleryButton.first());
@@ -235,7 +235,7 @@ export class PlanDetailPage extends BasePage {
         ).toBeGreaterThan(1);
     }
 
-    // ── Pricing — Verification (FD-03) ─────────────────────
+    // ── Pricing — Verification ─────────────────────────────
     async verifyMonthlyPaymentIsDisplayed(): Promise<void> {
         await this.scrollIntoView(this.monthlyPayment).catch(() => undefined);
         await Validator.requireVisible(
@@ -330,7 +330,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── Interactive Floor Plan (IFP) — Verification (FD-05) ─
+    // ── Interactive Floor Plan (IFP) — Verification ─────────
     async verifyFloorplanIfpIsDisplayed(): Promise<void> {
         await this.scrollIntoView(this.floorplanIframe.first());
         await Validator.requireVisible(
@@ -340,7 +340,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── CTAs — Verification (FD-06) ────────────────────────
+    // ── CTAs — Verification ────────────────────────────────
     async verifyCtasAreDisplayed(): Promise<void> {
         await this.page.waitForLoadState("load");
         await Validator.requireVisible(
