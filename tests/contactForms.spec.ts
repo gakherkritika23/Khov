@@ -4,22 +4,36 @@ import { ContactUsPage } from "../page-objects/contactUsPage";
 import { QmiPage } from "../page-objects/qmiPage";
 import { PlanDetailPage } from "../page-objects/planDetailPage";
 import { CommunityPage } from "../page-objects/communityPage";
+import { HomePage } from "../page-objects/homePage";
+import { RegionPage } from "../page-objects/regionPage";
 import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
 /**
- * All contact-form verification across khov.com lives in this spec. The three
- * surfaces share the same underlying form component but are reached differently,
- * so each gets its own describe block + navigation:
+ * All contact-form verification across khov.com lives in this spec. The surfaces
+ * share the same underlying form component but are reached differently, so each
+ * gets its own describe block + navigation:
  *   1. Contact Us page (footer "Contact Us" link) — the 5 "What are you
  *      interested in?" interest forms (field audit, validation, submit).
  *   2. QMI details page — the "Request Information" modal form.
  *   3. Floorplan details page — the "Request Information" modal form.
+ *   4. Community details page — the header "Request Information" modal form.
+ *   5. Region (market results) page — the first community card's "Request
+ *      Information" modal form (non-prod only; see that block).
  *
  * Submission never creates a real lead on prod: each submit path fills the form
  * but skips the actual submit there, asserting success + the API only on non-prod.
  */
+
+// Production is the live www.khov.com domain (env subdomains are www-dev /
+// www-uat / www-stg). Mirrors RequestInformationForm.isProdEnv for the one spot
+// the spec itself must branch on environment (the region-page prod skip).
+function isProdEnv(): boolean {
+  const env = (process.env.TEST_ENV ?? "").toLowerCase();
+  const baseUrl = process.env.BASE_URL ?? "";
+  return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+}
 
 // ── 1. Contact Us page — 5 interest forms ──────────────────────────────
 // Reached via the footer "Contact Us" link. One test per interest (the 5 forms
@@ -223,6 +237,64 @@ test.describe("Community Details — Request Information Form", () => {
     if (response) {
       await communityPage.requestInfo.verifyApiSubmission(response);
       await communityPage.requestInfo.verifySubmissionSuccess();
+    }
+  });
+});
+
+// ── 5. Region (market results) page — Request Information form ─────────
+// Reached from the Home page: search "Dallas" → select the "Dallas" suggestion
+// → the "New Home Communities" results page. The first community card carries a
+// "Request Information" CTA that opens the same shared form component.
+test.describe("Region Page — Request Information Form", () => {
+  let homePage: HomePage;
+  let regionPage: RegionPage;
+
+  // Home search + heavy results page (map + cards) + modal/Turnstile/submit.
+  test.describe.configure({ timeout: 180000 });
+
+  test.beforeEach(async ({ page }) => {
+    // The Request Information modal opened from a region card fetches the
+    // community's form remotely; on prod that fetch is Cloudflare/bot-gated and
+    // the modal never leaves its loading spinner, so this surface can only be
+    // exercised on non-prod. (The detail-page forms work on prod because their
+    // form is rendered in-page.)
+    test.skip(
+      isProdEnv(),
+      "Region-card Request Information modal does not load under automation on prod (bot-gated); covered on non-prod.",
+    );
+    homePage = new HomePage(page);
+    regionPage = new RegionPage(page);
+    await homePage.navigateToHome(constants.home_page.url);
+    await homePage.searchAndSelectSuggestion(
+      testData.region_request_info.term,
+      testData.region_request_info.suggestion,
+      testData.endpoint.search,
+    );
+    await homePage.verifyResultsPageDisplayed(
+      constants.home_search.dallas_results_url,
+      constants.home_search.dallas_results_heading,
+    );
+    await regionPage.verifyCommunitiesSectionIsDisplayed();
+  });
+
+  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    await regionPage.verifyRequestInfoCtaIsDisplayed();
+    await regionPage.openRequestInformationModal();
+    await regionPage.requestInfo.verifyModalIsDisplayed();
+    await regionPage.requestInfo.verifyModalFields();
+    await regionPage.requestInfo.verifyRequiredFieldValidation();
+    await regionPage.requestInfo.verifyInvalidValueValidation();
+
+    // Never creates a real lead on prod — submit() fills the form but skips
+    // submission there (returns null). On non-prod it captures the contact-us
+    // API response so we can assert the result + posted payload.
+    const response = await regionPage.requestInfo.submit(
+      testData.endpoint.contact_us,
+    );
+    if (response) {
+      await regionPage.requestInfo.verifyApiSubmission(response);
+      await regionPage.requestInfo.verifySubmissionSuccess();
     }
   });
 });

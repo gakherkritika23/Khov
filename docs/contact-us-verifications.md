@@ -5,7 +5,9 @@ _Last updated: 2026-06-15_
 What the **Contact Us** automated tests verify today (Step 1 — field & dropdown
 audit; Step 2 — validation + fill + submit). Source files:
 - Spec: `tests/contactForms.spec.ts` (houses **all** contact-form surfaces — the
-  Contact Us page plus the QMI / Floorplan / **Community** "Request Information" forms)
+  Contact Us page plus the QMI / Floorplan / **Community** / **Region** "Request
+  Information" forms; the Region surface is **non-prod only** — its card-triggered
+  modal is Cloudflare/bot-gated on prod and never finishes loading, so it `test.skip`s there)
 - Page Objects: `page-objects/contactUsPage.ts` (Contact Us page) and
   `page-objects/requestInformationForm.ts` — the **shared** Request Information
   form component (`RequestInformationForm`) used by the QMI, Floorplan and
