@@ -104,18 +104,38 @@ export class RegionPage extends BasePage {
     // overlay's pointer-events first. No-op on envs without the promo (e.g. dev).
     await this.handlePagePopups();
     await this.scrollIntoView(this.firstCommunityCard.first());
-    await this.letClicksPassThroughOverlay();
-    // Single press only: the modal loads its form async (a loading spinner
-    // first), and re-clicking would reset that spinner. force:true fires a real
-    // pointer event (react-aria needs it) but skips the post-click actionability
-    // wait — otherwise Playwright's click hangs when the opening modal covers the
-    // button it just pressed.
-    await this.requestInfoCta.first().click({ force: true }).catch(() => {});
-    console.log("Clicked on: Request Information CTA (first community card)");
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (await this.requestInfo.modal.isVisible().catch(() => false)) {
+        return;
+      }
+      // A prod-only promo `Modal_overlay` can intercept pointer events over the
+      // CTA; let the real click pass through it. The CTA is a react-aria
+      // pressable (needs a real pointer event — a DOM .click() won't fire it),
+      // and opening the modal covers the button, so force:true (skips the
+      // post-click actionability wait) avoids a hang.
+      await this.letClicksPassThroughOverlay();
+      await this.requestInfoCta.first().click({ force: true }).catch(() => {});
+      console.log("Clicked on: Request Information CTA (first community card)");
+      // Did the press register? The modal request is reflected in the URL. If
+      // so, wait for the form WITHOUT re-clicking (a second press resets the
+      // modal's loading spinner); only re-press when the click didn't take.
+      const pressRegistered = await this.page
+        .waitForURL(/modalKey=request-information/, { timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (pressRegistered) {
+        await Validator.requireVisible(
+          this.requestInfo.modal,
+          "Request Information modal should open from the first community card",
+          25000,
+        );
+        return;
+      }
+    }
     await Validator.requireVisible(
       this.requestInfo.modal,
       "Request Information modal should open from the first community card",
-      25000,
+      10000,
     );
   }
 
