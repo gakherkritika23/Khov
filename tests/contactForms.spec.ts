@@ -20,15 +20,15 @@ import testData from "../utils/test_data.json";
  *   3. Floorplan details page — the "Request Information" modal form.
  *   4. Community details page — the header "Request Information" modal form.
  *   5. Region (market results) page — the first community card's "Request
- *      Information" modal form (non-prod only; see that block).
+ *      Information" modal form.
  *
  * Submission never creates a real lead on prod: each submit path fills the form
  * but skips the actual submit there, asserting success + the API only on non-prod.
  */
 
 // Production is the live www.khov.com domain (env subdomains are www-dev /
-// www-uat / www-stg). Mirrors RequestInformationForm.isProdEnv for the one spot
-// the spec itself must branch on environment (the region-page prod skip).
+// www-uat / www-stg). Used by the region block to treat a Cloudflare-gated modal
+// load as an allowed skip on prod (a hard failure elsewhere).
 function isProdEnv(): boolean {
   const env = (process.env.TEST_ENV ?? "").toLowerCase();
   const baseUrl = process.env.BASE_URL ?? "";
@@ -253,15 +253,6 @@ test.describe("Region Page — Request Information Form", () => {
   test.describe.configure({ timeout: 180000 });
 
   test.beforeEach(async ({ page }) => {
-    // The Request Information modal opened from a region card fetches the
-    // community's form remotely; on prod that fetch is Cloudflare/bot-gated and
-    // the modal never leaves its loading spinner, so this surface can only be
-    // exercised on non-prod. (The detail-page forms work on prod because their
-    // form is rendered in-page.)
-    test.skip(
-      isProdEnv(),
-      "Region-card Request Information modal does not load under automation on prod (bot-gated); covered on non-prod.",
-    );
     homePage = new HomePage(page);
     regionPage = new RegionPage(page);
     await homePage.navigateToHome(constants.home_page.url);
@@ -280,7 +271,24 @@ test.describe("Region Page — Request Information Form", () => {
   test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
     await regionPage.verifyRequestInfoCtaIsDisplayed();
-    await regionPage.openRequestInformationModal();
+
+    // The card CTA opens a modal whose form is fetched remotely. On prod that
+    // fetch is behind Cloudflare bot-protection and can hang the modal on its
+    // loading spinner under automation (it loads for real users — see the manual
+    // tap). Treat that as an allowed skip on prod only; on non-prod a modal that
+    // fails to open is a real failure. The form's fields/validation are still
+    // covered on prod by the QMI/Floorplan/Community surfaces (same component).
+    const opened = await regionPage.openRequestInformationModal();
+    if (!opened) {
+      test.skip(
+        isProdEnv(),
+        "Region-card Request Information modal form did not load on prod (Cloudflare bot-protection under automation); covered on non-prod + via detail-page surfaces.",
+      );
+      throw new Error(
+        "Request Information modal did not open from the first community card",
+      );
+    }
+
     await regionPage.requestInfo.verifyModalIsDisplayed();
     await regionPage.requestInfo.verifyModalFields();
     await regionPage.requestInfo.verifyRequiredFieldValidation();

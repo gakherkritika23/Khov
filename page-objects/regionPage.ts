@@ -96,64 +96,42 @@ export class RegionPage extends BasePage {
     );
   }
 
-  async openRequestInformationModal(): Promise<void> {
-    // The results page can show a prod-only promo/lead modal whose `Modal_overlay`
-    // intercepts pointer events over the card CTA. The CTA is a react-aria
-    // pressable (needs a REAL pointer event — a DOM .click() won't fire it), so
-    // rather than a DOM click we let the real click reach it by disabling the
-    // overlay's pointer-events first. No-op on envs without the promo (e.g. dev).
+  // Opens the first community card's Request Information modal and resolves to
+  // whether the modal's FORM became visible. Returns `false` (rather than
+  // throwing) when the form never renders — on prod the card-triggered form is
+  // fetched remotely behind Cloudflare bot-protection, which can leave the modal
+  // on its loading spinner under automation; the caller decides how to treat
+  // that per environment.
+  async openRequestInformationModal(): Promise<boolean> {
     await this.handlePagePopups();
     await this.scrollIntoView(this.firstCommunityCard.first());
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (await this.requestInfo.modal.isVisible().catch(() => false)) {
-        return;
+        return true;
       }
-      // A prod-only promo `Modal_overlay` can intercept pointer events over the
-      // CTA; let the real click pass through it. The CTA is a react-aria
-      // pressable (needs a real pointer event — a DOM .click() won't fire it),
-      // and opening the modal covers the button, so force:true (skips the
-      // post-click actionability wait) avoids a hang.
-      await this.letClicksPassThroughOverlay();
-      await this.requestInfoCta.first().click({ force: true }).catch(() => {});
+      // A NATURAL pointer click is required: the CTA is a react-aria pressable,
+      // so a forced/synthetic click does not open it. Bounded so an intermittent
+      // promo-overlay interception can recover on the next attempt.
+      await this.requestInfoCta
+        .first()
+        .click({ timeout: 15000 })
+        .catch(() => {});
       console.log("Clicked on: Request Information CTA (first community card)");
       // Did the press register? The modal request is reflected in the URL. If
-      // so, wait for the form WITHOUT re-clicking (a second press resets the
+      // so, wait for the form WITHOUT re-clicking (a second press would reset the
       // modal's loading spinner); only re-press when the click didn't take.
       const pressRegistered = await this.page
         .waitForURL(/modalKey=request-information/, { timeout: 5000 })
         .then(() => true)
         .catch(() => false);
       if (pressRegistered) {
-        await Validator.requireVisible(
-          this.requestInfo.modal,
-          "Request Information modal should open from the first community card",
-          25000,
-        );
-        return;
+        return await this.requestInfo.modal
+          .waitFor({ state: "visible", timeout: 30000 })
+          .then(() => true)
+          .catch(() => false);
       }
+      await this.handlePagePopups();
     }
-    await Validator.requireVisible(
-      this.requestInfo.modal,
-      "Request Information modal should open from the first community card",
-      10000,
-    );
-  }
-
-  // Disables pointer-events on any visible promo/lead `Modal_overlay` so a real
-  // pointer click reaches the (react-aria pressable) card CTA behind it. Targets
-  // only the generic Modal_overlay backdrop, never the Request Information modal.
-  private async letClicksPassThroughOverlay(): Promise<void> {
-    await this.page
-      .evaluate(() => {
-        document
-          .querySelectorAll("[class*='Modal_overlay']")
-          .forEach((el) => {
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              (el as HTMLElement).style.pointerEvents = "none";
-            }
-          });
-      })
-      .catch(() => {});
+    return await this.requestInfo.modal.isVisible().catch(() => false);
   }
 }

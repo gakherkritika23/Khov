@@ -6,8 +6,11 @@ What the **Contact Us** automated tests verify today (Step 1 — field & dropdow
 audit; Step 2 — validation + fill + submit). Source files:
 - Spec: `tests/contactForms.spec.ts` (houses **all** contact-form surfaces — the
   Contact Us page plus the QMI / Floorplan / **Community** / **Region** "Request
-  Information" forms; the Region surface is **non-prod only** — its card-triggered
-  modal is Cloudflare/bot-gated on prod and never finishes loading, so it `test.skip`s there)
+  Information" forms. The Region surface is **best-effort on prod**: its
+  card-triggered modal form is fetched behind Cloudflare bot-protection, which can
+  hang the modal under heavy automation, so the test runs the full fill-only flow
+  on prod when the form loads and otherwise `test.skip`s on prod only — the form
+  itself is still covered on prod by the QMI/Floorplan/Community surfaces)
 - Page Objects: `page-objects/contactUsPage.ts` (Contact Us page) and
   `page-objects/requestInformationForm.ts` — the **shared** Request Information
   form component (`RequestInformationForm`) used by the QMI, Floorplan and
