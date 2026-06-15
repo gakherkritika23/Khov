@@ -112,8 +112,10 @@ The right-rail **"Find your local information"** section has a **"Select a State
 dropdown — a **react-aria custom dropdown** (trigger
 `[class*='Sidebar_sidebar'] button[aria-haspopup='listbox']`; opening it renders
 `role=option` items), distinct from the native `<select>`s in the interest forms.
-- **TC-01** opens it and asserts the **deduped** option set equals the 13
-  `state_of_interest_options` (dev lists each region twice, prod once).
+- **TC-01** opens it and asserts the option list equals the 13
+  `state_of_interest_options`, **each region exactly once (no duplicates)**. dev
+  currently renders 7 regions twice (20 options) — so TC-01 **fails on dev**
+  (flagging that defect) and **passes on prod** (13 unique).
 - **TC-02** selects a **random** region (via the listbox option — a forced
   `selectOption` on the hidden backing `<select>` would not update React state),
   then clicks **"Or Send Us a Text Message"** to open the **"Send us a text

@@ -487,28 +487,42 @@ export class ContactUsPage extends BasePage {
       .waitFor({ state: "visible", timeout: 10000 });
   }
 
-  // Verifies the dropdown lists exactly the expected regions (deduped — dev
-  // renders each region twice, prod once).
+  // Verifies the dropdown lists exactly the expected regions, each EXACTLY ONCE.
+  // (dev currently renders each region twice — a defect this assertion flags;
+  // prod lists each once.)
   async verifyLocalInfoRegions(expected: string[]): Promise<void> {
     await this.openStateDropdown();
     const found = (await this.page.getByRole("option").allInnerTexts())
       .map((t) => t.trim())
       .filter(Boolean);
-    const unique = [...new Set(found)].sort();
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const region of found) {
+      if (seen.has(region)) duplicates.add(region);
+      seen.add(region);
+    }
     await reportValue(
-      `Find-your-local-information regions (${unique.length}): ${unique.join(", ")}`,
+      `Find-your-local-information regions (${found.length}): ${found.join(", ")}`,
     );
+    await this.page.keyboard.press("Escape").catch(() => {});
+
+    // Every expected region present.
     for (const region of expected) {
       await Validator.requireTrue(
-        unique.includes(region),
+        found.includes(region),
         `Region '${region}' should appear in the 'Select a State' dropdown`,
       );
     }
+    // No duplicates — each region listed exactly once.
     await Validator.requireTrue(
-      unique.length === expected.length,
-      `Dropdown should list exactly ${expected.length} regions (found ${unique.length}: ${unique.join(", ")})`,
+      duplicates.size === 0,
+      `'Select a State' dropdown should not contain duplicate regions (duplicates: ${[...duplicates].join(", ") || "none"})`,
     );
-    await this.page.keyboard.press("Escape").catch(() => {});
+    // Exactly the expected set — no extras, no missing.
+    await Validator.requireTrue(
+      found.length === expected.length,
+      `Dropdown should list exactly ${expected.length} regions, each once (found ${found.length}: ${found.join(", ")})`,
+    );
   }
 
   // Selects the given region from the dropdown (via the react-aria listbox — a

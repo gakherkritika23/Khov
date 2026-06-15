@@ -132,7 +132,7 @@ test.describe("Contact Us — Local Information & Text Message", () => {
     await contactUsPage.verifyContactPageDisplayed();
   });
 
-  test("TC-01 | Find your local information — all regions appear in the dropdown @form @regression", async () => {
+  test("TC-01 | Find your local information — all regions appear exactly once (no duplicates) @form @regression", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.verifyLocalInfoRegions(
       constants.contact_us.state_of_interest_options,
