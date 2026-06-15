@@ -27,3 +27,15 @@ Thumbs.db
 .vscode/settings.json
 # logs
 debug.log
+
+# Generated coverage summary artifacts (local only — never commit)
+docs/coverage-summary.md
+docs/coverage-summary.pdf
+scripts/coverage-summary.html
+
+# AI context export bundle (local only — never commit)
+khov-automation-ai-context/
+khov-automation-ai-context.zip
+
+# Claude Code runtime
+.claude/scheduled_tasks.lock
