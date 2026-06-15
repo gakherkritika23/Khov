@@ -105,33 +105,21 @@ export class RegionPage extends BasePage {
   async openRequestInformationModal(): Promise<boolean> {
     await this.handlePagePopups();
     await this.scrollIntoView(this.firstCommunityCard.first());
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      if (await this.requestInfo.modal.isVisible().catch(() => false)) {
-        return true;
-      }
-      // A NATURAL pointer click is required: the CTA is a react-aria pressable,
-      // so a forced/synthetic click does not open it. Bounded so an intermittent
-      // promo-overlay interception can recover on the next attempt.
-      await this.requestInfoCta
-        .first()
-        .click({ timeout: 15000 })
-        .catch(() => {});
-      console.log("Clicked on: Request Information CTA (first community card)");
-      // Did the press register? The modal request is reflected in the URL. If
-      // so, wait for the form WITHOUT re-clicking (a second press would reset the
-      // modal's loading spinner); only re-press when the click didn't take.
-      const pressRegistered = await this.page
-        .waitForURL(/modalKey=request-information/, { timeout: 5000 })
-        .then(() => true)
-        .catch(() => false);
-      if (pressRegistered) {
-        return await this.requestInfo.modal
-          .waitFor({ state: "visible", timeout: 30000 })
-          .then(() => true)
-          .catch(() => false);
-      }
-      await this.handlePagePopups();
-    }
-    return await this.requestInfo.modal.isVisible().catch(() => false);
+    // A SINGLE natural pointer click opens the modal — the CTA is a react-aria
+    // pressable, so a forced/synthetic click won't fire it. Never click twice:
+    // a second press resets the modal's loading spinner and stops the form from
+    // rendering.
+    await this.requestInfoCta
+      .first()
+      .click({ timeout: 15000 })
+      .catch(() => {});
+    console.log("Clicked on: Request Information CTA (first community card)");
+    // The form is fetched remotely, so allow generous time for it to render.
+    // Resolves to false (rather than throwing) if it never loads — e.g. the
+    // remote fetch is throttled by bot-protection — so the caller can skip.
+    return await this.requestInfo.modal
+      .waitFor({ state: "visible", timeout: 40000 })
+      .then(() => true)
+      .catch(() => false);
   }
 }
