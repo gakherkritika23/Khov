@@ -12,8 +12,8 @@ Execute the Playwright spec file, parse results, and provide an actionable
 failure report with suggested fixes.
 
 ## Input
-- Spec file absolute path from Stage 5 (e.g., `D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts`)
-- POM file absolute path from Stage 4 (e.g., `D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts`)
+- Spec file absolute path from Stage 5 (e.g., `.claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts`)
+- POM file absolute path from Stage 4 (e.g., `.claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts`)
 - Manual TC list from Stage 5 (TCs skipped due to unresolved locators)
 
 ---
@@ -23,10 +23,10 @@ failure report with suggested fixes.
 **All commands in this stage run from inside the worktree directory.**
 
 ```powershell
-cd "D:\Khov\.claude\worktrees\worktree-feat+{slug}"
+cd ".claude/worktrees/worktree-feat+{slug}"
 ```
 
-Never run Playwright or tsc from `D:\Khov` directly — the main repo's `tests/`
+Never run Playwright or tsc from `<repo-root>` directly — the main repo's `tests/`
 directory has no spec files and tsc won't find the worktree source files.
 
 ---
@@ -182,10 +182,10 @@ For each failing test, determine which category applies:
 
 1. **Apply fixes to the worktree files only:**
    ```
-   D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
-   D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+   .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
+   .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
    ```
-   **NEVER edit files in `D:\Khov\page-objects\` or `D:\Khov\tests\` directly.**
+   **NEVER edit files in `page-objects/` or `tests/` directly.**
 
 2. **Rerun only the failing tests:**
    ```powershell

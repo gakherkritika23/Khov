@@ -25,7 +25,7 @@ Write the spec file to the **same worktree** used in Stage 4.
 
 The worktree path is:
 ```
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\
+.claude/worktrees/worktree-feat+{slug}/
 ```
 Where `{slug}` = the story slug from the branch name (e.g. `khov-394-hero-block`).
 
@@ -37,12 +37,12 @@ writing any files.
 All `Write` tool calls MUST use absolute paths inside the worktree:
 
 ```
-Spec:      D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
-Test data: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
-Constants: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+Spec:      .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
+Test data: .claude/worktrees/worktree-feat+{slug}/utils/test_data.json
+Constants: .claude/worktrees/worktree-feat+{slug}/utils/constants.json
 ```
 
-**NEVER write to `D:\Khov\tests\` directly** — changes in the main repo directory are
+**NEVER write to `tests/` directly** — changes in the main repo directory are
 not on the feature branch and will be lost.
 
 ---
@@ -52,7 +52,7 @@ not on the feature branch and will be lost.
 Before writing a single line, use the Read tool on the existing spec file:
 
 ```
-Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+Read: .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
 ```
 
 **If the file does not exist** → use Path B (Create New Spec) in Step 2.
@@ -81,7 +81,7 @@ Start from the full spec template below (includes import block).
 
 Write to:
 ```
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+.claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
 ```
 
 ---
@@ -93,7 +93,7 @@ D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
 `utils/test_data.json` may not exist yet. Check before importing it:
 
 ```
-Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
+Read: .claude/worktrees/worktree-feat+{slug}/utils/test_data.json
 ```
 
 - **File exists** → import it and use it normally
@@ -104,7 +104,7 @@ Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
     "{pageKey}": {}
   }
   ```
-  Write to: `D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json`
+  Write to: `.claude/worktrees/worktree-feat+{slug}/utils/test_data.json`
 - **File does not exist AND the spec has no form tests or API calls** → omit the
   `testData` import entirely; do NOT create an empty file just to satisfy the import
 
@@ -172,7 +172,7 @@ await homePage.navigate(constants.home_page.url);  // "/" → https://www.khov.c
 
 If the needed constant key does not exist yet, add it to:
 ```
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+.claude/worktrees/worktree-feat+{slug}/utils/constants.json
 ```
 under the appropriate page key before referencing it in the spec.
 
@@ -493,7 +493,7 @@ Present this summary to the engineer before calling Stage 6:
 ```
 Spec Generation Complete
 ──────────────────────────────────────────────────
-Spec file:  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+Spec file:  .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
 Action:     [Created new / Added {block} describe block to existing file]
 Branch:     feat/khov-{id}-{block-slug}
 

@@ -54,7 +54,7 @@ Rules:
 ## Steps to Execute
 
 1. Parse the `test_cases` array from the input JSON (from message context or uploaded file)
-2. Use the Write tool to write the CSV directly to a local temp path (e.g. `C:\Users\kritika\Downloads\{jira-id}-test-cases.csv` or the current working directory)
+2. Use the Write tool to write the CSV directly to a local temp path (e.g. `~/Downloads/{jira-id}-test-cases.csv` or the current working directory)
 3. Do NOT commit or stage the CSV file — it is local only
 4. Tell the user the file path so they can open it
 
