@@ -3,6 +3,7 @@ import { test } from "./baseTest";
 import { ContactUsPage } from "../page-objects/contactUsPage";
 import { QmiPage } from "../page-objects/qmiPage";
 import { PlanDetailPage } from "../page-objects/planDetailPage";
+import { CommunityPage } from "../page-objects/communityPage";
 import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
@@ -134,20 +135,18 @@ test.describe("QMI Details — Request Information Form", () => {
   test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
     await qmiPage.verifyCtasAreDisplayed();
     await qmiPage.openRequestInformationModal();
-    await qmiPage.verifyRequestInformationModalIsDisplayed();
-    await qmiPage.verifyRequestInformationModalFields();
-    await qmiPage.verifyRequestInformationRequiredFieldValidation();
-    await qmiPage.verifyRequestInformationInvalidValueValidation();
+    await qmiPage.requestInfo.verifyModalIsDisplayed();
+    await qmiPage.requestInfo.verifyModalFields();
+    await qmiPage.requestInfo.verifyRequiredFieldValidation();
+    await qmiPage.requestInfo.verifyInvalidValueValidation();
 
-    // Never creates a real lead on prod — submitRequestInformationForm fills the
-    // form but skips submission there (returns null). On non-prod it captures the
-    // contact-us API response so we can assert the result + posted payload.
-    const response = await qmiPage.submitRequestInformationForm(
-      constants.qmi.contact_us_api,
-    );
+    // Never creates a real lead on prod — submit() fills the form but skips
+    // submission there (returns null). On non-prod it captures the contact-us
+    // API response so we can assert the result + posted payload.
+    const response = await qmiPage.requestInfo.submit(constants.qmi.contact_us_api);
     if (response) {
-      await qmiPage.verifyRequestInformationApiSubmission(response);
-      await qmiPage.verifyRequestInformationSubmissionSuccess();
+      await qmiPage.requestInfo.verifyApiSubmission(response);
+      await qmiPage.requestInfo.verifySubmissionSuccess();
     }
   });
 });
@@ -167,20 +166,63 @@ test.describe("Floorplan Details — Request Information Form", () => {
   test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
     await planPage.verifyCtasAreDisplayed();
     await planPage.openRequestInformationModal();
-    await planPage.verifyRequestInformationModalIsDisplayed();
-    await planPage.verifyRequestInformationModalFields();
-    await planPage.verifyRequestInformationRequiredFieldValidation();
-    await planPage.verifyRequestInformationInvalidValueValidation();
+    await planPage.requestInfo.verifyModalIsDisplayed();
+    await planPage.requestInfo.verifyModalFields();
+    await planPage.requestInfo.verifyRequiredFieldValidation();
+    await planPage.requestInfo.verifyInvalidValueValidation();
 
-    // Never creates a real lead on prod — submitRequestInformationForm fills the
-    // form but skips submission there (returns null). On non-prod it captures the
-    // contact-us API response so we can assert it + the payload.
-    const response = await planPage.submitRequestInformationForm(
+    // Never creates a real lead on prod — submit() fills the form but skips
+    // submission there (returns null). On non-prod it captures the contact-us
+    // API response so we can assert it + the payload.
+    const response = await planPage.requestInfo.submit(
       constants.floorplan.contact_us_api,
     );
     if (response) {
-      await planPage.verifyRequestInformationApiSubmission(response);
-      await planPage.verifyRequestInformationSubmissionSuccess();
+      await planPage.requestInfo.verifyApiSubmission(response);
+      await planPage.requestInfo.verifySubmissionSuccess();
+    }
+  });
+});
+
+// ── 4. Community details page — Request Information form ───────────────
+// Pinned to River Ranch Trails (`constants.community.river_ranch_trails_url`).
+// The header "Request Information" CTA opens the same shared form component.
+async function openCommunity(page: Page): Promise<CommunityPage> {
+  const communityPage = new CommunityPage(page);
+  await communityPage.navigateToCommunity(
+    constants.community.river_ranch_trails_url,
+  );
+  return communityPage;
+}
+
+test.describe("Community Details — Request Information Form", () => {
+  let communityPage: CommunityPage;
+
+  // The community page is heavy (galleries/maps/video); allow extra headroom on
+  // top of the modal + Turnstile + submit steps.
+  test.describe.configure({ timeout: 180000 });
+
+  test.beforeEach(async ({ page }) => {
+    communityPage = await openCommunity(page);
+  });
+
+  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+    await communityPage.verifyRequestInfoCtaIsDisplayed();
+    await communityPage.openRequestInformationModal();
+    await communityPage.requestInfo.verifyModalIsDisplayed();
+    await communityPage.requestInfo.verifyModalFields();
+    await communityPage.requestInfo.verifyRequiredFieldValidation();
+    await communityPage.requestInfo.verifyInvalidValueValidation();
+
+    // Never creates a real lead on prod — submit() fills the form but skips
+    // submission there (returns null). On non-prod it captures the contact-us
+    // API response so we can assert the result + posted payload.
+    const response = await communityPage.requestInfo.submit(
+      constants.community.contact_us_api,
+    );
+    if (response) {
+      await communityPage.requestInfo.verifyApiSubmission(response);
+      await communityPage.requestInfo.verifySubmissionSuccess();
     }
   });
 });

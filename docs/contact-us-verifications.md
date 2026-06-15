@@ -1,12 +1,16 @@
 # Contact Us — Verification Coverage
 
-_Last updated: 2026-06-12_
+_Last updated: 2026-06-15_
 
 What the **Contact Us** automated tests verify today (Step 1 — field & dropdown
 audit; Step 2 — validation + fill + submit). Source files:
-- Spec: `tests/contactForms.spec.ts` (houses **all** contact-form surfaces —
-  the Contact Us page plus the QMI / Floorplan "Request Information" forms)
-- Page Object: `page-objects/contactUsPage.ts`
+- Spec: `tests/contactForms.spec.ts` (houses **all** contact-form surfaces — the
+  Contact Us page plus the QMI / Floorplan / **Community** "Request Information" forms)
+- Page Objects: `page-objects/contactUsPage.ts` (Contact Us page) and
+  `page-objects/requestInformationForm.ts` — the **shared** Request Information
+  form component (`RequestInformationForm`) used by the QMI, Floorplan and
+  Community page objects via a `requestInfo` instance (each page keeps only its
+  own CTA + `openRequestInformationModal()`)
 - Assertions: `utils/validator.ts` (`Validator`); value logging: `utils/reporter.ts`
 
 ## How the page is reached
@@ -16,8 +20,11 @@ URL): `navigate(home)` → scroll the footer link into view → click → wait f
 banner is dismissed by `BasePage.navigate` / `handlePagePopups`.
 
 The contact form is the **same shared component** used by the "Request
-Information" form on QMI/floorplan detail pages (stable `name` attributes; native,
-visually-hidden `<select>`s; react-aria visually-hidden disclaimer checkboxes).
+Information" form on the QMI, floorplan and community detail pages (stable `name`
+attributes; native, visually-hidden `<select>`s; react-aria visually-hidden
+disclaimer checkboxes). On those detail pages the form opens from a page header
+"Request Information" CTA into a modal ("Request Information for <name>") and is
+driven by the shared `RequestInformationForm` helper.
 
 ## Environments & submission
 Tests are **env-agnostic** (relative `/contact-us/` + config `BASE_URL`) and run on
