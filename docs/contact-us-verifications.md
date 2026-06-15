@@ -107,13 +107,35 @@ State/StateOfInterest "Texas", PreferredContactMethod "Email", ServiceTrade
 "Plumbing", YearsInBusiness "5 to 10 years"; disclaimers toggled via react-aria
 focus+Space).
 
+## Find your local information → Send us a text message
+The right-rail **"Find your local information"** section has a **"Select a State"**
+dropdown — a **react-aria custom dropdown** (trigger
+`[class*='Sidebar_sidebar'] button[aria-haspopup='listbox']`; opening it renders
+`role=option` items), distinct from the native `<select>`s in the interest forms.
+- **TC-01** opens it and asserts the **deduped** option set equals the 13
+  `state_of_interest_options` (dev lists each region twice, prod once).
+- **TC-02** selects a **random** region (via the listbox option — a forced
+  `selectOption` on the hidden backing `<select>` would not update React state),
+  then clicks **"Or Send Us a Text Message"** to open the **"Send us a text
+  message"** modal (`?modalKey=text-message`). Fields: `FirstName`, `LastName`,
+  `Email`, `Phone` (labelled "Mobile Number"), `CommentsQuestions` (optional),
+  an `RealEstateProfessional` checkbox and **one** `Disclaimer` checkbox; submit
+  is **"Start the Conversation"**. It verifies fields + required + invalid
+  email/phone validation, then fills and **submits on non-prod / fills-only on
+  prod**. The modal carries its **own** Turnstile token (the page then has two
+  `cf-turnstile-response` inputs), so the submit polls the modal-scoped token.
+  Best-effort: skips the modal flow if the chosen region surfaces no local-info
+  results.
+
 ## Currently NOT asserted (later steps)
 - multi-surface contact (QMI / floorplan detail "Request Information") — covered by `qmiPage`;
 - exact success-panel copy beyond the thank-you match; resend/duplicate handling.
 
 ## Notes
-- All dropdowns are **native `<select>`** (no custom comboboxes), so options are
-  read directly from `<option>` (works even though `PreferredContactMethod` is
-  visually hidden).
+- The **interest-form** dropdowns are **native `<select>`** (no custom
+  comboboxes), so options are read directly from `<option>` (works even though
+  `PreferredContactMethod` is visually hidden). The **"Find your local
+  information" state dropdown is the exception** — a react-aria custom dropdown
+  (see that section above).
 - Hidden plumbing inputs (`cf-turnstile-response`, `IsDesignPriceLead`) are
   intentionally excluded from field verification.

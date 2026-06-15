@@ -116,6 +116,56 @@ test.describe("Contact Us — Field & Dropdown Audit", () => {
   });
 });
 
+// ── 1b. Contact Us — "Find your local information" → Send us a text message ─
+// The right-rail "Select a State" dropdown lists K. Hovnanian regions. Picking a
+// region reveals local contact info incl. an "Or Send Us a Text Message" CTA that
+// opens a "Send us a text message" modal. The dropdown is verified on every env;
+// the modal flow runs end-to-end (dev submits, prod fills only) and best-effort
+// skips if the selected region happens to surface no local-information results.
+test.describe("Contact Us — Local Information & Text Message", () => {
+  let contactUsPage: ContactUsPage;
+
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(180000);
+    contactUsPage = new ContactUsPage(page);
+    await contactUsPage.navigateToContactViaFooter(constants.home_page.url);
+    await contactUsPage.verifyContactPageDisplayed();
+  });
+
+  test("TC-01 | Find your local information — all regions appear in the dropdown @form @regression", async () => {
+    await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
+    await contactUsPage.verifyLocalInfoRegions(
+      constants.contact_us.state_of_interest_options,
+    );
+  });
+
+  test("TC-02 | Send us a text message — fields, validation, fill/submit @form @regression", async () => {
+    const regions = constants.contact_us.state_of_interest_options;
+    const state = regions[Math.floor(Math.random() * regions.length)];
+    await reportValue(`Random local-information state: ${state}`);
+    await contactUsPage.selectLocalInfoState(state);
+
+    // The CTA + modal render only when the chosen region surfaces local-info
+    // results. Skip the modal flow if they don't appear — the dropdown itself
+    // is covered by TC-01.
+    const opened = await contactUsPage.openTextMessageModal();
+    test.skip(
+      !opened,
+      "Selected region surfaced no local-information results (no Send-us-a-text-message CTA).",
+    );
+
+    await contactUsPage.verifyTextMessageModalFields();
+    await contactUsPage.verifyTextMessageRequiredFieldValidation();
+    await contactUsPage.verifyTextMessageInvalidEmailPhoneValidation();
+    // Non-prod submits; prod fills only (no lead). On prod this is the typical
+    // path since the modal is only reachable there.
+    const resp = await contactUsPage.submitTextMessageForm(
+      testData.endpoint.contact_us,
+    );
+    if (resp) await contactUsPage.verifyTextMessageSubmissionSuccess();
+  });
+});
+
 // ── 2. QMI details page — Request Information form ─────────────────────
 // Pinned to a deterministic, feature-rich QMI home at River Ranch Trails
 // (`constants.qmi.detail_url`). If that home is no longer listed, update it.

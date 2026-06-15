@@ -46,6 +46,19 @@ export class ContactUsPage extends BasePage {
   readonly successMessage: Locator;
   readonly turnstileToken: Locator;
 
+  // "Find your local information" → "Send us a text message" flow (Stage 3).
+  readonly localInfoStateTrigger: Locator;
+  readonly sendTextMessageCta: Locator;
+  readonly textMessageModal: Locator;
+  readonly tmFirstName: Locator;
+  readonly tmLastName: Locator;
+  readonly tmEmail: Locator;
+  readonly tmMobile: Locator;
+  readonly tmRealEstatePro: Locator;
+  readonly tmDisclaimer: Locator;
+  readonly tmSubmit: Locator;
+  readonly tmErrors: Locator;
+
   // Per-interest expected fields (from Stage 3 discovery). Hidden plumbing
   // inputs (cf-turnstile-response, IsDesignPriceLead) are intentionally omitted.
   private readonly fieldMap: Record<ContactInterest, FieldSpec[]>;
@@ -74,6 +87,34 @@ export class ContactUsPage extends BasePage {
       .first();
     // Cloudflare Turnstile token (must be populated before a real submit).
     this.turnstileToken = page.locator("input[name='cf-turnstile-response']");
+
+    // "Find your local information" state dropdown (a react-aria custom select
+    // in the sidebar), the "Or Send Us a Text Message" CTA (renders only after a
+    // region is selected), and the "Send us a text message" modal + its fields.
+    this.localInfoStateTrigger = page
+      .locator("[class*='Sidebar_sidebar'] button[aria-haspopup='listbox']")
+      .first();
+    this.sendTextMessageCta = page
+      .locator("[class*='Sidebar_sidebar']")
+      .getByText(/Send Us a Text Message/i)
+      .first();
+    this.textMessageModal = page
+      .locator("[class*='Modal']")
+      .filter({
+        has: page.getByRole("heading", { name: /Send us a text message/i }),
+      })
+      .first();
+    this.tmFirstName = this.textMessageModal.locator("input[name='FirstName']");
+    this.tmLastName = this.textMessageModal.locator("input[name='LastName']");
+    this.tmEmail = this.textMessageModal.locator("input[name='Email']");
+    // The field is labelled "Mobile Number" but its name attribute is 'Phone'.
+    this.tmMobile = this.textMessageModal.locator("input[name='Phone']");
+    this.tmRealEstatePro = this.textMessageModal.locator(
+      "input[name='RealEstateProfessional']",
+    );
+    this.tmDisclaimer = this.textMessageModal.locator("input[name='Disclaimer']");
+    this.tmSubmit = this.textMessageModal.locator("button[type='submit']");
+    this.tmErrors = this.textMessageModal.locator("[class*='shared_error']");
 
     // Common to every form. Email/Phone are filled dynamically in fillForm.
     const contact: FieldSpec[] = [
@@ -322,11 +363,16 @@ export class ContactUsPage extends BasePage {
   }
 
   // Cloudflare Turnstile injects a token into a hidden input once it resolves;
-  // submitting before it's present silently fails. Wait for it (non-prod).
-  private async waitForTurnstileToken(timeout = 20000): Promise<void> {
+  // submitting before it's present silently fails. Wait for it (non-prod). When
+  // the text-message modal is open the page has TWO token inputs (main form +
+  // modal), so callers pass the modal-scoped token to poll the right one.
+  private async waitForTurnstileToken(
+    timeout = 20000,
+    token: Locator = this.turnstileToken,
+  ): Promise<void> {
     await expect
       .poll(
-        async () => (await this.turnstileToken.inputValue().catch(() => "")).length,
+        async () => (await token.inputValue().catch(() => "")).length,
         { message: "Cloudflare Turnstile token should populate before submit", timeout },
       )
       .toBeGreaterThan(0);
@@ -421,6 +467,194 @@ export class ContactUsPage extends BasePage {
     await Validator.requireVisible(
       this.successMessage,
       `${interest} — success / thank-you panel should be displayed after submit`,
+      20000,
+    );
+  }
+
+  // ── Find your local information → Send us a text message ──────────────
+
+  // Opens the "Select a State" react-aria dropdown (scrolling it clear of the
+  // sticky header) and waits for its options to render.
+  private async openStateDropdown(): Promise<void> {
+    await this.scrollIntoView(this.localInfoStateTrigger);
+    await this.page.mouse.wheel(0, 200); // clear the sticky header overlap
+    await this.page.waitForTimeout(300);
+    if ((await this.page.getByRole("option").count().catch(() => 0)) > 0) return;
+    await this.click(this.localInfoStateTrigger, "Select a State dropdown");
+    await this.page
+      .getByRole("option")
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  // Verifies the dropdown lists exactly the expected regions (deduped — dev
+  // renders each region twice, prod once).
+  async verifyLocalInfoRegions(expected: string[]): Promise<void> {
+    await this.openStateDropdown();
+    const found = (await this.page.getByRole("option").allInnerTexts())
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const unique = [...new Set(found)].sort();
+    await reportValue(
+      `Find-your-local-information regions (${unique.length}): ${unique.join(", ")}`,
+    );
+    for (const region of expected) {
+      await Validator.requireTrue(
+        unique.includes(region),
+        `Region '${region}' should appear in the 'Select a State' dropdown`,
+      );
+    }
+    await Validator.requireTrue(
+      unique.length === expected.length,
+      `Dropdown should list exactly ${expected.length} regions (found ${unique.length}: ${unique.join(", ")})`,
+    );
+    await this.page.keyboard.press("Escape").catch(() => {});
+  }
+
+  // Selects the given region from the dropdown (via the react-aria listbox — a
+  // forced selectOption on the hidden backing <select> would not update state).
+  async selectLocalInfoState(state: string): Promise<void> {
+    await this.openStateDropdown();
+    await this.page
+      .getByRole("option", { name: state, exact: true })
+      .first()
+      .click();
+    await reportValue(`Selected local-information state: ${state}`);
+  }
+
+  // Clicks "Or Send Us a Text Message" and waits for the modal form to load.
+  // Returns false when the CTA never appears (the selected region has no
+  // local-information results) so the caller can skip rather than fail.
+  async openTextMessageModal(): Promise<boolean> {
+    const ctaAppeared = await this.sendTextMessageCta
+      .waitFor({ state: "visible", timeout: 12000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ctaAppeared) return false;
+    await this.click(this.sendTextMessageCta, "Or Send Us a Text Message");
+    return await this.tmFirstName
+      .waitFor({ state: "visible", timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  async verifyTextMessageModalFields(): Promise<void> {
+    const visible: [string, Locator][] = [
+      ["First Name", this.tmFirstName],
+      ["Last Name", this.tmLastName],
+      ["Email Address", this.tmEmail],
+      ["Mobile Number", this.tmMobile],
+    ];
+    for (const [label, locator] of visible) {
+      await Validator.requireVisible(
+        locator,
+        `Text-message form — ${label} should be visible`,
+        10000,
+      );
+    }
+    await Validator.requireTrue(
+      (await this.tmRealEstatePro.count()) > 0,
+      "Text-message form — 'I'm a Real Estate Professional' checkbox should exist",
+    );
+    await Validator.requireTrue(
+      (await this.tmDisclaimer.count()) > 0,
+      "Text-message form — disclaimer checkbox should exist",
+    );
+    await Validator.requireVisible(
+      this.tmSubmit.first(),
+      "Text-message form — submit button should be visible",
+      10000,
+    );
+  }
+
+  private async fillTextMessageForm(
+    overrides: { email?: string; phone?: string } = {},
+  ): Promise<void> {
+    await this.type(this.tmFirstName, "Test", "First Name");
+    await this.type(this.tmLastName, "Automation", "Last Name");
+    await this.type(
+      this.tmEmail,
+      overrides.email ?? `test.automation+${Date.now()}@ex2india.com`,
+      "Email Address",
+    );
+    await this.type(this.tmMobile, overrides.phone ?? "7325551234", "Mobile Number");
+    await this.checkBox(this.tmDisclaimer, "Text-message disclaimer");
+  }
+
+  // Required-field validation (client-side, safe on all envs): empty submit →
+  // a required-field error appears and the success panel does not.
+  async verifyTextMessageRequiredFieldValidation(): Promise<void> {
+    await this.click(this.tmSubmit.first(), "Start the Conversation (empty form)");
+    await Validator.requireVisible(
+      this.tmErrors
+        .filter({ hasText: /Required field|complete the required field/i })
+        .first(),
+      "Text-message form — empty submit should show a required-field error",
+      10000,
+    );
+    await Validator.requireHidden(
+      this.successMessage,
+      "Text-message form — no success panel should appear for an empty submit",
+      4000,
+    );
+  }
+
+  // Invalid email/phone validation (client-side blocks the POST): valid names +
+  // disclaimer but bad email/phone → both flagged aria-invalid + format error.
+  async verifyTextMessageInvalidEmailPhoneValidation(): Promise<void> {
+    await this.fillTextMessageForm({ email: "not-an-email", phone: "123" });
+    await this.click(
+      this.tmSubmit.first(),
+      "Start the Conversation (invalid email/phone)",
+    );
+    await expect(this.tmEmail).toHaveAttribute("aria-invalid", "true", {
+      timeout: 10000,
+    });
+    await expect(this.tmMobile).toHaveAttribute("aria-invalid", "true", {
+      timeout: 10000,
+    });
+    await Validator.requireVisible(
+      this.tmErrors
+        .filter({ hasText: /Invalid format|correct the required field/i })
+        .first(),
+      "Text-message form — invalid email/phone should show an error",
+      10000,
+    );
+    await Validator.requireHidden(
+      this.successMessage,
+      "Text-message form — no success panel should appear with invalid values",
+      4000,
+    );
+  }
+
+  // Fills with valid data and submits — UNLESS on prod, where we fill but never
+  // submit (no real lead). Returns the API Response on non-prod, else null.
+  async submitTextMessageForm(apiEndpoint: string): Promise<Response | null> {
+    await this.fillTextMessageForm();
+    if (this.isProdEnv()) {
+      await reportValue(
+        "Text-message form: prod — filled but NOT submitted (no lead created)",
+      );
+      await Validator.requireTrue(
+        await this.tmSubmit.first().isEnabled(),
+        "Text-message form — should be filled & ready (submit not clicked on prod)",
+      );
+      return null;
+    }
+    // Poll the MODAL's own Turnstile token (the page also has the main form's).
+    await this.waitForTurnstileToken(
+      30000,
+      this.textMessageModal.locator("input[name='cf-turnstile-response']"),
+    );
+    const responsePromise = waitForApi(this.page, apiEndpoint, 30000);
+    await this.click(this.tmSubmit.first(), "Start the Conversation (valid)");
+    return await responsePromise;
+  }
+
+  async verifyTextMessageSubmissionSuccess(): Promise<void> {
+    await Validator.requireVisible(
+      this.successMessage,
+      "Text-message form — success / thank-you panel should be displayed after submit",
       20000,
     );
   }
