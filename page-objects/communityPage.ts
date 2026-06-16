@@ -3,6 +3,7 @@ import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 import { reportValue } from "../utils/reporter";
 import { dismissCookieBanner } from "../utils/cookieUtils";
+import { RequestInformationForm } from "./requestInformationForm";
 
 export class CommunityPage extends BasePage {
   readonly pageHeading: Locator;
@@ -42,6 +43,8 @@ export class CommunityPage extends BasePage {
   readonly calculatorModal: Locator;
   readonly calculatorEstimatedPayment: Locator;
   readonly calculatorInputs: Locator;
+  readonly requestInfoCta: Locator;
+  readonly requestInfo: RequestInformationForm;
 
   constructor(page: Page) {
     super(page);
@@ -144,6 +147,14 @@ export class CommunityPage extends BasePage {
     // Editable text inputs in order: 0=Price, 1=Down Payment %, 2=Down Payment $,
     // 3=Interest Rate, then computed/display fields.
     this.calculatorInputs = this.calculatorModal.locator("input[type='text']");
+    // Header "Request Information" CTA — opens the shared Request Information
+    // modal (the same component as the QMI / floorplan detail pages). Scope to a
+    // button, falling back to a link, and take the first (header) match.
+    this.requestInfoCta = page
+      .getByRole("button", { name: /Request Information/i })
+      .or(page.getByRole("link", { name: /Request Information/i }))
+      .first();
+    this.requestInfo = new RequestInformationForm(page);
   }
 
   // ── Navigation — Actions ───────────────────────────────
@@ -180,6 +191,43 @@ export class CommunityPage extends BasePage {
       heading.first(),
       `Community heading "${communityName}" should be visible`,
       20000,
+    );
+  }
+
+  // ── Request Information — Actions ──────────────────────
+  async verifyRequestInfoCtaIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.requestInfoCta,
+      "'Request Information' CTA should be visible in the community header",
+      20000,
+    );
+  }
+
+  async openRequestInformationModal(): Promise<void> {
+    // The header CTA needs React hydration and the page renders a promo overlay
+    // that can intercept the click, so dismiss popups first, then click and WAIT
+    // for the modal — only re-click if it genuinely didn't open (mirrors the
+    // sales-team modal open pattern).
+    await this.handlePagePopups();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.scrollIntoView(this.requestInfoCta.first());
+      await this.click(
+        this.requestInfoCta.first(),
+        attempt === 1
+          ? "Request Information CTA"
+          : "Request Information CTA (retry)",
+      );
+      const opened = await this.requestInfo.modal
+        .waitFor({ state: "visible", timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) return;
+      await this.handlePagePopups();
+    }
+    await Validator.requireVisible(
+      this.requestInfo.modal,
+      "Request Information modal should open from the community header CTA",
+      8000,
     );
   }
 

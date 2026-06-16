@@ -1,27 +1,11 @@
-import { Page, Locator, Response, expect } from "@playwright/test";
+import { Page, Locator, expect } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
-import { waitForApi } from "../utils/apiUtils";
-import type { RequestInformationFormData } from "./qmiPage";
 import constants from "../utils/constants.json";
-import testData from "../utils/test_data.json";
-
-// Shared form "user data" lives in utils/test_data.json so it is reused across
-// every page object that exposes the Request Information form. The `{{timestamp}}`
-// placeholder in the email is swapped for a unique value so repeated submissions
-// don't collide with lead de-duplication.
-const DEFAULT_REQUEST_INFORMATION_DATA: RequestInformationFormData = {
-    ...testData.request_information.valid,
-    preferredContactMethod: testData.request_information.valid
-        .preferredContactMethod as RequestInformationFormData["preferredContactMethod"],
-    email: testData.request_information.valid.email.replace(
-        "{{timestamp}}",
-        String(Date.now()),
-    ),
-};
+import { RequestInformationForm } from "./requestInformationForm";
 
 /**
- * Floorplan details page — E5 (FD-01..FD-06) in docs/test-plan.md.
+ * Floorplan details page — E5 in docs/test-plan.md.
  *
  * Pinned (via the spec) to a deterministic floorplan — Clyde II at River Ranch
  * Trails (`constants.floorplan.detail_url`). Unlike a QMI home, this page shows
@@ -47,18 +31,7 @@ export class PlanDetailPage extends BasePage {
     readonly detailNavBar: Locator;
     readonly requestTourCta: Locator;
     readonly requestInfoCta: Locator;
-    readonly requestInformationModal: Locator;
-    readonly requestInformationModalHeading: Locator;
-    readonly requestInfoFirstName: Locator;
-    readonly requestInfoLastName: Locator;
-    readonly requestInfoEmail: Locator;
-    readonly requestInfoPhone: Locator;
-    readonly requestInfoContactMethod: Locator;
-    readonly requestInfoDisclaimerCheckbox: Locator;
-    readonly requestInfoTextDisclaimerCheckbox: Locator;
-    readonly requestInfoSubmitButton: Locator;
-    readonly requestInfoFieldErrors: Locator;
-    readonly requestInfoSuccessMessage: Locator;
+    readonly requestInfo: RequestInformationForm;
 
     constructor(page: Page) {
         super(page);
@@ -108,50 +81,7 @@ export class PlanDetailPage extends BasePage {
         this.requestInfoCta = this.detailNavBar.getByRole("button", {
             name: "Request Information",
         });
-        // Request Information modal + form (identical component to the QMI page).
-        this.requestInformationModal = page
-            .locator("[class*='request-information_modal']")
-            .or(
-                page.locator("[class*='Modal_modal']").filter({
-                    hasText: /Request Information/i,
-                }),
-            )
-            .first();
-        this.requestInformationModalHeading = this.requestInformationModal
-            .getByRole("heading", { name: /Request Information for/i })
-            .first();
-        this.requestInfoFirstName = this.requestInformationModal.locator(
-            "input[name='FirstName']",
-        );
-        this.requestInfoLastName = this.requestInformationModal.locator(
-            "input[name='LastName']",
-        );
-        this.requestInfoEmail = this.requestInformationModal.locator(
-            "input[name='Email']",
-        );
-        this.requestInfoPhone = this.requestInformationModal.locator(
-            "input[name='Phone']",
-        );
-        this.requestInfoContactMethod = this.requestInformationModal.locator(
-            "select[name='PreferredContactMethod']",
-        );
-        this.requestInfoDisclaimerCheckbox = this.requestInformationModal.locator(
-            "input[name='Disclaimer']",
-        );
-        this.requestInfoTextDisclaimerCheckbox =
-            this.requestInformationModal.locator(
-                "input[name='TextMessageDisclaimerCheckbox']",
-            );
-        this.requestInfoSubmitButton = this.requestInformationModal.locator(
-            "button[type='submit']",
-        );
-        this.requestInfoFieldErrors = this.requestInformationModal.locator(
-            "[class*='shared_error']",
-        );
-        this.requestInfoSuccessMessage = page
-            .getByText(/Thank you for your message/i)
-            .or(page.getByText(/Online Community Specialist will be in touch/i))
-            .first();
+        this.requestInfo = new RequestInformationForm(page);
     }
 
     // ── Navigation — Actions ───────────────────────────────
@@ -167,7 +97,7 @@ export class PlanDetailPage extends BasePage {
         await this.handlePagePopups();
     }
 
-    // ── Overview — Verification (FD-01) ────────────────────
+    // ── Overview — Verification ────────────────────────────
     async verifyPageLoaded(): Promise<void> {
         await Validator.requireVisible(
             this.pageHeading.first(),
@@ -181,7 +111,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── Starting Price — Verification (FD-04) ──────────────
+    // ── Starting Price — Verification ──────────────────────
     async verifyStartingPriceDisplayed(): Promise<void> {
         await Validator.requireVisible(
             this.startingPriceTitle,
@@ -199,7 +129,7 @@ export class PlanDetailPage extends BasePage {
         ).toHaveText(/\$[\d,]+/);
     }
 
-    // ── Media Gallery — Actions / Verification (FD-02) ─────
+    // ── Media Gallery — Actions / Verification ─────────────
     async openGalleryModal(): Promise<void> {
         await this.handlePagePopups();
         await this.scrollIntoView(this.viewGalleryButton.first());
@@ -235,7 +165,7 @@ export class PlanDetailPage extends BasePage {
         ).toBeGreaterThan(1);
     }
 
-    // ── Pricing — Verification (FD-03) ─────────────────────
+    // ── Pricing — Verification ─────────────────────────────
     async verifyMonthlyPaymentIsDisplayed(): Promise<void> {
         await this.scrollIntoView(this.monthlyPayment).catch(() => undefined);
         await Validator.requireVisible(
@@ -330,7 +260,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── Interactive Floor Plan (IFP) — Verification (FD-05) ─
+    // ── Interactive Floor Plan (IFP) — Verification ─────────
     async verifyFloorplanIfpIsDisplayed(): Promise<void> {
         await this.scrollIntoView(this.floorplanIframe.first());
         await Validator.requireVisible(
@@ -340,7 +270,7 @@ export class PlanDetailPage extends BasePage {
         );
     }
 
-    // ── CTAs — Verification (FD-06) ────────────────────────
+    // ── CTAs — Verification ────────────────────────────────
     async verifyCtasAreDisplayed(): Promise<void> {
         await this.page.waitForLoadState("load");
         await Validator.requireVisible(
@@ -367,245 +297,6 @@ export class PlanDetailPage extends BasePage {
         await this.click(this.requestInfoCta.first(), "Request Information CTA");
     }
 
-    async fillRequestInformationForm(
-        data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
-    ): Promise<void> {
-        await this.type(this.requestInfoFirstName, data.firstName, "First Name");
-        await this.type(this.requestInfoLastName, data.lastName, "Last Name");
-        await this.type(this.requestInfoEmail, data.email, "Email Address");
-        await this.type(this.requestInfoPhone, data.phone, "Mobile Number");
-
-        if (data.preferredContactMethod) {
-            await this.requestInfoContactMethod.selectOption(
-                data.preferredContactMethod,
-                { force: true },
-            );
-        }
-
-        await this.checkRequestInfoBox(
-            this.requestInfoDisclaimerCheckbox,
-            "Terms & Conditions disclaimer",
-        );
-        await this.checkRequestInfoBox(
-            this.requestInfoTextDisclaimerCheckbox,
-            "Text message disclaimer",
-        );
-    }
-
-    // Fills with valid data and submits, unless the target is production — we
-    // never create real leads on prod. Captures the contact-us API response so
-    // callers can assert on it; returns null when submission is skipped on prod.
-    async submitRequestInformationForm(
-        apiEndpoint: string,
-        data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
-    ): Promise<Response | null> {
-        await this.fillRequestInformationForm(data);
-
-        if (this.isProdEnv()) {
-            console.warn(
-                "Skipping Request Information form submission on prod to avoid " +
-                "creating a real lead (form was filled but not submitted).",
-            );
-            return null;
-        }
-
-        await this.waitForTurnstileToken();
-
-        const responsePromise = waitForApi(this.page, apiEndpoint, 30000);
-        await this.click(
-            this.requestInfoSubmitButton.first(),
-            "Send Request (submit)",
-        );
-        return await responsePromise;
-    }
-
-    // The disclaimer checkboxes are visually-hidden react-aria inputs — a forced
-    // click on the input doesn't flip the state, so toggle via focus + Space.
-    private async checkRequestInfoBox(
-        input: Locator,
-        name: string,
-    ): Promise<void> {
-        if (await input.isChecked().catch(() => false)) {
-            return;
-        }
-
-        await input.focus();
-        await input.press("Space");
-        await expect(input, `${name} checkbox should be checked`).toBeChecked({
-            timeout: 5000,
-        });
-    }
-
-    // The form is gated by a Cloudflare Turnstile widget that injects a token into
-    // a hidden input once it resolves; submitting before it is present fails.
-    private async waitForTurnstileToken(timeout = 15000): Promise<void> {
-        const tokenInput = this.page.locator("input[name='cf-turnstile-response']");
-        await expect
-            .poll(
-                async () => (await tokenInput.inputValue().catch(() => "")).length,
-                {
-                    message:
-                        "Cloudflare Turnstile token should be populated before submit",
-                    timeout,
-                },
-            )
-            .toBeGreaterThan(0);
-    }
-
-    // ── Request Information Form — Verification ────────────
-    async verifyRequestInformationModalIsDisplayed(): Promise<void> {
-        await Validator.requireVisible(
-            this.requestInformationModal,
-            "Request Information modal should be displayed",
-            20000,
-        );
-        await Validator.requireVisible(
-            this.requestInformationModalHeading,
-            "Request Information modal heading should be visible",
-            20000,
-        );
-        await expect(this.requestInformationModalHeading).toContainText(
-            /Request Information for/i,
-        );
-    }
-
-    async verifyRequestInformationModalFields(): Promise<void> {
-        const requiredFields = [
-            { name: "First Name", locator: this.requestInfoFirstName },
-            { name: "Last Name", locator: this.requestInfoLastName },
-            { name: "Email Address", locator: this.requestInfoEmail },
-            { name: "Mobile Number", locator: this.requestInfoPhone },
-        ];
-
-        for (const field of requiredFields) {
-            await Validator.requireVisible(
-                field.locator,
-                `${field.name} field should be visible in Request Information modal`,
-                10000,
-            );
-        }
-
-        await Validator.requireVisible(
-            this.requestInformationModal
-                .getByText(/Preferred Method of Contact/i)
-                .first(),
-            "Preferred Method of Contact should be visible",
-            10000,
-        );
-    }
-
-    // Enters invalid values into the required fields and confirms the form blocks
-    // submission with inline "Please correct the required field" errors. Never
-    // creates a lead (client-side validation prevents the POST).
-    async verifyRequestInformationInvalidValueValidation(): Promise<void> {
-        const valid = DEFAULT_REQUEST_INFORMATION_DATA;
-        const invalid = testData.request_information.invalid;
-        await this.type(this.requestInfoFirstName, valid.firstName, "First Name");
-        await this.type(this.requestInfoLastName, valid.lastName, "Last Name");
-        await this.type(this.requestInfoEmail, invalid.email, "Email Address");
-        await this.type(this.requestInfoPhone, invalid.phone, "Mobile Number");
-        await this.requestInfoContactMethod.selectOption("Email", { force: true });
-        await this.checkRequestInfoBox(
-            this.requestInfoDisclaimerCheckbox,
-            "Terms & Conditions disclaimer",
-        );
-        await this.checkRequestInfoBox(
-            this.requestInfoTextDisclaimerCheckbox,
-            "Text message disclaimer",
-        );
-
-        await this.click(
-            this.requestInfoSubmitButton.first(),
-            "Send Request (submit with invalid values)",
-        );
-
-        await expect(this.requestInfoEmail).toHaveAttribute(
-            "aria-invalid",
-            "true",
-            { timeout: 10000 },
-        );
-        await expect(this.requestInfoPhone).toHaveAttribute(
-            "aria-invalid",
-            "true",
-            { timeout: 10000 },
-        );
-        await Validator.requireVisible(
-            this.requestInfoFieldErrors
-                .filter({ hasText: /Please correct the required field/i })
-                .first(),
-            "Invalid required fields should show a 'Please correct the required field' error",
-            10000,
-        );
-
-        await Validator.requireHidden(
-            this.requestInfoSuccessMessage,
-            "Success message should NOT appear when the form has invalid values",
-            5000,
-        );
-    }
-
-    async verifyRequestInformationSubmissionSuccess(): Promise<void> {
-        await Validator.requireVisible(
-            this.requestInfoSuccessMessage,
-            "Request Information thank-you / success message should be displayed after submission",
-            20000,
-        );
-        await Validator.requireUrlContains(
-            this.page,
-            "modalKey=success",
-            "URL should reflect the success modal after a successful submission",
-            15000,
-        );
-    }
-
-    // Asserts the contact-us API confirmed the submission AND that the payload it
-    // sent matches the data we entered.
-    async verifyRequestInformationApiSubmission(
-        response: Response,
-        data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
-    ): Promise<void> {
-        expect(response.status(), "contact-us API should return HTTP 200").toBe(
-            200,
-        );
-
-        const body = (await response.json()) as { status?: string; data?: string };
-        expect(
-            body.status,
-            "contact-us API response should report status 'success'",
-        ).toBe("success");
-        expect(
-            body.data,
-            "contact-us API response should report data 'Submitted successfully'",
-        ).toBe("Submitted successfully");
-
-        const payload = JSON.parse(response.request().postData() ?? "{}") as Record<
-            string,
-            string
-        >;
-        expect(
-            payload.FirstName,
-            "Submitted First Name should match the entered value",
-        ).toBe(data.firstName);
-        expect(
-            payload.LastName,
-            "Submitted Last Name should match the entered value",
-        ).toBe(data.lastName);
-        expect(
-            payload.Email,
-            "Submitted Email should match the entered value",
-        ).toBe(data.email);
-        expect(
-            payload.Phone,
-            "Submitted Phone should match the entered value",
-        ).toBe(data.phone);
-        if (data.preferredContactMethod) {
-            expect(
-                payload.PreferredContactMethod,
-                "Submitted Preferred Contact Method should match the selected value",
-            ).toBe(data.preferredContactMethod);
-        }
-    }
-
     // ── Data Getters ───────────────────────────────────────
     async getHeading(): Promise<string> {
         return await this.getText(this.pageHeading.first());
@@ -622,15 +313,6 @@ export class PlanDetailPage extends BasePage {
         }
 
         return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
-    }
-
-    // Production is the live www.khov.com domain (env subdomains are www-dev /
-    // www-uat / www-stg). We treat TEST_ENV=prod or that domain as "prod".
-    private isProdEnv(): boolean {
-        const env = (process.env.TEST_ENV ?? "").toLowerCase();
-        const baseUrl = process.env.BASE_URL ?? "";
-        const isProdUrl = /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
-        return env === "prod" || isProdUrl;
     }
 
     // Scrolls through the gallery modal and counts the distinct, non-placeholder

@@ -29,10 +29,10 @@ Run after Stage 6 (tests passing) and before Stage 7 (git push).
 All generated files live inside the worktree — NOT in the main repo. Read files from:
 
 ```
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json    (if modified)
-D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json    (if modified)
+.claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
+.claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
+.claude/worktrees/worktree-feat+{slug}/utils/test_data.json    (if modified)
+.claude/worktrees/worktree-feat+{slug}/utils/constants.json    (if modified)
 ```
 
 **`{slug}` = everything after `feat/` in the confirmed branch name.**
@@ -43,7 +43,7 @@ Branch: feat/khov-945-contact-form  →  slug: khov-945-contact-form
 Branch: feat/hero-block  (no Jira ID)  →  slug: hero-block
 ```
 
-**NEVER read from `D:\Khov\page-objects\` or `D:\Khov\tests\` — those directories
+**NEVER read from `page-objects/` or `tests/` — those directories
 contain the base scaffold only, not the generated files.**
 
 ### How to Review
@@ -249,9 +249,9 @@ await homePage.verifyFormTitleIsDisplayed();
 Code Review — PASSED
 ────────────────────────────────────────
 Files reviewed:
-  D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
-  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
-  D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
+  .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
+  .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
+  .claude/worktrees/worktree-feat+{slug}/utils/test_data.json
 
 All 6 checklists passed. Ready for Stage 7 (git push).
 ```
@@ -261,12 +261,12 @@ All 6 checklists passed. Ready for Stage 7 (git push).
 Code Review — X VIOLATIONS FOUND
 ────────────────────────────────────────
 Files reviewed:
-  D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
-  D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
+  .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
+  .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
 
 VIOLATIONS:
 
-1. [Spec Structure] ...\tests\homePage.spec.ts:345
+1. [Spec Structure] .../tests/homePage.spec.ts:345
    Validator called directly in spec instead of POM verify method
 
    Current:
@@ -275,7 +275,7 @@ VIOLATIONS:
    Fix:
      await homePage.verifyHeroBlockIsDisplayed();
 
-2. [Wait Pattern] ...\tests\homePage.spec.ts:520
+2. [Wait Pattern] .../tests/homePage.spec.ts:520
    page.waitForTimeout used for form submission
 
    Current:

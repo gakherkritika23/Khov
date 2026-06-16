@@ -1,6 +1,7 @@
 import { Page, Locator } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
+import { RequestInformationForm } from "./requestInformationForm";
 
 export class RegionPage extends BasePage {
   readonly communitiesHeading: Locator;
@@ -8,13 +9,19 @@ export class RegionPage extends BasePage {
   readonly firstCommunityCard: Locator;
   readonly firstCommunityLink: Locator;
   readonly firstCommunityName: Locator;
+  readonly requestInfoCta: Locator;
+  readonly requestInfo: RequestInformationForm;
 
   constructor(page: Page) {
     super(page);
-    // "New Home Communities" section heading on the region page.
-    this.communitiesHeading = page.getByRole("heading", {
-      name: "New Home Communities",
-    });
+    // "New Home Communities" section heading on the region page. The page can
+    // render more than one matching heading (e.g. a visually-hidden + visible
+    // one), so scope to the first to avoid a strict-mode violation.
+    this.communitiesHeading = page
+      .getByRole("heading", {
+        name: "New Home Communities",
+      })
+      .first();
     // Each result is a Community card (CSS-module class — match by stable prefix).
     this.communityCards = page.locator("[class*='Community_card']");
     this.firstCommunityCard = this.communityCards.first();
@@ -25,6 +32,17 @@ export class RegionPage extends BasePage {
     this.firstCommunityName = this.firstCommunityCard.locator(
       "[class*='Community_name']",
     );
+    // "Request Information" CTA on the first community card — opens the shared
+    // Request Information modal (same component as the detail pages).
+    this.requestInfoCta = this.firstCommunityCard
+      .getByRole("button", { name: /Request Information/i })
+      .or(
+        this.firstCommunityCard.getByRole("link", {
+          name: /Request Information/i,
+        }),
+      )
+      .first();
+    this.requestInfo = new RequestInformationForm(page);
   }
 
   // ── New Home Communities — Actions ─────────────────────
@@ -66,5 +84,42 @@ export class RegionPage extends BasePage {
       .first()
       .waitFor({ state: "visible", timeout: 25000 });
     return await this.getText(this.firstCommunityName.first());
+  }
+
+  // ── Request Information — Actions ──────────────────────
+  async verifyRequestInfoCtaIsDisplayed(): Promise<void> {
+    await this.scrollIntoView(this.firstCommunityCard.first());
+    await Validator.requireVisible(
+      this.requestInfoCta,
+      "'Request Information' CTA should be visible on the first community card",
+      20000,
+    );
+  }
+
+  // Opens the first community card's Request Information modal and resolves to
+  // whether the modal's FORM became visible. Returns `false` (rather than
+  // throwing) when the form never renders — on prod the card-triggered form is
+  // fetched remotely behind Cloudflare bot-protection, which can leave the modal
+  // on its loading spinner under automation; the caller decides how to treat
+  // that per environment.
+  async openRequestInformationModal(): Promise<boolean> {
+    await this.handlePagePopups();
+    await this.scrollIntoView(this.firstCommunityCard.first());
+    // A SINGLE natural pointer click opens the modal — the CTA is a react-aria
+    // pressable, so a forced/synthetic click won't fire it. Never click twice:
+    // a second press resets the modal's loading spinner and stops the form from
+    // rendering.
+    await this.requestInfoCta
+      .first()
+      .click({ timeout: 15000 })
+      .catch(() => {});
+    console.log("Clicked on: Request Information CTA (first community card)");
+    // The form is fetched remotely, so allow generous time for it to render.
+    // Resolves to false (rather than throwing) if it never loads — e.g. the
+    // remote fetch is throttled by bot-protection — so the caller can skip.
+    return await this.requestInfo.modal
+      .waitFor({ state: "visible", timeout: 40000 })
+      .then(() => true)
+      .catch(() => false);
   }
 }

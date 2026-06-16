@@ -7,6 +7,10 @@
     "term": "Texas",
     "suggestion": "Texas"
   },
+  "region_request_info": {
+    "term": "Dallas",
+    "suggestion": "Dallas"
+  },
   "community_search": {
     "term": "River Ranch Trails",
     "suggestion": "River Ranch Trails"

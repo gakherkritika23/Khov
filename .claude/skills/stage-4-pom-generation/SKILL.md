@@ -32,14 +32,14 @@ Before writing ANY `.ts` files, verify you are inside a git worktree.
 
 1. The worktree path was confirmed at the end of Stage 3. It is:
    ```
-   D:\Khov\.claude\worktrees\worktree-feat+{slug}\
+   .claude/worktrees/worktree-feat+{slug}/
    ```
    Where `{slug}` = the story slug from your branch name (e.g. `khov-394-hero-block`).
 
 2. If NOT already in a worktree, **STOP** and use the `EnterWorktree` tool:
    - Branch name: `feat/khov-{id}-{block-slug}` (confirmed in Stage 3)
    - Examples: `feat/khov-394-hero-block`, `feat/khov-945-contact-form`
-   - The tool creates the worktree at `D:\Khov\.claude\worktrees\worktree-feat+{slug}\`
+   - The tool creates the worktree at `.claude/worktrees/worktree-feat+{slug}/`
 
 3. If a worktree already exists (resuming a session), use that same path.
 
@@ -48,13 +48,13 @@ Before writing ANY `.ts` files, verify you are inside a git worktree.
 All `Write` tool calls MUST use absolute paths inside the worktree:
 
 ```
-POM:       D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
-Spec:      D:\Khov\.claude\worktrees\worktree-feat+{slug}\tests\{pageName}.spec.ts
-Test data: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\test_data.json
-Constants: D:\Khov\.claude\worktrees\worktree-feat+{slug}\utils\constants.json
+POM:       .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
+Spec:      .claude/worktrees/worktree-feat+{slug}/tests/{pageName}.spec.ts
+Test data: .claude/worktrees/worktree-feat+{slug}/utils/test_data.json
+Constants: .claude/worktrees/worktree-feat+{slug}/utils/constants.json
 ```
 
-**NEVER write to `D:\Khov\page-objects\` directly** — changes in the main repo
+**NEVER write to `page-objects/` directly** — changes in the main repo
 directory are not on the feature branch and will be overwritten.
 
 ---
@@ -64,7 +64,7 @@ directory are not on the feature branch and will be overwritten.
 Before writing a single line, use the Read tool on the existing POM file:
 
 ```
-Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+Read: .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
 ```
 
 **If the file does not exist** → use Path B (Create New POM) below.
@@ -91,7 +91,7 @@ Read: D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page
 ### Path B — Creating a New POM
 
 Start from the POM template below. Replace all `{placeholders}` before writing.
-Write to: `D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts`
+Write to: `.claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts`
 
 ---
 
@@ -468,7 +468,7 @@ Present this summary to the engineer before calling Stage 5:
 ```
 POM Generation Complete
 ──────────────────────────────────────────────────
-POM file:   D:\Khov\.claude\worktrees\worktree-feat+{slug}\page-objects\{pageName}Page.ts
+POM file:   .claude/worktrees/worktree-feat+{slug}/page-objects/{pageName}Page.ts
 Class name: {PageName}Page
 Branch:     feat/khov-{id}-{block-slug}
 Action:     [Created new / Updated existing — added {block} section]

@@ -304,13 +304,13 @@ worktree **must** be created before Stage 4 writes any `.ts` files.
    ```
 3. **If no worktree exists** → use the `EnterWorktree` tool:
    - Branch: `feat/khov-{id}-{block-slug}` (the confirmed name from Step 1)
-   - The tool creates the worktree at `D:\Khov\.claude\worktrees\worktree-feat+{slug}`
+   - The tool creates the worktree at `.claude/worktrees/worktree-feat+{slug}`
 4. **If a worktree already exists** (resuming a previous session) → navigate
    into it and continue. Do NOT create a duplicate.
 5. Confirm worktree path to the engineer before calling Stage 4
 
 **ALL file writes in Stages 4–7 happen inside the worktree. Never write
-generated `.ts` files to the main `D:\Khov` directory.**
+generated `.ts` files to the main `<repo-root>` directory.**
 
 ---
 

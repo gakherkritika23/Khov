@@ -27,7 +27,7 @@ Before running any git command, verify Stage 6b passed:
 
 If this stage was previously started (e.g., session was interrupted mid-push):
 
-1. Navigate to the worktree: `cd "D:\Khov\.claude\worktrees\worktree-feat+{story-slug}"`
+1. Navigate to the worktree: `cd ".claude/worktrees/worktree-feat+{story-slug}"`
 2. Run `git log --oneline -3` — check if a commit already exists
 3. Run `git status` — check for unstaged changes
 4. If commit exists and push hasn't happened → skip to the push step
@@ -89,7 +89,7 @@ Navigate into the worktree and stage only the automation files:
 
 ```powershell
 # Navigate to worktree (not the main repo)
-cd "D:\Khov\.claude\worktrees\worktree-feat+{story-slug}"
+cd ".claude/worktrees/worktree-feat+{story-slug}"
 
 # Stage specific files only — NEVER use git add -A or git add .
 git add page-objects/{pageName}Page.ts
@@ -243,7 +243,7 @@ After a successful push, exit the worktree to return to the main repo context:
 ExitWorktree tool
 ```
 
-Or manually navigate back: `cd "D:\Khov"`
+Or manually navigate back: `cd "<repo-root>"`
 
 ---
 

@@ -123,7 +123,7 @@ Jira Story
 ## Project File Structure (Actual)
 
 ```
-project-root/             ← D:\Khov
+project-root/             ← <repo-root>
 ├── playwright.config.ts
 ├── tsconfig.json
 ├── package.json
@@ -218,18 +218,18 @@ stage, use the Read tool to load it before proceeding. Skills exist at both
 project level (preferred) and user level:
 
 ```
-Project-level (D:\Khov\.claude\skills\):
-  Read: D:\Khov\.claude\skills\stage-1-test-generation\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-1b-csv-export\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-2-human-review\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-3-locator-discovery\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-4-pom-generation\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-5-spec-generation\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-6-test-execution\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-6b-code-review\SKILL.md
-  Read: D:\Khov\.claude\skills\stage-7-git-push\SKILL.md
+Project-level (.claude/skills/):
+  Read: .claude/skills/stage-1-test-generation/SKILL.md
+  Read: .claude/skills/stage-1b-csv-export/SKILL.md
+  Read: .claude/skills/stage-2-human-review/SKILL.md
+  Read: .claude/skills/stage-3-locator-discovery/SKILL.md
+  Read: .claude/skills/stage-4-pom-generation/SKILL.md
+  Read: .claude/skills/stage-5-spec-generation/SKILL.md
+  Read: .claude/skills/stage-6-test-execution/SKILL.md
+  Read: .claude/skills/stage-6b-code-review/SKILL.md
+  Read: .claude/skills/stage-7-git-push/SKILL.md
 
-User-level fallback (C:\Users\kritika\.claude\skills\):
+User-level fallback (~/.claude/skills/):
   Same folder names — use if project-level is unavailable
 ```
 
@@ -268,7 +268,7 @@ remotely, use `--force-with-lease` (never bare `--force`).
 ## Constraints & Best Practices
 
 - **Hard gate**: Stage 3 never starts without explicit Stage 2 approval
-- **Worktree gate**: Stage 4 never starts without creating a git worktree first using the `EnterWorktree` tool. Branch name: `feat/khov-{id}-{block-slug}` (e.g. `feat/khov-394-hero-block`). No Jira ID: `feat/{block-slug}`. All `.ts` file writes (POM, spec, test data) happen inside the worktree at `D:\Khov\.claude\worktrees\worktree-feat+{slug}\`. This is MANDATORY — never write generated files to the main repo directory.
+- **Worktree gate**: Stage 4 never starts without creating a git worktree first using the `EnterWorktree` tool. Branch name: `feat/khov-{id}-{block-slug}` (e.g. `feat/khov-394-hero-block`). No Jira ID: `feat/{block-slug}`. All `.ts` file writes (POM, spec, test data) happen inside the worktree at `.claude/worktrees/worktree-feat+{slug}/`. This is MANDATORY — never write generated files to the main repo directory.
 - **Conventional commits**: all Git messages follow `test(scope): message [JIRA-ID]`
 - **No skipped tests**: if a case can't be automated, mark it `@manual` with a comment, don't skip
 

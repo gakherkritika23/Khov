@@ -5,6 +5,11 @@ import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
+// The home page is heavy (headed, full-suite contention); the default 30s test
+// timeout can be exceeded by the beforeEach navigation. Raise it at the describe
+// level so it also covers the hooks.
+test.describe.configure({ timeout: 90000 });
+
 test.describe("Home Page — Hero Search", () => {
   let homePage: HomePage;
   let communityPage: CommunityPage;
