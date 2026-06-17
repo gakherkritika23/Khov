@@ -13,15 +13,26 @@ const testEnv = (
     : FALLBACK_ENV
 ) as (typeof SUPPORTED_ENVS)[number];
 
+
+
 if (requestedEnv && testEnv !== requestedEnv) {
   console.warn(
     `[playwright.config] Unknown TEST_ENV "${requestedEnv}". Falling back to "${FALLBACK_ENV}". ` +
-      `Supported: ${SUPPORTED_ENVS.join(", ")}.`,
+    `Supported: ${SUPPORTED_ENVS.join(", ")}.`,
   );
 }
 
 const envPath = path.resolve(process.cwd(), `environment/${testEnv}.env`);
 dotenv.config({ path: envPath });
+const rpConfig = {
+  apiKey: process.env.RP_API_KEY,
+  endpoint: process.env.RP_ENDPOINT,
+  project: process.env.RP_PROJECT,
+  launch: 'KHOV Automation',
+  attributes: [{ value: 'poc' }],
+  description: 'KHov ReportPortal',
+
+};
 
 if (!process.env.BASE_URL) {
   throw new Error(
@@ -47,6 +58,7 @@ export default defineConfig({
     // dropping low-level pw:api/expect steps (locator code, file:line, snippets).
     ["allure-playwright", { outputFolder: "allure-results", detail: false }],
     ["html", { outputFolder: "playwright-report", open: "never" }],
+    ['@reportportal/agent-js-playwright', rpConfig],
   ],
   use: {
     baseURL: process.env.BASE_URL,
