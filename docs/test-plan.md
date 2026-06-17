@@ -21,7 +21,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 |------|------|-----------------------|-----------------|--------|
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
-| E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | 🟡 |
+| E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | ✅ (RG-01..06, RG-08..11; RG-07 deferred — data limitation) |
 | E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | ✅ (header, floorplan, QMI) |
 | E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09 ✅; QD-05/08 deferred) |
 | E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
@@ -63,28 +63,37 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 
 ---
 
-## E2 — Region page 🟡
+## E2 — Region page ✅
 
 > "Maps: load behavior, zoom, pan, marker selection, scattered lots. Community
 > Filters. Community Sort. Navigating to community page from a region page."
 
+> The map is the Google Maps **JS API rendered into the page DOM** (NOT a
+> cross-origin iframe), so its markers, zoom controls and marker→card linkage are
+> all assertable. The page renders one map + one results rail **per breakpoint**
+> (desktop + mobile), so map/rail/filter locators are scoped with `:visible`.
+> The results rail is driven by **POST `/api/search/`** (the same endpoint as the
+> hero search), so filter/sort applies wait on it.
+
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` TC-01) |
-| RG-02 | Click first community card → navigate to its community detail page | @regression | ✅ (`regionPage.spec.ts` TC-01) |
-| RG-03 | Map loads (tiles render, markers present) | @smoke | ⬜ |
-| RG-04 | Map zoom in/out controls | @regression | ⬜ |
-| RG-05 | Map pan behavior | @regression | ⬜ |
-| RG-06 | Marker selection highlights / scrolls to the matching community card | @regression | ⬜ |
-| RG-07 | Scattered-lots rendering on the map | @regression | ⬜ |
-| RG-08 | Community filters (Price Range, Bed & Baths, Home Availability, Home Type, Community Type) update results | @regression | ⬜ |
-| RG-09 | "Reset All" clears filters | @regression | ⬜ |
-| RG-10 | Community Sort ("Sort by: Featured" → other options) reorders results | @regression | ⬜ |
-| RG-11 | Navigate to community via CTA (e.g. "Learn More") as well as the card | @regression | ⬜ |
+| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
+| RG-02 | Click first community card → navigate to its community detail page | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
+| RG-03 | Map loads (markers present) | @smoke | ✅ (`regionPage.spec.ts` "Map" TC-01 — Google Maps `gmp-advanced-marker` pins) |
+| RG-04 | Map zoom in/out controls | @regression | ✅ (`regionPage.spec.ts` "Map" TC-02 — "Zoom in"/"Zoom out" change the tile-layer transform + fetch tiles) |
+| RG-05 | Map pan behavior | @regression | ✅ (`regionPage.spec.ts` "Map" TC-03 — a drag-pan fetches fresh map tiles for the new viewport). The map is draggable (open-hand cursor); it renders **below the fold**, so it's scrolled into the viewport before the raw mouse-drag (Playwright's auto-scrolling `click()` masks this; `mouse.move` uses absolute coords and won't reach an off-screen map). Verified by the tile-fetch signal (~35 tiles), with a small retry for map-settle timing. |
+| RG-06 | Marker selection highlights the matching community card | @regression | ✅ (`regionPage.spec.ts` "Map" TC-04 — clicking a community pin adds `rail_selected` to the matching rail card; pinned to a **city** view so pins aren't clustered into "N cities" pills) |
+| RG-07 | Scattered-lots rendering on the map | @regression | ⬜ deferred — **data limitation, confirmed by an exhaustive prod sweep of all 13 states** (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV): no state surfaces scattered lots — map markers are only `community:<id>` pins (+ "N cities" cluster pills; even well-populated FL/OH/SC/NJ showed no other type), and "scatter"/"scattered" appears in **no** rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. The `/api/search` model is Market/County/City/Community pages only, and the live filter set is Price + Bed & Baths only (no Home/Community-Type filter). Blocked on data/feature existence, not framework capability (like QD-05/QD-08). Re-evaluate if/when a scattered-lot product is launched; needs product/content to name a market if one exists outside the public site. |
+| RG-08 | Community filters (Price Range …) update results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — a max-price filter reduces the "N results" count). **Note:** the live filter set (dev + prod) is currently only **Price Range** + **Bed & Baths** — the broader "Home Availability / Home Type / Community Type" filters in the original requirement are not present in the UI today. |
+| RG-09 | "Clear all" clears filters | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — "Clear all" restores the result count; the in-dialog control is "Clear all", not "Reset All") |
+| RG-10 | Community Sort ("Sort by: Featured" → other options) reorders results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-02 — "Price - Low to High" changes the first card) |
+| RG-11 | Navigate to community via CTA ("Learn More") as well as the card | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-03 — the card's visible "Learn More" link) |
 
-**Notes / open questions:** map is a Google Maps embed (iframe) — confirm whether
-zoom/pan can be asserted via DOM or only via control buttons. Filter URL params
-to be captured during Stage 3.
+**Notes:** RG-08/RG-09 are covered by one test (filter reduces → "Clear all"
+restores). Result-count reads poll until the streaming "N results" settles.
+Markers are Google `gmp-advanced-marker`s; individual community pins carry
+`data-marker-id="community:<id>"` and only appear at a **city** view (state views
+cluster them), so the Map block is pinned to the Dallas city results.
 
 ---
 
@@ -226,7 +235,7 @@ submit endpoint during Stage 3 for `verifyNetworkRequest()`. Tag form tests
 2. **E3 Community page** — unlocks the most downstream pages (floorplan & QMI links originate here).
 3. **E4 / E5** — QMI & floorplan details (reached from E3).
 4. **E6 Contact form** — shared component, exercised across E3/E4/E5 surfaces.
-5. **E2 RG-03…RG-11** — maps/filters/sort (heaviest; map interactions need spike).
+5. ~~**E2 RG-03…RG-11** — maps/filters/sort (heaviest; map interactions need spike).~~ ✅ done (RG-05 pan via the tile-fetch signal; RG-07 scattered-lots deferred — confirmed data limitation).
 
 Rationale: navigation flows naturally Home → Region → Community → (Floorplan |
 QMI) → details. Building the community page early gives the entry points for the
@@ -238,7 +247,12 @@ detail-page epics and the contact form.
 
 - A stable set of **example communities/QMIs/floorplans** that exhibit the
   conditional features (promo rate, was/now, hero gallery 2.0, QMI sticker, IFP).
-- Whether map **zoom/pan** is assertable via DOM or only via control clicks.
+- ~~Whether map **zoom/pan** is assertable via DOM or only via control clicks.~~
+  **Resolved:** the map is the Google Maps JS API in the page DOM (not an iframe).
+  Both zoom (controls) and pan (drag) are assertable via the map fetching fresh
+  tiles. The only catch: the map renders below the fold, so a raw mouse-drag must
+  scroll it into view first (Playwright's `click()` auto-scrolls, `mouse.move`
+  does not). RG-04 and RG-05 are both full assertions.
 - Contact form **submit endpoint(s)** and whether prod submissions are safe to
   fire (may need a non-prod env or a test-mode flag).
 - Which environment(s) to certify against. Env files now exist for `dev`/`uat`/`stage`/`prod` (`environment/{env}.env`), pointing to `www-dev`/`www-uat`/`www-stg`/`www` respectively. Community-page specs are pinned to a **prod**-only community (River Ranch Trails).
