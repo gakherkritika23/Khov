@@ -46,3 +46,105 @@ test.describe("Region Page — Community Results", () => {
     );
   });
 });
+
+// The region map is the Google Maps JS API rendered into the page DOM (not an
+// iframe), so the markers, zoom controls, pan, and marker→card linkage are all
+// assertable. Pinned to a CITY view (search "Dallas" → "Dallas") because the
+// state view clusters communities into "N cities" pills; a city view renders
+// individual community markers, which RG-06 needs.
+// RG-07 (scattered-lots rendering) is deferred — it needs a community/zoom level
+// that exhibits individual scattered lots, which the market view does not show.
+test.describe("Region Page — Map", () => {
+  let homePage: HomePage;
+  let regionPage: RegionPage;
+
+  // Home search + heavy results page + Google Maps tile loading.
+  test.describe.configure({ timeout: 240000 });
+
+  test.beforeEach(async ({ page }) => {
+    homePage = new HomePage(page);
+    regionPage = new RegionPage(page);
+    await homePage.navigateToHome(constants.home_page.url);
+    await homePage.searchAndSelectSuggestion(
+      testData.region_request_info.term,
+      testData.region_request_info.suggestion,
+      testData.endpoint.search,
+    );
+    await regionPage.verifyOnRegionPage(constants.home_search.dallas_results_url);
+    await regionPage.verifyCommunitiesSectionIsDisplayed();
+  });
+
+  test("TC-01 | Map loads with community markers @smoke", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    await regionPage.verifyMapLoadsWithMarkers();
+  });
+
+  test("TC-02 | Zoom in/out controls change the map view @regression", async () => {
+    await regionPage.verifyMapLoadsWithMarkers();
+    await regionPage.verifyZoomChangesView();
+  });
+
+  test("TC-03 | Panning the map changes the view @regression", async () => {
+    await regionPage.verifyMapLoadsWithMarkers();
+    await regionPage.verifyPanChangesView();
+  });
+
+  test("TC-04 | Selecting a marker highlights the matching community card @regression", async () => {
+    await regionPage.verifyMarkerSelectionHighlightsCommunityCard();
+  });
+});
+
+// Filters, sort, and the per-card "Learn More" CTA on the region results rail.
+// Reached the same way as above (search "Texas" → "Texas" suggestion). The
+// results rail is driven by POST /api/search/, so filter/sort apply waits on it.
+test.describe("Region Page — Filters & Sort", () => {
+  let homePage: HomePage;
+  let regionPage: RegionPage;
+  let communityPage: CommunityPage;
+
+  // Home search + heavy results rail + multi-step filter/sort interactions.
+  test.describe.configure({ timeout: 240000 });
+
+  test.beforeEach(async ({ page }) => {
+    homePage = new HomePage(page);
+    regionPage = new RegionPage(page);
+    communityPage = new CommunityPage(page);
+    await homePage.navigateToHome(constants.home_page.url);
+    await homePage.searchAndSelectSuggestion(
+      testData.region.term,
+      testData.region.suggestion,
+      testData.endpoint.search,
+    );
+    await regionPage.verifyOnRegionPage(constants.region.texas_url);
+    await regionPage.verifyCommunitiesSectionIsDisplayed();
+  });
+
+  test("TC-01 | Price filter reduces the results and 'Clear all' restores them @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    await regionPage.verifyPriceFilterReducesThenClearRestores(
+      testData.region_filters_sort.maxPrice,
+    );
+  });
+
+  test("TC-02 | Sorting the communities reorders the results @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    await regionPage.verifySortReordersResults(
+      testData.region_filters_sort.sortOption,
+    );
+  });
+
+  test("TC-03 | First community 'Learn More' CTA opens its detail page @regression", async () => {
+    const community = await regionPage.getFirstCommunityCardName();
+    await reportValue(`First community: ${community}`);
+
+    await regionPage.clickFirstCommunityLearnMore();
+
+    await communityPage.verifyCommunityPageDisplayed(
+      constants.region.community_detail_url_pattern,
+      community,
+    );
+    await reportValue(
+      `Community detail heading: ${await communityPage.getHeading()}`,
+    );
+  });
+});

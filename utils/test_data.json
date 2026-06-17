@@ -11,6 +11,10 @@
     "term": "Dallas",
     "suggestion": "Dallas"
   },
+  "region_filters_sort": {
+    "maxPrice": "300000",
+    "sortOption": "Price - Low to High"
+  },
   "community_search": {
     "term": "River Ranch Trails",
     "suggestion": "River Ranch Trails"
