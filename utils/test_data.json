@@ -23,18 +23,5 @@
   "endpoint": {
     "search": "/api/search",
     "contact_us": "/api/contact-us/"
-  },
-  "request_information": {
-    "valid": {
-      "firstName": "Test",
-      "lastName": "Automation",
-      "email": "test.automation_{{timestamp}}@ex2india.com",
-      "phone": "7325551234",
-      "preferredContactMethod": "Email"
-    },
-    "invalid": {
-      "email": "invalid-email@test",
-      "phone": "123"
-    }
   }
 }

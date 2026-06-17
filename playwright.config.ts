@@ -57,6 +57,9 @@ export default defineConfig({
     video: "off",
     launchOptions: {
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],
+      // Demo pacing: wait ~350ms before each browser action so the whole headed
+      // run is watchable when presenting to the QA team / client.
+      slowMo: 200,
     },
   },
   projects: [

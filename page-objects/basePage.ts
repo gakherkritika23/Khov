@@ -38,9 +38,18 @@ export class BasePage {
     console.log(`Clicked on: ${name ?? "element"}`);
   }
 
+  // Types character-by-character (not an instant fill) so the values are visibly
+  // entered into the form during the headed demo run.
   async type(locator: Locator, text: string, name?: string): Promise<void> {
     await this.waitForVisible(locator);
-    await locator.fill(text);
+    const current = await locator.inputValue().catch(() => "");
+    if (current === text) {
+      console.log(`Skipped (already filled): ${name ?? "input"} → ${text}`);
+      return;
+    }
+    await locator.click();
+    await locator.fill("");
+    await locator.pressSequentially(text, { delay: 50 });
     console.log(`Typed in: ${name ?? "input"} → ${text}`);
   }
 
@@ -83,6 +92,12 @@ export class BasePage {
   }
 
   /* ================= UTILITIES ================= */
+  // Holds the current screen briefly so the demo audience can read it (e.g. the
+  // success / thank-you panel before the test tears down).
+  async demoHold(ms = 4000): Promise<void> {
+    await this.page.waitForTimeout(ms);
+  }
+
   // Best-effort: pages lazy-render, so the target can detach mid-scroll. Retry
   // (re-resolving the locator) and don't throw — callers follow with an
   // auto-waiting assertion/action.
@@ -113,6 +128,48 @@ export class BasePage {
 
   async isEnabled(locator: Locator): Promise<boolean> {
     return locator.isEnabled();
+  }
+
+  /* ================= FORM HELPERS ================= */
+  // react-aria visually-hidden checkboxes: a forced click doesn't flip component
+  // state — focus the input and press Space the way react-aria expects.
+  protected async checkBox(input: Locator, name: string): Promise<void> {
+    if (await input.isChecked().catch(() => false)) return;
+    await input.focus();
+    await input.press("Space");
+    await expect(input, `${name} checkbox should be checked`).toBeChecked({ timeout: 5000 });
+  }
+
+  // The contact forms are gated by Cloudflare Turnstile. The widget injects a
+  // token into a hidden input once it resolves; submitting before the token is
+  // present silently fails. When a modal is open alongside the main form, pass
+  // the modal-scoped locator so we poll the right input.
+  protected async waitForTurnstileToken(
+    timeout = 15000,
+    token?: Locator,
+  ): Promise<void> {
+    const t = token ?? this.page.locator("input[name='cf-turnstile-response']").first();
+    await expect
+      .poll(
+        async () => (await t.inputValue().catch(() => "")).length,
+        { message: "Cloudflare Turnstile token should be populated before submit", timeout },
+      )
+      .toBeGreaterThan(0);
+  }
+
+  // Production is the live www.khov.com domain (env subdomains: www-dev /
+  // www-uat / www-stg). Both TEST_ENV=prod and that URL pattern count as prod.
+  protected isProdEnv(): boolean {
+    const env = (process.env.TEST_ENV ?? "").toLowerCase();
+    const baseUrl = process.env.BASE_URL ?? "";
+    return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+  }
+
+  // Resolves a relative path against BASE_URL so POMs can store either form
+  // and always navigate correctly.
+  protected resolveUrl(url: string): string {
+    if (/^https?:\/\//i.test(url)) return url;
+    return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
   }
 
   /* ================= POPUP HANDLERS ================= */

@@ -3,6 +3,7 @@ import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 import { reportValue } from "../utils/reporter";
 import { waitForApi } from "../utils/apiUtils";
+import { randomFirstName, randomLastName, randomPhone, randomEmail } from "../utils/testDataUtils";
 
 /**
  * The five "What are you interested in?" options on the Contact Us page. Each
@@ -336,12 +337,18 @@ export class ContactUsPage extends BasePage {
     interest: ContactInterest,
     overrides: { email?: string; phone?: string } = {},
   ): Promise<void> {
-    const email = overrides.email ?? `test.automation+${Date.now()}@ex2india.com`;
-    const phone = overrides.phone ?? "7325551234";
+    const firstName = randomFirstName();
+    const lastName = randomLastName();
+    const email = overrides.email ?? randomEmail();
+    const phone = overrides.phone ?? randomPhone();
     for (const field of this.fieldMap[interest]) {
       const locator = this.fieldLocator(field);
       if (field.kind === "checkbox") {
         await this.checkBox(locator, field.label);
+      } else if (field.name === "FirstName") {
+        await this.type(locator, firstName, field.label);
+      } else if (field.name === "LastName") {
+        await this.type(locator, lastName, field.label);
       } else if (field.name === "Email") {
         await this.type(locator, email, "Email");
       } else if (field.name === "Phone" || field.name === "OwnerPhone") {
@@ -352,36 +359,6 @@ export class ContactUsPage extends BasePage {
         await this.type(locator, field.value ?? "Test", field.label);
       }
     }
-  }
-
-  // react-aria checkbox: a forced click doesn't flip state — focus + Space.
-  private async checkBox(input: Locator, name: string): Promise<void> {
-    if (await input.isChecked().catch(() => false)) return;
-    await input.focus();
-    await input.press("Space");
-    await expect(input, `${name} should be checked`).toBeChecked({ timeout: 5000 });
-  }
-
-  // Cloudflare Turnstile injects a token into a hidden input once it resolves;
-  // submitting before it's present silently fails. Wait for it (non-prod). When
-  // the text-message modal is open the page has TWO token inputs (main form +
-  // modal), so callers pass the modal-scoped token to poll the right one.
-  private async waitForTurnstileToken(
-    timeout = 20000,
-    token: Locator = this.turnstileToken,
-  ): Promise<void> {
-    await expect
-      .poll(
-        async () => (await token.inputValue().catch(() => "")).length,
-        { message: "Cloudflare Turnstile token should populate before submit", timeout },
-      )
-      .toBeGreaterThan(0);
-  }
-
-  private isProdEnv(): boolean {
-    const env = (process.env.TEST_ENV ?? "").toLowerCase();
-    const baseUrl = process.env.BASE_URL ?? "";
-    return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
   }
 
   /**
@@ -469,6 +446,8 @@ export class ContactUsPage extends BasePage {
       `${interest} — success / thank-you panel should be displayed after submit`,
       20000,
     );
+    // Keep the success panel on screen for the demo audience.
+    await this.demoHold();
   }
 
   // ── Find your local information → Send us a text message ──────────────
@@ -584,14 +563,10 @@ export class ContactUsPage extends BasePage {
   private async fillTextMessageForm(
     overrides: { email?: string; phone?: string } = {},
   ): Promise<void> {
-    await this.type(this.tmFirstName, "Test", "First Name");
-    await this.type(this.tmLastName, "Automation", "Last Name");
-    await this.type(
-      this.tmEmail,
-      overrides.email ?? `test.automation+${Date.now()}@ex2india.com`,
-      "Email Address",
-    );
-    await this.type(this.tmMobile, overrides.phone ?? "7325551234", "Mobile Number");
+    await this.type(this.tmFirstName, randomFirstName(), "First Name");
+    await this.type(this.tmLastName, randomLastName(), "Last Name");
+    await this.type(this.tmEmail, overrides.email ?? randomEmail(), "Email Address");
+    await this.type(this.tmMobile, overrides.phone ?? randomPhone(), "Mobile Number");
     await this.checkBox(this.tmDisclaimer, "Text-message disclaimer");
   }
 
@@ -671,5 +646,7 @@ export class ContactUsPage extends BasePage {
       "Text-message form — success / thank-you panel should be displayed after submit",
       20000,
     );
+    // Keep the success panel on screen for the demo audience.
+    await this.demoHold();
   }
 }

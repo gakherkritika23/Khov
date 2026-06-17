@@ -204,30 +204,13 @@ export class CommunityPage extends BasePage {
   }
 
   async openRequestInformationModal(): Promise<void> {
-    // The header CTA needs React hydration and the page renders a promo overlay
-    // that can intercept the click, so dismiss popups first, then click and WAIT
-    // for the modal — only re-click if it genuinely didn't open (mirrors the
-    // sales-team modal open pattern).
     await this.handlePagePopups();
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await this.scrollIntoView(this.requestInfoCta.first());
-      await this.click(
-        this.requestInfoCta.first(),
-        attempt === 1
-          ? "Request Information CTA"
-          : "Request Information CTA (retry)",
-      );
-      const opened = await this.requestInfo.modal
-        .waitFor({ state: "visible", timeout: 8000 })
-        .then(() => true)
-        .catch(() => false);
-      if (opened) return;
-      await this.handlePagePopups();
-    }
+    await this.scrollIntoView(this.requestInfoCta.first());
+    await this.click(this.requestInfoCta.first(), "Request Information CTA");
     await Validator.requireVisible(
       this.requestInfo.modal,
       "Request Information modal should open from the community header CTA",
-      8000,
+      20000,
     );
   }
 

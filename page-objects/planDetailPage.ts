@@ -306,14 +306,6 @@ export class PlanDetailPage extends BasePage {
         return await this.getText(this.startingPriceValue);
     }
 
-    // ── Helpers ────────────────────────────────────────────
-    private resolveUrl(url: string): string {
-        if (/^https?:\/\//i.test(url)) {
-            return url;
-        }
-
-        return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
-    }
 
     // Scrolls through the gallery modal and counts the distinct, non-placeholder
     // image sources that become visible — used to prove the gallery is navigable.

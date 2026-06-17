@@ -824,13 +824,6 @@ export class QmiPage extends BasePage {
     return await this.getText(this.detailHeader.first());
   }
 
-  private resolveUrl(url: string): string {
-    if (/^https?:\/\//i.test(url)) {
-      return url;
-    }
-
-    return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
-  }
 
   private qmiCardLink(targetDetailUrl?: string): Locator {
     if (targetDetailUrl) {

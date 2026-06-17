@@ -104,19 +104,25 @@ export class RegionPage extends BasePage {
   // that per environment.
   async openRequestInformationModal(): Promise<boolean> {
     await this.handlePagePopups();
+    // Community cards are loaded via API and React-hydrated asynchronously after
+    // the initial page load. Clicking the CTA before hydration completes updates
+    // the URL but doesn't trigger the form fetch. Wait for the network to settle
+    // so the card component is fully mounted before we click.
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 20000 })
+      .catch(() => {});
     await this.scrollIntoView(this.firstCommunityCard.first());
-    // A SINGLE natural pointer click opens the modal — the CTA is a react-aria
-    // pressable, so a forced/synthetic click won't fire it. Never click twice:
-    // a second press resets the modal's loading spinner and stops the form from
-    // rendering.
+    await this.page.waitForTimeout(300);
+    // Use a DOM-level click (evaluate) rather than a Playwright pointer-event
+    // sequence. With slowMo active, the multi-step pointer sequence (move →
+    // pointerdown → pointerup) takes several seconds and the dynamically-rendered
+    // card can detach mid-sequence. The instant DOM click fires reliably after the
+    // card is hydrated.
     await this.requestInfoCta
       .first()
-      .click({ timeout: 15000 })
+      .evaluate((el) => (el as HTMLElement).click())
       .catch(() => {});
     console.log("Clicked on: Request Information CTA (first community card)");
-    // The form is fetched remotely, so allow generous time for it to render.
-    // Resolves to false (rather than throwing) if it never loads — e.g. the
-    // remote fetch is throttled by bot-protection — so the caller can skip.
     return await this.requestInfo.modal
       .waitFor({ state: "visible", timeout: 40000 })
       .then(() => true)
