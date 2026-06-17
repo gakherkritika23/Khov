@@ -24,14 +24,29 @@ if (requestedEnv && testEnv !== requestedEnv) {
 
 const envPath = path.resolve(process.cwd(), `environment/${testEnv}.env`);
 dotenv.config({ path: envPath });
+// Detect --project=<name> from the CLI args so the RP launch reflects which suite ran.
+const projectArgRaw =
+  process.argv.find((a) => a.startsWith("--project="))?.split("=")[1] ??
+  (() => {
+    const idx = process.argv.indexOf("--project");
+    return idx !== -1 ? process.argv[idx + 1] : undefined;
+  })();
+
+const suiteName =
+  projectArgRaw === "smoke" ? "Smoke"
+  : projectArgRaw === "regression" ? "Regression"
+  : "Full";
+
 const rpConfig = {
   apiKey: process.env.RP_API_KEY,
   endpoint: process.env.RP_ENDPOINT,
   project: process.env.RP_PROJECT,
-  launch: 'KHOV Automation',
-  attributes: [{ value: 'poc' }],
-  description: 'KHov ReportPortal',
-
+  launch: `KHOV ${suiteName} — ${process.env.ENV}`,
+  attributes: [
+    { key: "env", value: process.env.ENV },
+    { key: "suite", value: suiteName.toLowerCase() },
+  ],
+  description: `Automated ${suiteName.toLowerCase()} run against ${process.env.ENV} environment`,
 };
 
 if (!process.env.BASE_URL) {
