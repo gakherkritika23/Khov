@@ -341,6 +341,7 @@ export class ContactUsPage extends BasePage {
     const lastName = randomLastName();
     const email = overrides.email ?? randomEmail();
     const phone = overrides.phone ?? randomPhone();
+    console.log(`Filling Contact Us form [${interest}] — First Name: ${firstName} | Last Name: ${lastName} | Email: ${email} | Phone: ${phone}`);
     for (const field of this.fieldMap[interest]) {
       const locator = this.fieldLocator(field);
       if (field.kind === "checkbox") {
@@ -354,11 +355,14 @@ export class ContactUsPage extends BasePage {
       } else if (field.name === "Phone" || field.name === "OwnerPhone") {
         await this.type(locator, phone, field.label);
       } else if (field.kind === "select") {
-        await locator.selectOption(field.value ?? "", { force: true });
+        const value = field.value ?? "";
+        await locator.selectOption(value, { force: true });
+        console.log(`Selected dropdown [${field.label}]: ${value}`);
       } else {
         await this.type(locator, field.value ?? "Test", field.label);
       }
     }
+    console.log(`Form fill complete for interest: ${interest}`);
   }
 
   /**
@@ -441,11 +445,13 @@ export class ContactUsPage extends BasePage {
   }
 
   async verifySubmissionSuccess(interest: ContactInterest): Promise<void> {
+    console.log(`Verifying submission success for interest: ${interest}`);
     await Validator.requireVisible(
       this.successMessage,
       `${interest} — success / thank-you panel should be displayed after submit`,
       20000,
     );
+    console.log(`SUCCESS — Thank you message displayed for: ${interest}`);
     // Keep the success panel on screen for the demo audience.
     await this.demoHold();
   }
@@ -563,11 +569,17 @@ export class ContactUsPage extends BasePage {
   private async fillTextMessageForm(
     overrides: { email?: string; phone?: string } = {},
   ): Promise<void> {
-    await this.type(this.tmFirstName, randomFirstName(), "First Name");
-    await this.type(this.tmLastName, randomLastName(), "Last Name");
-    await this.type(this.tmEmail, overrides.email ?? randomEmail(), "Email Address");
-    await this.type(this.tmMobile, overrides.phone ?? randomPhone(), "Mobile Number");
+    const firstName = randomFirstName();
+    const lastName = randomLastName();
+    const email = overrides.email ?? randomEmail();
+    const phone = overrides.phone ?? randomPhone();
+    console.log(`Filling Send Us a Text Message form — First Name: ${firstName} | Last Name: ${lastName} | Email: ${email} | Phone: ${phone}`);
+    await this.type(this.tmFirstName, firstName, "First Name");
+    await this.type(this.tmLastName, lastName, "Last Name");
+    await this.type(this.tmEmail, email, "Email Address");
+    await this.type(this.tmMobile, phone, "Mobile Number");
     await this.checkBox(this.tmDisclaimer, "Text-message disclaimer");
+    console.log("Text message form fill complete");
   }
 
   // Required-field validation (client-side, safe on all envs): empty submit →
@@ -641,11 +653,13 @@ export class ContactUsPage extends BasePage {
   }
 
   async verifyTextMessageSubmissionSuccess(): Promise<void> {
+    console.log("Verifying Send Us a Text Message form submission success...");
     await Validator.requireVisible(
       this.successMessage,
       "Text-message form — success / thank-you panel should be displayed after submit",
       20000,
     );
+    console.log("SUCCESS — Thank you message displayed for text message form submission");
     // Keep the success panel on screen for the demo audience.
     await this.demoHold();
   }

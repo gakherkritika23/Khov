@@ -134,10 +134,14 @@ export class BasePage {
   // react-aria visually-hidden checkboxes: a forced click doesn't flip component
   // state — focus the input and press Space the way react-aria expects.
   protected async checkBox(input: Locator, name: string): Promise<void> {
-    if (await input.isChecked().catch(() => false)) return;
+    if (await input.isChecked().catch(() => false)) {
+      console.log(`Checkbox already checked: ${name}`);
+      return;
+    }
     await input.focus();
     await input.press("Space");
     await expect(input, `${name} checkbox should be checked`).toBeChecked({ timeout: 5000 });
+    console.log(`Checked: ${name}`);
   }
 
   // The contact forms are gated by Cloudflare Turnstile. The widget injects a
@@ -148,6 +152,7 @@ export class BasePage {
     timeout = 15000,
     token?: Locator,
   ): Promise<void> {
+    console.log("Waiting for Cloudflare Turnstile security token...");
     const t = token ?? this.page.locator("input[name='cf-turnstile-response']").first();
     await expect
       .poll(
@@ -155,6 +160,7 @@ export class BasePage {
         { message: "Cloudflare Turnstile token should be populated before submit", timeout },
       )
       .toBeGreaterThan(0);
+    console.log("Turnstile token received — form is ready to submit");
   }
 
   // Production is the live www.khov.com domain (env subdomains: www-dev /

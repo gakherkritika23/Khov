@@ -214,6 +214,7 @@ export class RequestInformationForm extends BasePage {
   }
 
   async verifySubmissionSuccess(): Promise<void> {
+    console.log("Verifying form submission success...");
     await Validator.requireVisible(
       this.successMessage,
       "Request Information thank-you / success message should be displayed after submission",
@@ -225,6 +226,7 @@ export class RequestInformationForm extends BasePage {
       "URL should reflect the success modal after a successful submission",
       15000,
     );
+    console.log("SUCCESS — Thank you message displayed and URL reflects successful submission");
     // Keep the success panel on screen for the demo audience.
     await this.demoHold();
   }
@@ -237,6 +239,7 @@ export class RequestInformationForm extends BasePage {
     data?: RequestInformationFormData,
   ): Promise<void> {
     const d = data ?? this._lastFilledData;
+    console.log(`Verifying API submission — expected payload: First Name: ${d.firstName} | Last Name: ${d.lastName} | Email: ${d.email} | Phone: ${d.phone}`);
     expect(response.status(), "contact-us API should return HTTP 200").toBe(200);
 
     const body = (await response.json()) as { status?: string; data?: string };
@@ -273,6 +276,7 @@ export class RequestInformationForm extends BasePage {
         "Submitted Preferred Contact Method should match the selected value",
       ).toBe(d.preferredContactMethod);
     }
+    console.log("API verification PASSED — submitted payload matches entered form data");
   }
 
   // ── Actions ────────────────────────────────────────────
@@ -281,17 +285,17 @@ export class RequestInformationForm extends BasePage {
   async fill(data?: RequestInformationFormData): Promise<void> {
     const d = data ?? generateDefaultData();
     this._lastFilledData = d;
+    console.log(`Filling Request Information form — First Name: ${d.firstName} | Last Name: ${d.lastName} | Email: ${d.email} | Phone: ${d.phone} | Contact Method: ${d.preferredContactMethod ?? "not set"}`);
     await this.type(this.firstName, d.firstName, "First Name");
     await this.type(this.lastName, d.lastName, "Last Name");
     await this.type(this.email, d.email, "Email Address");
     await this.type(this.phone, d.phone, "Mobile Number");
 
     if (d.preferredContactMethod) {
-      // The select is visually hidden (a styled button mirrors it), so bypass
-      // the visibility actionability check.
       await this.contactMethod.selectOption(d.preferredContactMethod, {
         force: true,
       });
+      console.log(`Selected preferred contact method: ${d.preferredContactMethod}`);
     }
 
     // Both disclaimers are required to submit.
@@ -311,8 +315,7 @@ export class RequestInformationForm extends BasePage {
 
     if (this.isProdEnv()) {
       console.warn(
-        "Skipping Request Information form submission on prod to avoid " +
-          "creating a real lead (form was filled but not submitted).",
+        "PROD environment detected — form filled but NOT submitted (no real lead created).",
       );
       return null;
     }
