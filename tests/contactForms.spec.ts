@@ -140,9 +140,13 @@ test.describe("Contact Us — Local Information & Text Message", () => {
   });
 
   test("TC-02 | Send us a text message — fields, validation, fill/submit @form @smoke", async () => {
-    const regions = constants.contact_us.state_of_interest_options;
-    const state = regions[Math.floor(Math.random() * regions.length)];
-    await reportValue(`Random local-information state: ${state}`);
+    // Pick randomly from the single-occurrence states only. The duplicated
+    // dropdown regions surface no local-information results, so a random pick
+    // across the full list was flaky; every state in this set is verified to
+    // have local info + a Send-us-a-text-message CTA.
+    const states = testData.contact_us.local_information_states;
+    const state = states[Math.floor(Math.random() * states.length)];
+    await reportValue(`Local-information state: ${state}`);
     await contactUsPage.selectLocalInfoState(state);
 
     // The CTA + modal render only when the chosen region surfaces local-info
