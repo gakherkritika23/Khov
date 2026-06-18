@@ -1,4 +1,4 @@
-import { Page } from "@playwright/test";
+import { Page, expect } from "@playwright/test";
 import { test } from "./baseTest";
 import { ContactUsPage } from "../page-objects/contactUsPage";
 import { QmiPage } from "../page-objects/qmiPage";
@@ -146,13 +146,13 @@ test.describe("Contact Us — Local Information & Text Message", () => {
     await contactUsPage.selectLocalInfoState(state);
 
     // The CTA + modal render only when the chosen region surfaces local-info
-    // results. Skip the modal flow if they don't appear — the dropdown itself
-    // is covered by TC-01.
+    // results. Treat a missing CTA/modal as a FAILURE (data expected to be
+    // visible) rather than skipping.
     const opened = await contactUsPage.openTextMessageModal();
-    test.skip(
-      !opened,
-      "Selected region surfaced no local-information results (no Send-us-a-text-message CTA).",
-    );
+    expect(
+      opened,
+      "Selected region surfaced no local-information results (no Send-us-a-text-message CTA) — expected the local-information CTA + modal to be available.",
+    ).toBeTruthy();
 
     await contactUsPage.verifyTextMessageModalFields();
     await contactUsPage.verifyTextMessageRequiredFieldValidation();
@@ -316,16 +316,14 @@ test.describe("Region Page — Request Information Form", () => {
     // The card CTA opens a modal whose form is fetched remotely (unlike the
     // detail-page forms, which are in-page). That fetch sits behind Cloudflare
     // bot-protection, which can hang the modal on its loading spinner under
-    // repeated automation on ANY environment (it loads for real users — see the
-    // manual tap). When the form genuinely loads we run the full flow; when the
-    // external gate prevents it we skip rather than fail (an infra condition, not
-    // a product defect). The form's fields/validation are still covered on every
-    // environment by the in-page QMI/Floorplan/Community surfaces.
+    // repeated automation (it loads for real users — see the manual tap). Treat a
+    // form that never becomes visible as a FAILURE (data expected to be visible)
+    // rather than skipping.
     const opened = await regionPage.openRequestInformationModal();
-    test.skip(
-      !opened,
-      "Region-card Request Information modal form did not load (remote form fetch is Cloudflare bot-protected and can throttle under automation); covered via the in-page detail-page surfaces.",
-    );
+    expect(
+      opened,
+      "Region-card Request Information modal form did not load (remote form fetch did not render the form) — expected the form to be visible.",
+    ).toBeTruthy();
 
     await regionPage.requestInfo.verifyModalIsDisplayed();
     await regionPage.requestInfo.verifyModalFields();

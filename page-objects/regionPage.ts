@@ -98,34 +98,86 @@ export class RegionPage extends BasePage {
 
   // Opens the first community card's Request Information modal and resolves to
   // whether the modal's FORM became visible. Returns `false` (rather than
-  // throwing) when the form never renders — on prod the card-triggered form is
-  // fetched remotely behind Cloudflare bot-protection, which can leave the modal
-  // on its loading spinner under automation; the caller decides how to treat
-  // that per environment.
+  // throwing) when the form never renders.
   async openRequestInformationModal(): Promise<boolean> {
-    await this.handlePagePopups();
-    // Community cards are loaded via API and React-hydrated asynchronously after
-    // the initial page load. Clicking the CTA before hydration completes updates
-    // the URL but doesn't trigger the form fetch. Wait for the network to settle
-    // so the card component is fully mounted before we click.
+    // Reaching this page via the SPA search-navigation leaves the app in a state
+    // where the card CTA will NOT mount the modal — the click sets the modal
+    // deep-link on the URL but the modal component never renders (verified: the
+    // URL updates yet the modal element count stays 0). A FULL page load renders
+    // the modal from the CTA reliably, so reload the results page first to swap
+    // the SPA-nav state for a clean full-load state, then interact.
     await this.page
-      .waitForLoadState("networkidle", { timeout: 20000 })
+      .reload({ waitUntil: "domcontentloaded", timeout: 60000 })
       .catch(() => {});
+    await this.handlePagePopups();
     await this.scrollIntoView(this.firstCommunityCard.first());
-    await this.page.waitForTimeout(300);
-    // Use a DOM-level click (evaluate) rather than a Playwright pointer-event
-    // sequence. With slowMo active, the multi-step pointer sequence (move →
-    // pointerdown → pointerup) takes several seconds and the dynamically-rendered
-    // card can detach mid-sequence. The instant DOM click fires reliably after the
-    // card is hydrated.
-    await this.requestInfoCta
-      .first()
-      .evaluate((el) => (el as HTMLElement).click())
-      .catch(() => {});
-    console.log("Clicked on: Request Information CTA (first community card)");
-    return await this.requestInfo.modal
+    const cta = this.requestInfoCta.first();
+    await cta.waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
+
+    // The CTA is a react-aria pressable on an asynchronously-hydrated card. The
+    // full pointer sequence is dispatched in-page atomically (no slowMo gap for
+    // the card to detach into — more reliable than a Playwright click). Retry
+    // only while the modal CONTAINER has not appeared, and never re-press once it
+    // has: a second react-aria press resets the loading spinner so the form never
+    // renders. The 8s wait is generous enough that a slow-but-successful open is
+    // never re-pressed.
+    let opened = false;
+    for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+      await this.dispatchPointerClick(cta);
+      console.log(
+        `Clicked on: Request Information CTA (first community card) — attempt ${attempt}`,
+      );
+      opened = await this.isVisible(this.requestInfo.modal, 8000);
+    }
+    if (!opened) return false;
+
+    // Form-loaded gate: the first input renders only after the remote form fetch
+    // completes. Container/spinner being up is not enough. true → form usable;
+    // false → fetch never resolved (genuine remote block).
+    return await this.requestInfo.firstName
       .waitFor({ state: "visible", timeout: 40000 })
       .then(() => true)
       .catch(() => false);
+  }
+
+  // Fires a complete pointer-press sequence (pointerdown → pointerup → click) on
+  // the element synchronously in the page, centred on the element so react-aria's
+  // "released over target" check passes. Unlike a Playwright click, there is no
+  // inter-event delay for slowMo to stretch (which lets a re-rendering card
+  // detach mid-press), and unlike a bare `el.click()` it gives react-aria the
+  // pointer events its `usePress` actually listens for.
+  private async dispatchPointerClick(locator: Locator): Promise<void> {
+    await locator
+      .evaluate((el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const base: PointerEventInit = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+          button: 0,
+          clientX: x,
+          clientY: y,
+          view: window,
+        };
+        el.dispatchEvent(new PointerEvent("pointerdown", { ...base, buttons: 1 }));
+        el.dispatchEvent(new PointerEvent("pointerup", { ...base, buttons: 0 }));
+        el.dispatchEvent(
+          new MouseEvent("click", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            button: 0,
+            clientX: x,
+            clientY: y,
+            view: window,
+          }),
+        );
+      })
+      .catch(() => {});
   }
 }
