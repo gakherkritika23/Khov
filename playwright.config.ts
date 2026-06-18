@@ -23,6 +23,10 @@ if (requestedEnv && testEnv !== requestedEnv) {
 const envPath = path.resolve(process.cwd(), `environment/${testEnv}.env`);
 dotenv.config({ path: envPath });
 
+// ReportPortal is enabled only when RP_API_KEY is present (POC: opt-in, so
+// normal runs are unaffected when RP_* is not configured).
+const reportPortalEnabled = !!process.env.RP_API_KEY;
+
 if (!process.env.BASE_URL) {
   throw new Error(
     `BASE_URL is not set. Define BASE_URL in environment/${testEnv}.env.`,
@@ -43,10 +47,44 @@ export default defineConfig({
   reporter: [
     ["list"],
     ["junit", { outputFile: "results.xml" }],
+    // Allure is being retired in favour of ReportPortal. Kept disabled (deps +
+    // global-setup retained) as a transition fallback — uncomment to flip back.
     // detail: false → Allure records only named test.step() verifications,
     // dropping low-level pw:api/expect steps (locator code, file:line, snippets).
-    ["allure-playwright", { outputFolder: "allure-results", detail: false }],
+    // ["allure-playwright", { outputFolder: "allure-results", detail: false }],
     ["html", { outputFolder: "playwright-report", open: "never" }],
+    // ReportPortal — primary report. Only added when RP_API_KEY is set.
+    ...(reportPortalEnabled
+      ? [
+          [
+            // Wrapper around @reportportal/agent-js-playwright that drops
+            // pw:api/expect/fixture steps so RP shows only our named steps.
+            "./reporters/reportPortalReporter.ts",
+            {
+              apiKey: process.env.RP_API_KEY,
+              endpoint: process.env.RP_ENDPOINT,
+              project: process.env.RP_PROJECT,
+              launch: `khov-${testEnv}`,
+              // Launch-level run metadata (replaces the old Allure
+              // environment.properties file).
+              attributes: [
+                { key: "env", value: testEnv },
+                { key: "baseURL", value: process.env.BASE_URL ?? "" },
+                { key: "os", value: process.platform },
+                { key: "node", value: process.version },
+              ],
+              description: "End to End tests",
+              // Report test.step() calls as nested steps in RP. Without this the
+              // agent drops ALL steps (Validator assertions, reportValue) — only
+              // logs/pass-fail would show. Required for the full step tree.
+              includeTestSteps: true,
+              // Surface the last error into the RP test description (reliable,
+              // unlike ReportingApi-in-hooks which races on stdout attribution).
+              extendTestDescriptionWithLastError: true,
+            },
+          ] as const,
+        ]
+      : []),
   ],
   use: {
     baseURL: process.env.BASE_URL,
