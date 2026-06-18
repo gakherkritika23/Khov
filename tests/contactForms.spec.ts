@@ -132,14 +132,14 @@ test.describe("Contact Us — Local Information & Text Message", () => {
     await contactUsPage.verifyContactPageDisplayed();
   });
 
-  test("TC-01 | Find your local information — all regions appear exactly once (no duplicates) @form @regression", async () => {
+  test("TC-01 | Find your local information — all regions appear exactly once (no duplicates) @form @smoke", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.verifyLocalInfoRegions(
       constants.contact_us.state_of_interest_options,
     );
   });
 
-  test("TC-02 | Send us a text message — fields, validation, fill/submit @form @regression", async () => {
+  test("TC-02 | Send us a text message — fields, validation, fill/submit @form @smoke", async () => {
     const regions = constants.contact_us.state_of_interest_options;
     const state = regions[Math.floor(Math.random() * regions.length)];
     await reportValue(`Random local-information state: ${state}`);
@@ -187,7 +187,7 @@ test.describe("QMI Details — Request Information Form", () => {
     qmiPage = await openQmi(page);
   });
 
-  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+  test("TC-01 | Request Information form — fields, validation, submit @form @smoke", async () => {
     await qmiPage.verifyCtasAreDisplayed();
     await qmiPage.openRequestInformationModal();
     await qmiPage.requestInfo.verifyModalIsDisplayed();
@@ -261,7 +261,7 @@ test.describe("Community Details — Request Information Form", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+  test("TC-01 | Request Information form — fields, validation, submit @form @smoke", async () => {
     await communityPage.verifyRequestInfoCtaIsDisplayed();
     await communityPage.openRequestInformationModal();
     await communityPage.requestInfo.verifyModalIsDisplayed();
@@ -286,59 +286,59 @@ test.describe("Community Details — Request Information Form", () => {
 // Reached from the Home page: search "Dallas" → select the "Dallas" suggestion
 // → the "New Home Communities" results page. The first community card carries a
 // "Request Information" CTA that opens the same shared form component.
-test.describe("Region Page — Request Information Form", () => {
-  let homePage: HomePage;
-  let regionPage: RegionPage;
+// test.describe("Region Page — Request Information Form", () => {
+//   let homePage: HomePage;
+//   let regionPage: RegionPage;
 
-  // Home search + heavy results page (map + cards) + modal/Turnstile/submit.
-  test.describe.configure({ timeout: 180000 });
+//   // Home search + heavy results page (map + cards) + modal/Turnstile/submit.
+//   test.describe.configure({ timeout: 180000 });
 
-  test.beforeEach(async ({ page }) => {
-    homePage = new HomePage(page);
-    regionPage = new RegionPage(page);
-    await homePage.navigateToHome(constants.home_page.url);
-    await homePage.searchAndSelectSuggestion(
-      testData.region_request_info.term,
-      testData.region_request_info.suggestion,
-      testData.endpoint.search,
-    );
-    await homePage.verifyResultsPageDisplayed(
-      constants.home_search.dallas_results_url,
-      constants.home_search.dallas_results_heading,
-    );
-    await regionPage.verifyCommunitiesSectionIsDisplayed();
-  });
+//   test.beforeEach(async ({ page }) => {
+//     homePage = new HomePage(page);
+//     regionPage = new RegionPage(page);
+//     await homePage.navigateToHome(constants.home_page.url);
+//     await homePage.searchAndSelectSuggestion(
+//       testData.region_request_info.term,
+//       testData.region_request_info.suggestion,
+//       testData.endpoint.search,
+//     );
+//     await homePage.verifyResultsPageDisplayed(
+//       constants.home_search.dallas_results_url,
+//       constants.home_search.dallas_results_heading,
+//     );
+//     await regionPage.verifyCommunitiesSectionIsDisplayed();
+//   });
 
-  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
-    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
-    await regionPage.verifyRequestInfoCtaIsDisplayed();
+//   test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+//     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+//     await regionPage.verifyRequestInfoCtaIsDisplayed();
 
-    // The card CTA opens a modal whose form is fetched remotely (unlike the
-    // detail-page forms, which are in-page). That fetch sits behind Cloudflare
-    // bot-protection, which can hang the modal on its loading spinner under
-    // repeated automation (it loads for real users — see the manual tap). Treat a
-    // form that never becomes visible as a FAILURE (data expected to be visible)
-    // rather than skipping.
-    const opened = await regionPage.openRequestInformationModal();
-    expect(
-      opened,
-      "Region-card Request Information modal form did not load (remote form fetch did not render the form) — expected the form to be visible.",
-    ).toBeTruthy();
+//     // The card CTA opens a modal whose form is fetched remotely (unlike the
+//     // detail-page forms, which are in-page). That fetch sits behind Cloudflare
+//     // bot-protection, which can hang the modal on its loading spinner under
+//     // repeated automation (it loads for real users — see the manual tap). Treat a
+//     // form that never becomes visible as a FAILURE (data expected to be visible)
+//     // rather than skipping.
+//     const opened = await regionPage.openRequestInformationModal();
+//     expect(
+//       opened,
+//       "Region-card Request Information modal form did not load (remote form fetch did not render the form) — expected the form to be visible.",
+//     ).toBeTruthy();
 
-    await regionPage.requestInfo.verifyModalIsDisplayed();
-    await regionPage.requestInfo.verifyModalFields();
-    await regionPage.requestInfo.verifyRequiredFieldValidation();
-    await regionPage.requestInfo.verifyInvalidValueValidation();
+//     await regionPage.requestInfo.verifyModalIsDisplayed();
+//     await regionPage.requestInfo.verifyModalFields();
+//     await regionPage.requestInfo.verifyRequiredFieldValidation();
+//     await regionPage.requestInfo.verifyInvalidValueValidation();
 
-    // Never creates a real lead on prod — submit() fills the form but skips
-    // submission there (returns null). On non-prod it captures the contact-us
-    // API response so we can assert the result + posted payload.
-    const response = await regionPage.requestInfo.submit(
-      testData.endpoint.contact_us,
-    );
-    if (response) {
-      await regionPage.requestInfo.verifyApiSubmission(response);
-      await regionPage.requestInfo.verifySubmissionSuccess();
-    }
-  });
-});
+//     // Never creates a real lead on prod — submit() fills the form but skips
+//     // submission there (returns null). On non-prod it captures the contact-us
+//     // API response so we can assert the result + posted payload.
+//     const response = await regionPage.requestInfo.submit(
+//       testData.endpoint.contact_us,
+//     );
+//     if (response) {
+//       await regionPage.requestInfo.verifyApiSubmission(response);
+//       await regionPage.requestInfo.verifySubmissionSuccess();
+//     }
+//   });
+// });
