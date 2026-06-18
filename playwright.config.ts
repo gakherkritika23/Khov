@@ -91,7 +91,10 @@ export default defineConfig({
     trace: "on-first-retry",
     headless: false,
     viewport: null,
-    screenshot: "on-first-failure",
+    // Failure screenshots are captured explicitly in tests/baseTest.ts afterEach
+    // (reliable even when a test fails right after a navigation). Native capture
+    // is off to avoid duplicate screenshots in the report.
+    screenshot: "off",
     video: "off",
     launchOptions: {
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],

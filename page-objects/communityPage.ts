@@ -206,11 +206,22 @@ export class CommunityPage extends BasePage {
   async openRequestInformationModal(): Promise<void> {
     await this.handlePagePopups();
     await this.scrollIntoView(this.requestInfoCta.first());
-    await this.click(this.requestInfoCta.first(), "Request Information CTA");
+    // The CTA is a react-aria pressable; under slowMo a plain Playwright click
+    // intermittently fails to fire the press, leaving the modal unmounted
+    // ("element(s) not found"). Dispatch the full pointer sequence atomically and
+    // retry until the modal container appears — never re-press once it is up (a
+    // second press would reset a loading spinner).
+    const cta = this.requestInfoCta.first();
+    let opened = false;
+    for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
+      opened = await this.isVisible(this.requestInfo.modal, 8000);
+    }
     await Validator.requireVisible(
       this.requestInfo.modal,
       "Request Information modal should open from the community header CTA",
-      20000,
+      8000,
     );
   }
 

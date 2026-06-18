@@ -123,7 +123,7 @@ export class RegionPage extends BasePage {
     // never re-pressed.
     let opened = false;
     for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
-      await this.dispatchPointerClick(cta);
+      await this.pressAtomically(cta);
       console.log(
         `Clicked on: Request Information CTA (first community card) — attempt ${attempt}`,
       );
@@ -138,46 +138,5 @@ export class RegionPage extends BasePage {
       .waitFor({ state: "visible", timeout: 40000 })
       .then(() => true)
       .catch(() => false);
-  }
-
-  // Fires a complete pointer-press sequence (pointerdown → pointerup → click) on
-  // the element synchronously in the page, centred on the element so react-aria's
-  // "released over target" check passes. Unlike a Playwright click, there is no
-  // inter-event delay for slowMo to stretch (which lets a re-rendering card
-  // detach mid-press), and unlike a bare `el.click()` it gives react-aria the
-  // pointer events its `usePress` actually listens for.
-  private async dispatchPointerClick(locator: Locator): Promise<void> {
-    await locator
-      .evaluate((el: HTMLElement) => {
-        const r = el.getBoundingClientRect();
-        const x = r.left + r.width / 2;
-        const y = r.top + r.height / 2;
-        const base: PointerEventInit = {
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          pointerId: 1,
-          pointerType: "mouse",
-          isPrimary: true,
-          button: 0,
-          clientX: x,
-          clientY: y,
-          view: window,
-        };
-        el.dispatchEvent(new PointerEvent("pointerdown", { ...base, buttons: 1 }));
-        el.dispatchEvent(new PointerEvent("pointerup", { ...base, buttons: 0 }));
-        el.dispatchEvent(
-          new MouseEvent("click", {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            button: 0,
-            clientX: x,
-            clientY: y,
-            view: window,
-          }),
-        );
-      })
-      .catch(() => {});
   }
 }

@@ -808,7 +808,16 @@ export class QmiPage extends BasePage {
   async openRequestInformationModal(): Promise<void> {
     await this.handlePagePopups();
     await this.scrollIntoView(this.requestInfoCta.first());
-    await this.click(this.requestInfoCta.first(), "Request Information CTA");
+    // The CTA is a react-aria pressable; under slowMo a plain click intermittently
+    // fails to fire the press, leaving the modal unmounted. Dispatch the full
+    // pointer sequence atomically and retry until the modal appears — never
+    // re-press once it is up (a second press would reset a loading spinner).
+    const cta = this.requestInfoCta.first();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
+      if (await this.isVisible(this.requestInfo.modal, 8000)) break;
+    }
   }
 
   // ── Data Getters ───────────────────────────────────────

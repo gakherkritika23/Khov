@@ -78,6 +78,50 @@ export class BasePage {
     console.log(`Clicked (script) on: ${name ?? "element"}`);
   }
 
+  // Fires a complete pointer-press sequence (pointerdown → pointerup → click) on
+  // the element synchronously in the page, centred on it so react-aria's
+  // "released over target" check passes. Unlike a Playwright click there is no
+  // inter-event delay for slowMo to stretch (which lets a re-rendering element
+  // detach mid-press), and unlike a bare `el.click()` it gives react-aria's
+  // usePress the pointer events it listens for. Use for react-aria pressables
+  // (e.g. the Request Information modal CTAs) that a normal click intermittently
+  // fails to trigger under slowMo.
+  protected async pressAtomically(locator: Locator): Promise<void> {
+    await locator
+      .first()
+      .evaluate((el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const base: PointerEventInit = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+          button: 0,
+          clientX: x,
+          clientY: y,
+          view: window,
+        };
+        el.dispatchEvent(new PointerEvent("pointerdown", { ...base, buttons: 1 }));
+        el.dispatchEvent(new PointerEvent("pointerup", { ...base, buttons: 0 }));
+        el.dispatchEvent(
+          new MouseEvent("click", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            button: 0,
+            clientX: x,
+            clientY: y,
+            view: window,
+          }),
+        );
+      })
+      .catch(() => {});
+  }
+
   /* ================= WAITS ================= */
   async waitForVisible(locator: Locator, timeout = 5000): Promise<void> {
     await expect(locator).toBeVisible({ timeout });
@@ -181,7 +225,10 @@ export class BasePage {
   /* ================= POPUP HANDLERS ================= */
   async handlePagePopups(timeout = 8000): Promise<void> {
     await this.handleConsentPopup(timeout);
-    await this.handleOneTrustPopup(timeout);
+    // Use the OneTrust probe's own short default — do NOT pass the consent
+    // timeout, which made this wait the full 8s for a OneTrust banner that
+    // never appears.
+    await this.handleOneTrustPopup();
   }
 
   async handleConsentPopup(timeout = 8000): Promise<void> {
@@ -191,6 +238,12 @@ export class BasePage {
       if (!(await this.isConsentPopupVisible())) {
         return;
       }
+    } else if (!(await this.isConsentPopupVisible())) {
+      // No consent banner on the page — return immediately instead of polling
+      // out the full timeout. This handler runs on every navigation and every
+      // modal-open, so spinning ~8s here each time (with nothing to dismiss) was
+      // the bulk of the long pause before the Request Information tap.
+      return;
     }
 
     const consentButtons = [
@@ -224,7 +277,7 @@ export class BasePage {
     }
   }
 
-  async handleOneTrustPopup(timeout = 3000): Promise<void> {
+  async handleOneTrustPopup(timeout = 1500): Promise<void> {
     const acceptButton = this.page.locator("#onetrust-accept-btn-handler").first();
 
     if (await this.isVisible(acceptButton, timeout)) {
