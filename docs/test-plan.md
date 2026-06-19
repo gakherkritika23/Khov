@@ -52,7 +52,7 @@ Done as part of the first two specs:
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| SB-01 | Search a state/region term → select region suggestion → land on region page | @smoke | ⬜ — previously covered by `regionPage.spec.ts` TC-01, which now uses the lighter **Dallas city** market view (for dev stability), so the **state-level** region-suggestion path is no longer exercised. Add a lightweight state-search check to `homePage.spec.ts` if that coverage is needed. |
+| SB-01 | Search a state/region term → select region suggestion → land on region page | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01 — search "Texas" → "Texas" suggestion → the state region page) |
 | SB-02 | Search a market/city term → select suggestion → land on results page | @smoke | ✅ (`homePage.spec.ts` TC-01 — Texas → Dallas) |
 | SB-03 | Search a **community name** → select community suggestion → land directly on that **community page** | @smoke | ✅ (`homePage.spec.ts` TC-02 — "River Ranch Trails") |
 | SB-04 | Suggestion list groups/renders for partial input (markets, counties, communities) | @regression | ⬜ |
@@ -77,7 +77,7 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01 — on the Dallas city market-results page, same rail component as the state view) |
+| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01 — the Texas **state** region page) |
 | RG-02 | Click first community card → navigate to its community detail page | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
 | RG-03 | Map loads (markers present) | @smoke | ✅ (`regionPage.spec.ts` "Map" TC-01 — Google Maps `gmp-advanced-marker` pins) |
 | RG-04 | Map zoom in/out controls | @regression | ✅ (`regionPage.spec.ts` "Map" TC-02 — both controls present; "Zoom in" fetches fresh tiles / moves the camera (asserted); "Zoom out" operates the control + map stays healthy (tile delta best-effort — a reversing zoom often serves cached tiles)) |
@@ -93,12 +93,14 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 restores). Result-count reads poll until the streaming "N results" settles.
 Markers are Google `gmp-advanced-marker`s; individual community pins carry
 `data-marker-id="community:<id>"` and only appear at a **city** view (state views
-cluster them) — so the **Map and Filters & Sort blocks are pinned to the Dallas
-city view** (the ~47-community Texas state rail is too heavy for the multi-step
-filter/sort/CTA interactions on a degraded dev). Entry goes through a retrying
-`enterRegion()` helper that gates on a ready signal (heading + a result card);
-the "Learn More" CTA is DOM-clicked (`clickViaScript`) since the streaming rail
-leaves it attached-but-not-visible.
+cluster them). **Coverage split for both state & city:** Community Results uses the
+**Texas state** view (covers SB-01 + the state region page; it's light — loads +
+one card click); the **Map and Filters & Sort** blocks use the **Dallas city** view
+(Map needs individual markers for RG-06; the ~47-community state rail is too heavy
+for the multi-step filter/sort/CTA interactions on a degraded dev). Entry goes
+through a retrying `enterRegion()` helper that gates on a ready signal (heading + a
+result card); the "Learn More" CTA is DOM-clicked (`clickViaScript`) since the
+streaming rail leaves it attached-but-not-visible.
 
 ---
 

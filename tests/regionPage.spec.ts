@@ -68,17 +68,21 @@ test.describe("Region Page — Community Results", () => {
     homePage = new HomePage(page);
     regionPage = new RegionPage(page);
     communityPage = new CommunityPage(page);
+    // State view (search "Texas" → "Texas") — covers the state-level region page
+    // + SB-01 (state-suggestion → region page). This test only loads the page and
+    // clicks the first community (no heavy multi-card interaction), so the larger
+    // state rail is fine here; the interaction-heavy Map/Filters blocks use Dallas.
     await enterRegion(
       homePage,
       regionPage,
-      testData.region_request_info.term,
-      testData.region_request_info.suggestion,
-      constants.home_search.dallas_results_url,
+      testData.region.term,
+      testData.region.suggestion,
+      constants.region.texas_url,
     );
   });
 
-  test("TC-01 | First community card opens its community detail page @regression", async () => {
-    await regionPage.verifyOnRegionPage(constants.home_search.dallas_results_url);
+  test("TC-01 | Selecting the 'Texas' region then the first community opens its detail page @regression", async () => {
+    await regionPage.verifyOnRegionPage(constants.region.texas_url);
     await regionPage.verifyCommunitiesSectionIsDisplayed();
 
     const firstCommunity = await regionPage.getFirstCommunityCardName();
