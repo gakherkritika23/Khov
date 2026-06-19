@@ -23,9 +23,9 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
 | E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | ✅ (RG-01..06, RG-08..11; RG-07 deferred — data limitation) |
 | E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | ✅ (header, floorplan, QMI) |
-| E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09 ✅; QD-05/08 deferred) |
-| E5 | Floorplan details page | `floorplanDetailPage.ts` _(new)_ | `floorplanDetailPage.spec.ts` _(new)_ | ⬜ |
-| E6 | Contact form (site-wide) | `contactForm.ts` _(new, shared)_ | `contactForm.spec.ts` _(new)_ | ⬜ |
+| E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09/10/11 ✅; QD-05/08 deferred) |
+| E5 | Floorplan details page | `planDetailPage.ts` | `planDetailPage.spec.ts` | ✅ (FD-01..FD-09; Request Info lives in `contactForms.spec.ts`) |
+| E6 | Contact forms (site-wide) | `contactUsPage.ts` + `requestInformationForm.ts` _(shared)_ | `contactForms.spec.ts` | ✅ |
 
 The thin navigation-verification POM was **renamed `communityDetailPage.ts` →
 `communityPage.ts`** and extended for E3 (it's the single Community-page POM,
@@ -173,9 +173,9 @@ per-consultant detail modal).
 | QD-06 | Availability date shown | @regression | ✅ (Overview TC-02 — "Available Now") |
 | QD-07 | Interactive Floor Plan (IFP) loads / is interactive | @regression | ✅ (Interactive Floor Plan TC-01) |
 | QD-08 | QMI sticker breakdown _(if applicable)_ | @regression | ⬜ deferred — no itemized "window sticker" element present in the DOM for this home |
-| QD-09 | CTAs (Request Info, Schedule a Tour, etc.) present / functional | @regression | ✅ (Overview TC-03 — Request a Tour / Request Information) |
-| QD-10 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (Request Information Form TC-01 — invalid email/phone → "Please correct the required field", no submit) |
-| QD-11 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (Request Information Form TC-02 — submission **skipped on prod** to avoid real leads) |
+| QD-09 | CTAs (Request Info, Schedule a Tour, etc.) present / functional | @regression | ✅ (`qmiPage.spec.ts` Overview TC-01 — CTAs incl. Request a Tour / Request Information) |
+| QD-10 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (`contactForms.spec.ts` "QMI Details — Request Information Form" TC-01 — invalid email/phone → "Please correct the required field", no submit) |
+| QD-11 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (`contactForms.spec.ts` "QMI Details — Request Information Form" TC-01 — submission **skipped on prod** to avoid real leads) |
 
 ---
 
@@ -201,31 +201,48 @@ per-consultant detail modal).
 | FD-04 | Starting price displayed | @regression | ✅ (Overview TC-02) |
 | FD-05 | Interactive Floor Plan (IFP) loads / is interactive | @regression | ✅ (Interactive Floor Plan TC-01) |
 | FD-06 | CTAs present / functional | @regression | ✅ (Overview TC-03 — Request a Tour / Request Information) |
-| FD-07 | Request Information CTA opens modal with required fields | @regression | ✅ (Request Information Form TC-01) |
-| FD-08 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (Request Information Form TC-02 — invalid email/phone → "Please correct the required field", no submit) |
-| FD-09 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (Request Information Form TC-03 — submission **skipped on prod** to avoid real leads) |
+| FD-07 | Request Information CTA opens modal with required fields | @regression | ✅ (`contactForms.spec.ts` "Floorplan Details — Request Information Form" TC-01) |
+| FD-08 | Request Information form rejects invalid values in required fields and blocks submission | @regression | ✅ (`contactForms.spec.ts` "Floorplan Details — Request Information Form" TC-01 — invalid email/phone → "Please correct the required field", no submit) |
+| FD-09 | Request Information form submits successfully with valid values (UI thank-you + contact-us API success, payload matches input) | @regression | ✅ (`contactForms.spec.ts` "Floorplan Details — Request Information Form" TC-01 — submission **skipped on prod** to avoid real leads) |
 
 ---
 
-## E6 — Contact form (site-wide) ⬜
+## E6 — Contact forms (site-wide) ✅
 
 > "Contact form submissions across the site."
 
-Likely a shared component appearing on multiple page types → a shared
-`ContactForm` POM consumed by the relevant page specs (or one dedicated spec
-that exercises each surface).
+All contact-form surfaces live in one spec, **`tests/contactForms.spec.ts`**. Two
+distinct form components are exercised:
+- The **standalone Contact Us page** form (`page-objects/contactUsPage.ts`) — the 5
+  "What are you interested in?" interest forms + the "Find your local information"
+  region dropdown + the "Send us a text message" modal.
+- The shared **"Request Information"** modal (`page-objects/requestInformationForm.ts`,
+  `RequestInformationForm`) reused by the QMI / Floorplan / Community detail pages
+  and the Region results card — each page object exposes a `requestInfo` instance
+  and only owns its page-specific CTA + `openRequestInformationModal()`.
 
-| ID | Test case | Tag |
-|----|-----------|-----|
-| CF-01 | Form renders with all fields on a community page | @smoke @form |
-| CF-02 | Required-field validation messages | @regression @form |
-| CF-03 | Successful submit → success modal/state (assert via `waitForApi`, not timeouts) | @regression @form |
-| CF-04 | Invalid email / phone formats rejected | @regression @form |
-| CF-05 | Form present + submittable on each surface (QMI details, floorplan details, etc.) | @regression @form |
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| CF-01 | Contact Us — 5 interest forms: fields exist + dropdown options logged | @form @smoke/@regression | ✅ (`Contact Us — Field & Dropdown Audit` TC-01..TC-05) |
+| CF-02 | Contact Us — required-field validation ("Required field") per interest | @form @regression | ✅ (TC-01..TC-05) |
+| CF-03 | Contact Us — invalid email/phone rejected ("Invalid format", `aria-invalid`) per interest | @form @regression | ✅ (TC-01..TC-05) |
+| CF-04 | Contact Us — fill + submit (success + `/api/contact-us/` 200; **dev submits, prod fill-only**) | @form @regression | ✅ (TC-01..TC-05) |
+| CF-05 | Contact Us — "Find your local information" "Select a State" dropdown lists all 13 regions **each exactly once (no duplicates)** | @form @regression | ✅ (`Local Information & Text Message` TC-01) — **fails on dev** (7 regions duplicated; surfaces the dev defect), passes prod |
+| CF-06 | Contact Us — select random region → "Or Send Us a Text Message" → "Send us a text message" modal: fields, required + invalid validation, fill + submit (dev) / fill-only (prod) | @form @regression | ✅ (`Local Information & Text Message` TC-02 — best-effort skip if a region has no local-info results) |
+| CF-07 | Request Information modal (shared) on **QMI** detail: fields, required + invalid validation, fill + submit + contact-us API (prod fill-only) | @form @regression | ✅ (`QMI Details — Request Information Form` TC-01) |
+| CF-08 | Request Information modal (shared) on **Floorplan** detail | @form @regression | ✅ (`Floorplan Details — Request Information Form` TC-01) |
+| CF-09 | Request Information modal (shared) on **Community** detail (header CTA) | @form @regression | ✅ (`Community Details — Request Information Form` TC-01) |
+| CF-10 | Request Information modal (shared) from the **Region** results first-community card | @form @regression | ✅ (`Region Page — Request Information Form` TC-01 — single react-aria click; best-effort skip if the remote form fetch is throttled) |
 
-**Notes:** use synthetic/non-PII test data in `test_data.json`. Capture the
-submit endpoint during Stage 3 for `verifyNetworkRequest()`. Tag form tests
-`@form` (per framework convention) before `@smoke`/`@regression`.
+**Notes:** synthetic/non-PII data (First "Test", Last "Automation", timestamped
+`test.automation+<ts>@ex2india.com`, phone `7325551234`) inline in the POMs.
+Submit endpoint is **`/api/contact-us/`** (asserted via `waitForApi`, status 200).
+**Never submitted on prod** — `isProdEnv()` fills the form but skips the submit
+click (no real lead); validation steps are client-side and run on every env. The
+non-prod submit awaits the Cloudflare **Turnstile** token (the text-message modal
+has its own token, so it polls the modal-scoped one). Tag order: `@form` before
+`@smoke`/`@regression`. **Known dev defect:** the "Find your local information"
+dropdown lists 7 regions twice on dev (CF-05 flags it).
 
 ---
 
@@ -234,7 +251,7 @@ submit endpoint during Stage 3 for `verifyNetworkRequest()`. Tag form tests
 1. **E1 SB-03** — search bar → community page (small, builds on existing HomePage). 
 2. **E3 Community page** — unlocks the most downstream pages (floorplan & QMI links originate here).
 3. **E4 / E5** — QMI & floorplan details (reached from E3).
-4. **E6 Contact form** — shared component, exercised across E3/E4/E5 surfaces.
+4. ~~**E6 Contact form** — shared component, exercised across E3/E4/E5 surfaces.~~ ✅ done (`contactForms.spec.ts`).
 5. ~~**E2 RG-03…RG-11** — maps/filters/sort (heaviest; map interactions need spike).~~ ✅ done (RG-05 pan via the tile-fetch signal; RG-07 scattered-lots deferred — confirmed data limitation).
 
 Rationale: navigation flows naturally Home → Region → Community → (Floorplan |
@@ -253,6 +270,7 @@ detail-page epics and the contact form.
   tiles. The only catch: the map renders below the fold, so a raw mouse-drag must
   scroll it into view first (Playwright's `click()` auto-scrolls, `mouse.move`
   does not). RG-04 and RG-05 are both full assertions.
-- Contact form **submit endpoint(s)** and whether prod submissions are safe to
-  fire (may need a non-prod env or a test-mode flag).
+- ~~Contact form **submit endpoint(s)** and whether prod submissions are safe to
+  fire.~~ **Resolved:** endpoint is `/api/contact-us/`; prod is **never** submitted
+  (fill-only via `isProdEnv()`), non-prod submit awaits the Cloudflare Turnstile token.
 - Which environment(s) to certify against. Env files now exist for `dev`/`uat`/`stage`/`prod` (`environment/{env}.env`), pointing to `www-dev`/`www-uat`/`www-stg`/`www` respectively. Community-page specs are pinned to a **prod**-only community (River Ranch Trails).

@@ -204,25 +204,19 @@ export class CommunityPage extends BasePage {
   }
 
   async openRequestInformationModal(): Promise<void> {
-    // The header CTA needs React hydration and the page renders a promo overlay
-    // that can intercept the click, so dismiss popups first, then click and WAIT
-    // for the modal — only re-click if it genuinely didn't open (mirrors the
-    // sales-team modal open pattern).
     await this.handlePagePopups();
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await this.scrollIntoView(this.requestInfoCta.first());
-      await this.click(
-        this.requestInfoCta.first(),
-        attempt === 1
-          ? "Request Information CTA"
-          : "Request Information CTA (retry)",
-      );
-      const opened = await this.requestInfo.modal
-        .waitFor({ state: "visible", timeout: 8000 })
-        .then(() => true)
-        .catch(() => false);
-      if (opened) return;
-      await this.handlePagePopups();
+    await this.scrollIntoView(this.requestInfoCta.first());
+    // The CTA is a react-aria pressable; under slowMo a plain Playwright click
+    // intermittently fails to fire the press, leaving the modal unmounted
+    // ("element(s) not found"). Dispatch the full pointer sequence atomically and
+    // retry until the modal container appears — never re-press once it is up (a
+    // second press would reset a loading spinner).
+    const cta = this.requestInfoCta.first();
+    let opened = false;
+    for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
+      opened = await this.isVisible(this.requestInfo.modal, 8000);
     }
     await Validator.requireVisible(
       this.requestInfo.modal,

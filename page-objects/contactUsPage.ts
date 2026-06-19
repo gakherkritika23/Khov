@@ -3,6 +3,7 @@ import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 import { reportValue } from "../utils/reporter";
 import { waitForApi } from "../utils/apiUtils";
+import { randomFirstName, randomLastName, randomPhone, randomEmail } from "../utils/testDataUtils";
 
 /**
  * The five "What are you interested in?" options on the Contact Us page. Each
@@ -336,52 +337,32 @@ export class ContactUsPage extends BasePage {
     interest: ContactInterest,
     overrides: { email?: string; phone?: string } = {},
   ): Promise<void> {
-    const email = overrides.email ?? `test.automation+${Date.now()}@ex2india.com`;
-    const phone = overrides.phone ?? "7325551234";
+    const firstName = randomFirstName();
+    const lastName = randomLastName();
+    const email = overrides.email ?? randomEmail();
+    const phone = overrides.phone ?? randomPhone();
+    console.log(`Filling Contact Us form [${interest}] — First Name: ${firstName} | Last Name: ${lastName} | Email: ${email} | Phone: ${phone}`);
     for (const field of this.fieldMap[interest]) {
       const locator = this.fieldLocator(field);
       if (field.kind === "checkbox") {
         await this.checkBox(locator, field.label);
+      } else if (field.name === "FirstName") {
+        await this.type(locator, firstName, field.label);
+      } else if (field.name === "LastName") {
+        await this.type(locator, lastName, field.label);
       } else if (field.name === "Email") {
         await this.type(locator, email, "Email");
       } else if (field.name === "Phone" || field.name === "OwnerPhone") {
         await this.type(locator, phone, field.label);
       } else if (field.kind === "select") {
-        await locator.selectOption(field.value ?? "", { force: true });
+        const value = field.value ?? "";
+        await locator.selectOption(value, { force: true });
+        console.log(`Selected dropdown [${field.label}]: ${value}`);
       } else {
         await this.type(locator, field.value ?? "Test", field.label);
       }
     }
-  }
-
-  // react-aria checkbox: a forced click doesn't flip state — focus + Space.
-  private async checkBox(input: Locator, name: string): Promise<void> {
-    if (await input.isChecked().catch(() => false)) return;
-    await input.focus();
-    await input.press("Space");
-    await expect(input, `${name} should be checked`).toBeChecked({ timeout: 5000 });
-  }
-
-  // Cloudflare Turnstile injects a token into a hidden input once it resolves;
-  // submitting before it's present silently fails. Wait for it (non-prod). When
-  // the text-message modal is open the page has TWO token inputs (main form +
-  // modal), so callers pass the modal-scoped token to poll the right one.
-  private async waitForTurnstileToken(
-    timeout = 20000,
-    token: Locator = this.turnstileToken,
-  ): Promise<void> {
-    await expect
-      .poll(
-        async () => (await token.inputValue().catch(() => "")).length,
-        { message: "Cloudflare Turnstile token should populate before submit", timeout },
-      )
-      .toBeGreaterThan(0);
-  }
-
-  private isProdEnv(): boolean {
-    const env = (process.env.TEST_ENV ?? "").toLowerCase();
-    const baseUrl = process.env.BASE_URL ?? "";
-    return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+    console.log(`Form fill complete for interest: ${interest}`);
   }
 
   /**
@@ -464,11 +445,15 @@ export class ContactUsPage extends BasePage {
   }
 
   async verifySubmissionSuccess(interest: ContactInterest): Promise<void> {
+    console.log(`Verifying submission success for interest: ${interest}`);
     await Validator.requireVisible(
       this.successMessage,
       `${interest} — success / thank-you panel should be displayed after submit`,
       20000,
     );
+    console.log(`SUCCESS — Thank you message displayed for: ${interest}`);
+    // Keep the success panel on screen for the demo audience.
+    await this.demoHold();
   }
 
   // ── Find your local information → Send us a text message ──────────────
@@ -584,15 +569,17 @@ export class ContactUsPage extends BasePage {
   private async fillTextMessageForm(
     overrides: { email?: string; phone?: string } = {},
   ): Promise<void> {
-    await this.type(this.tmFirstName, "Test", "First Name");
-    await this.type(this.tmLastName, "Automation", "Last Name");
-    await this.type(
-      this.tmEmail,
-      overrides.email ?? `test.automation+${Date.now()}@ex2india.com`,
-      "Email Address",
-    );
-    await this.type(this.tmMobile, overrides.phone ?? "7325551234", "Mobile Number");
+    const firstName = randomFirstName();
+    const lastName = randomLastName();
+    const email = overrides.email ?? randomEmail();
+    const phone = overrides.phone ?? randomPhone();
+    console.log(`Filling Send Us a Text Message form — First Name: ${firstName} | Last Name: ${lastName} | Email: ${email} | Phone: ${phone}`);
+    await this.type(this.tmFirstName, firstName, "First Name");
+    await this.type(this.tmLastName, lastName, "Last Name");
+    await this.type(this.tmEmail, email, "Email Address");
+    await this.type(this.tmMobile, phone, "Mobile Number");
     await this.checkBox(this.tmDisclaimer, "Text-message disclaimer");
+    console.log("Text message form fill complete");
   }
 
   // Required-field validation (client-side, safe on all envs): empty submit →
@@ -666,10 +653,14 @@ export class ContactUsPage extends BasePage {
   }
 
   async verifyTextMessageSubmissionSuccess(): Promise<void> {
+    console.log("Verifying Send Us a Text Message form submission success...");
     await Validator.requireVisible(
       this.successMessage,
       "Text-message form — success / thank-you panel should be displayed after submit",
       20000,
     );
+    console.log("SUCCESS — Thank you message displayed for text message form submission");
+    // Keep the success panel on screen for the demo audience.
+    await this.demoHold();
   }
 }

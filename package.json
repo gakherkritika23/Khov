@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.1",
+    "@reportportal/agent-js-playwright": "^5.4.1",
     "@types/node": "^25.2.0",
     "allure-commandline": "^2.37.0",
     "allure-js-commons": "^3.4.5",

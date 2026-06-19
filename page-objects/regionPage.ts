@@ -164,26 +164,43 @@ export class RegionPage extends BasePage {
 
   // Opens the first community card's Request Information modal and resolves to
   // whether the modal's FORM became visible. Returns `false` (rather than
-  // throwing) when the form never renders — on prod the card-triggered form is
-  // fetched remotely behind Cloudflare bot-protection, which can leave the modal
-  // on its loading spinner under automation; the caller decides how to treat
-  // that per environment.
+  // throwing) when the form never renders.
   async openRequestInformationModal(): Promise<boolean> {
+    // Reaching this page via the SPA search-navigation leaves the app in a state
+    // where the card CTA will NOT mount the modal — the click sets the modal
+    // deep-link on the URL but the modal component never renders (verified: the
+    // URL updates yet the modal element count stays 0). A FULL page load renders
+    // the modal from the CTA reliably, so reload the results page first to swap
+    // the SPA-nav state for a clean full-load state, then interact.
+    await this.page
+      .reload({ waitUntil: "domcontentloaded", timeout: 60000 })
+      .catch(() => {});
     await this.handlePagePopups();
     await this.scrollIntoView(this.firstCommunityCard.first());
-    // A SINGLE natural pointer click opens the modal — the CTA is a react-aria
-    // pressable, so a forced/synthetic click won't fire it. Never click twice:
-    // a second press resets the modal's loading spinner and stops the form from
-    // rendering.
-    await this.requestInfoCta
-      .first()
-      .click({ timeout: 15000 })
-      .catch(() => {});
-    console.log("Clicked on: Request Information CTA (first community card)");
-    // The form is fetched remotely, so allow generous time for it to render.
-    // Resolves to false (rather than throwing) if it never loads — e.g. the
-    // remote fetch is throttled by bot-protection — so the caller can skip.
-    return await this.requestInfo.modal
+    const cta = this.requestInfoCta.first();
+    await cta.waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
+
+    // The CTA is a react-aria pressable on an asynchronously-hydrated card. The
+    // full pointer sequence is dispatched in-page atomically (no slowMo gap for
+    // the card to detach into — more reliable than a Playwright click). Retry
+    // only while the modal CONTAINER has not appeared, and never re-press once it
+    // has: a second react-aria press resets the loading spinner so the form never
+    // renders. The 8s wait is generous enough that a slow-but-successful open is
+    // never re-pressed.
+    let opened = false;
+    for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(
+        `Clicked on: Request Information CTA (first community card) — attempt ${attempt}`,
+      );
+      opened = await this.isVisible(this.requestInfo.modal, 8000);
+    }
+    if (!opened) return false;
+
+    // Form-loaded gate: the first input renders only after the remote form fetch
+    // completes. Container/spinner being up is not enough. true → form usable;
+    // false → fetch never resolved (genuine remote block).
+    return await this.requestInfo.firstName
       .waitFor({ state: "visible", timeout: 40000 })
       .then(() => true)
       .catch(() => false);

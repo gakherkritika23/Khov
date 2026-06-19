@@ -64,7 +64,19 @@ npm run test:prod -- tests/homePage.spec.ts --project=Chrome
 TEST_ENV=stage npx playwright test tests/homePage.spec.ts --project=Chrome
 ```
 
-### Viewing Allure Reports
+### Viewing Reports
+
+**ReportPortal (primary).** Set `RP_API_KEY`, `RP_ENDPOINT`, `RP_PROJECT` in the
+active `environment/{TEST_ENV}.env`; the agent then reports each run live. Open
+the launches page printed at the end of the run (e.g. `http://localhost:8080`),
+or use the convenience script which opens it for you:
+
+```bash
+npm run test:report:dev    # runs the suite, then opens the RP launches page
+```
+
+**Allure (retired, kept as a transition fallback).** The reporter is commented
+out in `playwright.config.ts`; re-enable that line to use it, then:
 
 ```bash
 npx allure generate allure-results --clean
@@ -89,9 +101,11 @@ environment/    → dev.env / uat.env / stage.env / prod.env (per-env BASE_URL)
 
 > The community-page specs are pinned to a **prod**-only community (River Ranch Trails), so run them with `TEST_ENV=prod`.
 
-### Allure Integration
+### ReportPortal Integration
 
-`tests/baseTest.ts` extends Playwright's base test with Allure lifecycle hooks (environment properties, test descriptions, failure screenshots). All spec files must import `test` from `./baseTest` — importing directly from `@playwright/test` bypasses these hooks and produces incomplete Allure reports. `expect` is imported separately from `@playwright/test` since `baseTest.ts` does not re-export it:
+`tests/baseTest.ts` extends Playwright's base test with ReportPortal lifecycle hooks (per-test description, start/end markers, and on-failure screenshot + reason) via the agent's `ReportingApi`. Run/environment metadata (env, base URL, OS, Node) is attached at the **launch** level via the agent's `attributes` in `playwright.config.ts`. All spec files must import `test` from `./baseTest` — importing directly from `@playwright/test` bypasses these hooks. `expect` is imported separately from `@playwright/test` since `baseTest.ts` does not re-export it:
+
+**Step tree.** The agent's `includeTestSteps: true` is required for `test.step()` calls (every `Validator` assertion + `reportValue`) to appear in RP — without it the step tree is dropped entirely. Because the agent then reports ALL Playwright steps (incl. raw `pw:api`/`expect` lines exposing locators/methods, with no `detail: false` equivalent), the RP reporter is wrapped by `reporters/reportPortalReporter.ts`, which forwards only `test.step` + `hook` categories and drops `pw:api`/`expect`/`fixture`. This yields the clean, named-steps-only view (the Allure `detail: false` equivalent) and also suppresses the benign caught-timeout error logs from best-effort waits. The config points at the wrapper, not the agent package directly.
 
 ```typescript
 import { expect } from "@playwright/test";
@@ -126,5 +140,6 @@ Tests are tagged in their description string with `@smoke` or `@regression`. The
 
 - **List** — console output
 - **JUnit** — `results.xml` for CI integration
-- **Allure** — detailed HTML reports written to `allure-results/`
+- **ReportPortal** — primary report; agent pushes live to the RP server (enabled when `RP_API_KEY` is set)
+- **Allure** — retired; reporter commented out in `playwright.config.ts`, kept as a transition fallback
 - **HTML** — Playwright's built-in HTML report in `playwright-report/`
