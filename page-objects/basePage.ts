@@ -38,9 +38,18 @@ export class BasePage {
     console.log(`Clicked on: ${name ?? "element"}`);
   }
 
+  // Types character-by-character (not an instant fill) so the values are visibly
+  // entered into the form during the headed demo run.
   async type(locator: Locator, text: string, name?: string): Promise<void> {
     await this.waitForVisible(locator);
-    await locator.fill(text);
+    const current = await locator.inputValue().catch(() => "");
+    if (current === text) {
+      console.log(`Skipped (already filled): ${name ?? "input"} → ${text}`);
+      return;
+    }
+    await locator.click();
+    await locator.fill("");
+    await locator.pressSequentially(text, { delay: 50 });
     console.log(`Typed in: ${name ?? "input"} → ${text}`);
   }
 
@@ -69,6 +78,50 @@ export class BasePage {
     console.log(`Clicked (script) on: ${name ?? "element"}`);
   }
 
+  // Fires a complete pointer-press sequence (pointerdown → pointerup → click) on
+  // the element synchronously in the page, centred on it so react-aria's
+  // "released over target" check passes. Unlike a Playwright click there is no
+  // inter-event delay for slowMo to stretch (which lets a re-rendering element
+  // detach mid-press), and unlike a bare `el.click()` it gives react-aria's
+  // usePress the pointer events it listens for. Use for react-aria pressables
+  // (e.g. the Request Information modal CTAs) that a normal click intermittently
+  // fails to trigger under slowMo.
+  protected async pressAtomically(locator: Locator): Promise<void> {
+    await locator
+      .first()
+      .evaluate((el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        const base: PointerEventInit = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+          button: 0,
+          clientX: x,
+          clientY: y,
+          view: window,
+        };
+        el.dispatchEvent(new PointerEvent("pointerdown", { ...base, buttons: 1 }));
+        el.dispatchEvent(new PointerEvent("pointerup", { ...base, buttons: 0 }));
+        el.dispatchEvent(
+          new MouseEvent("click", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            button: 0,
+            clientX: x,
+            clientY: y,
+            view: window,
+          }),
+        );
+      })
+      .catch(() => {});
+  }
+
   /* ================= WAITS ================= */
   async waitForVisible(locator: Locator, timeout = 5000): Promise<void> {
     await expect(locator).toBeVisible({ timeout });
@@ -83,6 +136,12 @@ export class BasePage {
   }
 
   /* ================= UTILITIES ================= */
+  // Holds the current screen briefly so the demo audience can read it (e.g. the
+  // success / thank-you panel before the test tears down).
+  async demoHold(ms = 4000): Promise<void> {
+    await this.page.waitForTimeout(ms);
+  }
+
   // Best-effort: pages lazy-render, so the target can detach mid-scroll. Retry
   // (re-resolving the locator) and don't throw — callers follow with an
   // auto-waiting assertion/action.
@@ -115,10 +174,61 @@ export class BasePage {
     return locator.isEnabled();
   }
 
+  /* ================= FORM HELPERS ================= */
+  // react-aria visually-hidden checkboxes: a forced click doesn't flip component
+  // state — focus the input and press Space the way react-aria expects.
+  protected async checkBox(input: Locator, name: string): Promise<void> {
+    if (await input.isChecked().catch(() => false)) {
+      console.log(`Checkbox already checked: ${name}`);
+      return;
+    }
+    await input.focus();
+    await input.press("Space");
+    await expect(input, `${name} checkbox should be checked`).toBeChecked({ timeout: 5000 });
+    console.log(`Checked: ${name}`);
+  }
+
+  // The contact forms are gated by Cloudflare Turnstile. The widget injects a
+  // token into a hidden input once it resolves; submitting before the token is
+  // present silently fails. When a modal is open alongside the main form, pass
+  // the modal-scoped locator so we poll the right input.
+  protected async waitForTurnstileToken(
+    timeout = 15000,
+    token?: Locator,
+  ): Promise<void> {
+    console.log("Waiting for Cloudflare Turnstile security token...");
+    const t = token ?? this.page.locator("input[name='cf-turnstile-response']").first();
+    await expect
+      .poll(
+        async () => (await t.inputValue().catch(() => "")).length,
+        { message: "Cloudflare Turnstile token should be populated before submit", timeout },
+      )
+      .toBeGreaterThan(0);
+    console.log("Turnstile token received — form is ready to submit");
+  }
+
+  // Production is the live www.khov.com domain (env subdomains: www-dev /
+  // www-uat / www-stg). Both TEST_ENV=prod and that URL pattern count as prod.
+  protected isProdEnv(): boolean {
+    const env = (process.env.TEST_ENV ?? "").toLowerCase();
+    const baseUrl = process.env.BASE_URL ?? "";
+    return env === "prod" || /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
+  }
+
+  // Resolves a relative path against BASE_URL so POMs can store either form
+  // and always navigate correctly.
+  protected resolveUrl(url: string): string {
+    if (/^https?:\/\//i.test(url)) return url;
+    return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
+  }
+
   /* ================= POPUP HANDLERS ================= */
   async handlePagePopups(timeout = 8000): Promise<void> {
     await this.handleConsentPopup(timeout);
-    await this.handleOneTrustPopup(timeout);
+    // Use the OneTrust probe's own short default — do NOT pass the consent
+    // timeout, which made this wait the full 8s for a OneTrust banner that
+    // never appears.
+    await this.handleOneTrustPopup();
   }
 
   async handleConsentPopup(timeout = 8000): Promise<void> {
@@ -128,6 +238,12 @@ export class BasePage {
       if (!(await this.isConsentPopupVisible())) {
         return;
       }
+    } else if (!(await this.isConsentPopupVisible())) {
+      // No consent banner on the page — return immediately instead of polling
+      // out the full timeout. This handler runs on every navigation and every
+      // modal-open, so spinning ~8s here each time (with nothing to dismiss) was
+      // the bulk of the long pause before the Request Information tap.
+      return;
     }
 
     const consentButtons = [
@@ -161,7 +277,7 @@ export class BasePage {
     }
   }
 
-  async handleOneTrustPopup(timeout = 3000): Promise<void> {
+  async handleOneTrustPopup(timeout = 1500): Promise<void> {
     const acceptButton = this.page.locator("#onetrust-accept-btn-handler").first();
 
     if (await this.isVisible(acceptButton, timeout)) {

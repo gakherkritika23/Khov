@@ -2,6 +2,7 @@ import { Page, Locator, Response, expect } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
 import { waitForApi } from "../utils/apiUtils";
+import { randomFirstName, randomLastName, randomPhone, randomEmail } from "../utils/testDataUtils";
 
 export interface RequestInformationFormData {
   firstName: string;
@@ -11,14 +12,15 @@ export interface RequestInformationFormData {
   preferredContactMethod?: "Text" | "Email" | "Phone";
 }
 
-// Sensible defaults for a successful submission; callers may override per test.
-const DEFAULT_REQUEST_INFORMATION_DATA: RequestInformationFormData = {
-  firstName: "Test",
-  lastName: "Automation",
-  email: `test.automation+${Date.now()}@ex2india.com`,
-  phone: "7325551234",
-  preferredContactMethod: "Email",
-};
+function generateDefaultData(): RequestInformationFormData {
+  return {
+    firstName: randomFirstName(),
+    lastName: randomLastName(),
+    email: randomEmail(),
+    phone: randomPhone(),
+    preferredContactMethod: "Email",
+  };
+}
 
 /**
  * Shared "Request Information" contact form. The same modal component is reused
@@ -32,6 +34,10 @@ const DEFAULT_REQUEST_INFORMATION_DATA: RequestInformationFormData = {
  * page-specific section.
  */
 export class RequestInformationForm extends BasePage {
+  // Tracks the data used in the most recent fill() so verifyApiSubmission()
+  // can assert the POST payload without callers having to thread it through.
+  private _lastFilledData: RequestInformationFormData = generateDefaultData();
+
   readonly modal: Locator;
   readonly modalHeading: Locator;
   readonly firstName: Locator;
@@ -208,6 +214,7 @@ export class RequestInformationForm extends BasePage {
   }
 
   async verifySubmissionSuccess(): Promise<void> {
+    console.log("Verifying form submission success...");
     await Validator.requireVisible(
       this.successMessage,
       "Request Information thank-you / success message should be displayed after submission",
@@ -219,6 +226,9 @@ export class RequestInformationForm extends BasePage {
       "URL should reflect the success modal after a successful submission",
       15000,
     );
+    console.log("SUCCESS — Thank you message displayed and URL reflects successful submission");
+    // Keep the success panel on screen for the demo audience.
+    await this.demoHold();
   }
 
   // Asserts the contact-us API confirmed the submission AND that the payload it
@@ -226,8 +236,10 @@ export class RequestInformationForm extends BasePage {
   // method) — i.e. the form posted what we filled, not stale/wrong values.
   async verifyApiSubmission(
     response: Response,
-    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
+    data?: RequestInformationFormData,
   ): Promise<void> {
+    const d = data ?? this._lastFilledData;
+    console.log(`Verifying API submission — expected payload: First Name: ${d.firstName} | Last Name: ${d.lastName} | Email: ${d.email} | Phone: ${d.phone}`);
     expect(response.status(), "contact-us API should return HTTP 200").toBe(200);
 
     const body = (await response.json()) as { status?: string; data?: string };
@@ -247,42 +259,43 @@ export class RequestInformationForm extends BasePage {
     expect(
       payload.FirstName,
       "Submitted First Name should match the entered value",
-    ).toBe(data.firstName);
+    ).toBe(d.firstName);
     expect(
       payload.LastName,
       "Submitted Last Name should match the entered value",
-    ).toBe(data.lastName);
+    ).toBe(d.lastName);
     expect(payload.Email, "Submitted Email should match the entered value").toBe(
-      data.email,
+      d.email,
     );
     expect(payload.Phone, "Submitted Phone should match the entered value").toBe(
-      data.phone,
+      d.phone,
     );
-    if (data.preferredContactMethod) {
+    if (d.preferredContactMethod) {
       expect(
         payload.PreferredContactMethod,
         "Submitted Preferred Contact Method should match the selected value",
-      ).toBe(data.preferredContactMethod);
+      ).toBe(d.preferredContactMethod);
     }
+    console.log("API verification PASSED — submitted payload matches entered form data");
   }
 
   // ── Actions ────────────────────────────────────────────
   // Fills the required text fields, picks a preferred contact method, and ticks
   // the two required disclaimer checkboxes so the form is ready to submit.
-  async fill(
-    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
-  ): Promise<void> {
-    await this.type(this.firstName, data.firstName, "First Name");
-    await this.type(this.lastName, data.lastName, "Last Name");
-    await this.type(this.email, data.email, "Email Address");
-    await this.type(this.phone, data.phone, "Mobile Number");
+  async fill(data?: RequestInformationFormData): Promise<void> {
+    const d = data ?? generateDefaultData();
+    this._lastFilledData = d;
+    console.log(`Filling Request Information form — First Name: ${d.firstName} | Last Name: ${d.lastName} | Email: ${d.email} | Phone: ${d.phone} | Contact Method: ${d.preferredContactMethod ?? "not set"}`);
+    await this.type(this.firstName, d.firstName, "First Name");
+    await this.type(this.lastName, d.lastName, "Last Name");
+    await this.type(this.email, d.email, "Email Address");
+    await this.type(this.phone, d.phone, "Mobile Number");
 
-    if (data.preferredContactMethod) {
-      // The select is visually hidden (a styled button mirrors it), so bypass
-      // the visibility actionability check.
-      await this.contactMethod.selectOption(data.preferredContactMethod, {
+    if (d.preferredContactMethod) {
+      await this.contactMethod.selectOption(d.preferredContactMethod, {
         force: true,
       });
+      console.log(`Selected preferred contact method: ${d.preferredContactMethod}`);
     }
 
     // Both disclaimers are required to submit.
@@ -296,14 +309,13 @@ export class RequestInformationForm extends BasePage {
   // `null` when submission was skipped on prod.
   async submit(
     apiEndpoint: string,
-    data: RequestInformationFormData = DEFAULT_REQUEST_INFORMATION_DATA,
+    data?: RequestInformationFormData,
   ): Promise<Response | null> {
     await this.fill(data);
 
     if (this.isProdEnv()) {
       console.warn(
-        "Skipping Request Information form submission on prod to avoid " +
-          "creating a real lead (form was filled but not submitted).",
+        "PROD environment detected — form filled but NOT submitted (no real lead created).",
       );
       return null;
     }
@@ -319,43 +331,6 @@ export class RequestInformationForm extends BasePage {
   }
 
   // ── Private helpers ────────────────────────────────────
-  // The disclaimer checkboxes are visually-hidden inputs driven by react-aria;
-  // a forced click on the input doesn't flip the component state, so toggle them
-  // the way react-aria expects — focus the input and press Space.
-  private async checkBox(input: Locator, name: string): Promise<void> {
-    if (await input.isChecked().catch(() => false)) {
-      return;
-    }
-
-    await input.focus();
-    await input.press("Space");
-    await expect(input, `${name} checkbox should be checked`).toBeChecked({
-      timeout: 5000,
-    });
-  }
-
-  // The contact form is gated by a Cloudflare Turnstile widget that injects a
-  // token into a hidden input once it resolves; submitting before the token is
-  // present silently fails. Wait for it (best-effort) before clicking submit.
-  private async waitForTurnstileToken(timeout = 15000): Promise<void> {
-    const tokenInput = this.page.locator("input[name='cf-turnstile-response']");
-    await expect
-      .poll(async () => (await tokenInput.inputValue().catch(() => "")).length, {
-        message: "Cloudflare Turnstile token should be populated before submit",
-        timeout,
-      })
-      .toBeGreaterThan(0);
-  }
-
-  // Production is the live www.khov.com domain (env subdomains are www-dev /
-  // www-uat / www-stg). We treat TEST_ENV=prod or that domain as "prod".
-  private isProdEnv(): boolean {
-    const env = (process.env.TEST_ENV ?? "").toLowerCase();
-    const baseUrl = process.env.BASE_URL ?? "";
-    const isProdUrl = /^https?:\/\/(www\.)?khov\.com/i.test(baseUrl);
-    return env === "prod" || isProdUrl;
-  }
-
   private requestField(name: RegExp): Locator {
     return this.modal
       .getByPlaceholder(name)

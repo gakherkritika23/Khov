@@ -294,7 +294,16 @@ export class PlanDetailPage extends BasePage {
     async openRequestInformationModal(): Promise<void> {
         await this.handlePagePopups();
         await this.scrollIntoView(this.requestInfoCta.first());
-        await this.click(this.requestInfoCta.first(), "Request Information CTA");
+        // The CTA is a react-aria pressable; under slowMo a plain click intermittently
+        // fails to fire the press, leaving the modal unmounted. Dispatch the full
+        // pointer sequence atomically and retry until the modal appears — never
+        // re-press once it is up (a second press would reset a loading spinner).
+        const cta = this.requestInfoCta.first();
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await this.pressAtomically(cta);
+            console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
+            if (await this.isVisible(this.requestInfo.modal, 8000)) break;
+        }
     }
 
     // ── Data Getters ───────────────────────────────────────
@@ -306,14 +315,6 @@ export class PlanDetailPage extends BasePage {
         return await this.getText(this.startingPriceValue);
     }
 
-    // ── Helpers ────────────────────────────────────────────
-    private resolveUrl(url: string): string {
-        if (/^https?:\/\//i.test(url)) {
-            return url;
-        }
-
-        return new URL(url, process.env.BASE_URL ?? "https://www.khov.com/").href;
-    }
 
     // Scrolls through the gallery modal and counts the distinct, non-placeholder
     // image sources that become visible — used to prove the gallery is navigable.
