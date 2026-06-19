@@ -23,15 +23,16 @@ search is React-hydration sensitive) and gates on a real ready signal —
 Communities" heading **+ a rendered result card** (the rail actually populated, not
 just the heading). This removes the per-test entry flakiness without test-level retries.
 
-- **Community Results**: `enterRegion` with **"Texas"** → state region
-  `/new-construction-homes/texas/` (only clicks the first community card, so the heavy
-  state rail is fine here).
-- **Map** & **Filters & Sort**: `enterRegion` with **"Dallas"** → the **city** results
-  `/new-construction-homes/texas/dallas-tx/`. Both are pinned to the **city** view: the
-  state view clusters communities into **"N cities"** pills (Map needs individual
-  markers for RG-06), and the ~47-community state rail is heavy enough that the
-  multi-step filter/sort/CTA interactions stall on a degraded dev — the lighter city
-  rail behaves reliably.
+All three describes use `enterRegion` with **"Dallas"** → the **city** market-results
+page `/new-construction-homes/texas/dallas-tx/`:
+- **Map** is pinned to the city view because the state view clusters communities into
+  **"N cities"** pills, whereas a city view renders individual markers (RG-06 needs them).
+- **Filters & Sort** and **Community Results** use the city view because the
+  ~47-community Texas **state** rail is heavy enough to stall the interactions on a
+  degraded dev; the lighter city rail behaves reliably (same rail component either way).
+
+_Coverage note:_ the state-level region page + the state-suggestion search (SB-01) are
+no longer exercised as a result — see `test-plan.md` SB-01.
 
 The cookie/consent banner is dismissed by `BasePage.navigate` / `handlePagePopups` /
 `dismissCookieBanner` on first navigation (best-effort).
@@ -75,12 +76,13 @@ plain English rather than locator code.
 
 ## Block 1 — Community Results
 
-### TC-01 | Selecting 'Texas' then the first community opens its detail page  `@regression`
+### TC-01 | First community card opens its community detail page  `@regression`
+_(Dallas city market-results page — same rail component as the state region page.)_
 | # | Verification | How |
 |---|--------------|-----|
-| 1 | Search → region page | Type "Texas", await `/api/search`, click the "Texas" suggestion; URL contains `/new-construction-homes/texas/` |
+| 1 | Reach the results page | `enterRegion` (search "Dallas", await `/api/search`, select the suggestion, retry-on-flake); URL contains `/new-construction-homes/texas/dallas-tx/` |
 | 2 | **"New Home Communities" section** shown | VISIBLE — section heading |
-| 3 | **First community name** captured | Read from the first community card; **logged** |
+| 3 | **First community name** captured | Read from the first community card's `data-card-element`; **logged** |
 | 4 | **First community card opens its detail page** | Click the card's zero-size "stretched link" via a DOM click (`clickViaScript`; the card list re-renders as the map loads); lands on a community detail URL (`new-construction-homes/texas/[^/]+/[^/]+`) with a level-1 heading naming that community; heading **logged** |
 
 ---

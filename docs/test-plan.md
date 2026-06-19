@@ -52,7 +52,7 @@ Done as part of the first two specs:
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| SB-01 | Search a state/region term → select region suggestion → land on region page | @smoke | ✅ (`regionPage.spec.ts` TC-01 covers the region-suggestion path) |
+| SB-01 | Search a state/region term → select region suggestion → land on region page | @smoke | ⬜ — previously covered by `regionPage.spec.ts` TC-01, which now uses the lighter **Dallas city** market view (for dev stability), so the **state-level** region-suggestion path is no longer exercised. Add a lightweight state-search check to `homePage.spec.ts` if that coverage is needed. |
 | SB-02 | Search a market/city term → select suggestion → land on results page | @smoke | ✅ (`homePage.spec.ts` TC-01 — Texas → Dallas) |
 | SB-03 | Search a **community name** → select community suggestion → land directly on that **community page** | @smoke | ✅ (`homePage.spec.ts` TC-02 — "River Ranch Trails") |
 | SB-04 | Suggestion list groups/renders for partial input (markets, counties, communities) | @regression | ⬜ |
@@ -77,7 +77,7 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
+| RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01 — on the Dallas city market-results page, same rail component as the state view) |
 | RG-02 | Click first community card → navigate to its community detail page | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
 | RG-03 | Map loads (markers present) | @smoke | ✅ (`regionPage.spec.ts` "Map" TC-01 — Google Maps `gmp-advanced-marker` pins) |
 | RG-04 | Map zoom in/out controls | @regression | ✅ (`regionPage.spec.ts` "Map" TC-02 — both controls present; "Zoom in" fetches fresh tiles / moves the camera (asserted); "Zoom out" operates the control + map stays healthy (tile delta best-effort — a reversing zoom often serves cached tiles)) |

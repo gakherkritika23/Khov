@@ -71,17 +71,17 @@ test.describe("Region Page — Community Results", () => {
     await enterRegion(
       homePage,
       regionPage,
-      testData.region.term,
-      testData.region.suggestion,
-      constants.region.texas_url,
+      testData.region_request_info.term,
+      testData.region_request_info.suggestion,
+      constants.home_search.dallas_results_url,
     );
   });
 
-  test("TC-01 | Selecting 'Texas' suggestion then the first community opens its detail page @regression", async () => {
-    await regionPage.verifyOnRegionPage(constants.region.texas_url);
+  test("TC-01 | First community card opens its community detail page @regression", async () => {
+    await regionPage.verifyOnRegionPage(constants.home_search.dallas_results_url);
     await regionPage.verifyCommunitiesSectionIsDisplayed();
 
-    const firstCommunity = await regionPage.getFirstCommunityName();
+    const firstCommunity = await regionPage.getFirstCommunityCardName();
     await reportValue(`First community: ${firstCommunity}`);
 
     await regionPage.clickFirstCommunity();
