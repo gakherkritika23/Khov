@@ -16,14 +16,22 @@ e.g. `/new-construction-homes/texas/`) automated tests verify today. Source file
 ## How the page is reached
 Every test reaches the page through the **hero search**, not a direct URL — a cold
 direct navigation to a state/market URL loads an essentially empty page (the results
-rail + map populate only via the search-driven flow):
-- **Community Results** & **Filters & Sort**: `navigate(home)` → type **"Texas"** →
-  wait for `/api/search` → click the **"Texas"** suggestion → region page
-  `/new-construction-homes/texas/`.
-- **Map**: same flow with **"Dallas"** → the **city** results
-  `/new-construction-homes/texas/dallas-tx/`. The map is pinned to a **city** view on
-  purpose: a state view clusters communities into **"N cities"** pills, whereas a city
-  view renders **individual community markers** (which RG-06 needs).
+rail + map populate only via the search-driven flow). Entry goes through a robust
+helper, `enterRegion()`, which **retries the whole navigation in-code** (the hero
+search is React-hydration sensitive) and gates on a real ready signal —
+`RegionPage.waitForRegionReady()` waits for the correct URL + the "New Home
+Communities" heading **+ a rendered result card** (the rail actually populated, not
+just the heading). This removes the per-test entry flakiness without test-level retries.
+
+- **Community Results**: `enterRegion` with **"Texas"** → state region
+  `/new-construction-homes/texas/` (only clicks the first community card, so the heavy
+  state rail is fine here).
+- **Map** & **Filters & Sort**: `enterRegion` with **"Dallas"** → the **city** results
+  `/new-construction-homes/texas/dallas-tx/`. Both are pinned to the **city** view: the
+  state view clusters communities into **"N cities"** pills (Map needs individual
+  markers for RG-06), and the ~47-community state rail is heavy enough that the
+  multi-step filter/sort/CTA interactions stall on a degraded dev — the lighter city
+  rail behaves reliably.
 
 The cookie/consent banner is dismissed by `BasePage.navigate` / `handlePagePopups` /
 `dismissCookieBanner` on first navigation (best-effort).
@@ -129,7 +137,7 @@ plain English rather than locator code.
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | First community name captured | From the card's `data-card-element`; **logged** |
-| 2 | **"Learn More" opens the detail page** | Click the card's visible **"Learn More"** link (distinct from the zero-size stretched link) → lands on that community's detail page (URL pattern + level-1 heading matches the name); heading **logged** |
+| 2 | **"Learn More" opens the detail page** | DOM-click the card's **"Learn More"** link (`clickViaScript` — the card re-renders as the rail streams in, leaving the link attached-but-not-"visible", which hangs a normal click) → lands on that community's detail page (URL pattern + level-1 heading matches the name); heading **logged** |
 
 ---
 

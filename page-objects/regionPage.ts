@@ -114,7 +114,21 @@ export class RegionPage extends BasePage {
   // ── New Home Communities — Actions ─────────────────────
   async navigateToRegion(url: string): Promise<void> {
     await this.navigate(url);
-    await this.page.waitForLoadState("load");
+    // Cap the load wait: the region page is heavy (map + video + many cards) and
+    // its "load" event can be very slow or never settle — proceed and let the
+    // ready-signal/assertion auto-waits gate readiness instead of hanging here.
+    await this.page.waitForLoadState("load", { timeout: 15000 }).catch(() => {});
+  }
+
+  // Confirms the region results page is genuinely ready: correct URL, the
+  // "New Home Communities" section visible, AND at least one result card rendered
+  // (the rail data populated — the heading can appear before the rail does). Uses
+  // raw waits (not Validator) so a failed attempt doesn't emit failed report
+  // steps when the caller retries the entry.
+  async waitForRegionReady(expectedUrlPart: string): Promise<void> {
+    await this.page.waitForURL(new RegExp(expectedUrlPart), { timeout: 20000 });
+    await this.communitiesHeading.waitFor({ state: "visible", timeout: 25000 });
+    await this.communityCards.first().waitFor({ state: "visible", timeout: 25000 });
   }
 
   // ── New Home Communities — Verification ────────────────
@@ -344,7 +358,12 @@ export class RegionPage extends BasePage {
   // ── Navigate via card CTA (RG-11) — Actions ────────────
   async clickFirstCommunityLearnMore(): Promise<void> {
     await this.scrollIntoView(this.firstCommunityCard.first());
-    await this.click(
+    // The card re-renders as the heavy rail/map stream in, which can leave the
+    // "Learn More" link attached-but-not-"visible" — a normal click then retries
+    // its visibility check until the test times out. A DOM click (re-resolving
+    // the locator, no actionability wait) navigates reliably — same approach as
+    // the stretched-link first-community click.
+    await this.clickViaScript(
       this.firstCommunityLearnMore,
       "Learn More (first community card)",
     );

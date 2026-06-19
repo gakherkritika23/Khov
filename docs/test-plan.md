@@ -93,7 +93,12 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 restores). Result-count reads poll until the streaming "N results" settles.
 Markers are Google `gmp-advanced-marker`s; individual community pins carry
 `data-marker-id="community:<id>"` and only appear at a **city** view (state views
-cluster them), so the Map block is pinned to the Dallas city results.
+cluster them) — so the **Map and Filters & Sort blocks are pinned to the Dallas
+city view** (the ~47-community Texas state rail is too heavy for the multi-step
+filter/sort/CTA interactions on a degraded dev). Entry goes through a retrying
+`enterRegion()` helper that gates on a ready signal (heading + a result card);
+the "Learn More" CTA is DOM-clicked (`clickViaScript`) since the streaming rail
+leaves it attached-but-not-visible.
 
 ---
 
