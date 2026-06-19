@@ -6,6 +6,19 @@ import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
+// Run the region spec WITHOUT the framework's demo pacing (config `slowMo: 200`).
+// The map tests assert precise Google-Maps gestures (zoom/pan) and tile-fetch
+// timing + marker actionability; slowMo injects mid-gesture delays that break
+// those (zoom-out fetched 0 tiles; the marker click hung). These are functional
+// tests, not a visual demo, so they don't need pacing — this restores the
+// conditions under which they were certified green. (args mirror the config.)
+test.use({
+  launchOptions: {
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],
+    slowMo: 0,
+  },
+});
+
 // Multi-page journey (home → region → community detail) on a heavy site; raise
 // the timeout at the describe level so it covers the beforeEach navigation too.
 test.describe.configure({ timeout: 90000 });
