@@ -79,28 +79,22 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 |----|-----------|-----|--------|
 | RG-01 | Region page loads with "New Home Communities" section + results count | @smoke | ✅ (`regionPage.spec.ts` "Community Results" TC-01 — the Texas **state** region page) |
 | RG-02 | Click first community card → navigate to its community detail page | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-01) |
+| RG-02b | Card metadata (name/location/home-type/price non-empty) + image HTTP 200 | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-02 — first 5 of 42 Texas cards; see Item B) |
+| RG-02c | "N results" count matches rendered card count | @regression | ✅ (`regionPage.spec.ts` "Community Results" TC-02 — 42 = 42; no pagination, all load at once; see Item D) |
 | RG-03 | Map loads (markers present) | @smoke | ✅ (`regionPage.spec.ts` "Map" TC-01 — Google Maps `gmp-advanced-marker` pins) |
-| RG-04 | Map zoom in/out controls | @regression | ✅ (`regionPage.spec.ts` "Map" TC-02 — both controls present; "Zoom in" fetches fresh tiles / moves the camera (asserted); "Zoom out" operates the control + map stays healthy (tile delta best-effort — a reversing zoom often serves cached tiles)) |
-| RG-05 | Map pan behavior | @regression | ✅ (`regionPage.spec.ts` "Map" TC-03 — a drag-pan fetches fresh map tiles for the new viewport). The map is draggable (open-hand cursor); it renders **below the fold**, so it's scrolled into the viewport before the raw mouse-drag (Playwright's auto-scrolling `click()` masks this; `mouse.move` uses absolute coords and won't reach an off-screen map). Verified by the tile-fetch signal (~35 tiles), with a small retry for map-settle timing. |
-| RG-06 | Marker selection highlights the matching community card | @regression | ✅ (`regionPage.spec.ts` "Map" TC-04 — clicking a community pin adds `rail_selected` to the matching rail card; pinned to a **city** view so pins aren't clustered into "N cities" pills) |
-| RG-07 | Scattered-lots rendering on the map | @regression | ⬜ deferred — **data limitation, confirmed by an exhaustive prod sweep of all 13 states** (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV): no state surfaces scattered lots — map markers are only `community:<id>` pins (+ "N cities" cluster pills; even well-populated FL/OH/SC/NJ showed no other type), and "scatter"/"scattered" appears in **no** rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. The `/api/search` model is Market/County/City/Community pages only, and the live filter set is Price + Bed & Baths only (no Home/Community-Type filter). Blocked on data/feature existence, not framework capability (like QD-05/QD-08). Re-evaluate if/when a scattered-lot product is launched; needs product/content to name a market if one exists outside the public site. |
-| RG-08 | Community filters (Price Range …) update results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — a max-price filter reduces the "N results" count). **Note:** the live filter set (dev + prod) is currently only **Price Range** + **Bed & Baths** — the broader "Home Availability / Home Type / Community Type" filters in the original requirement are not present in the UI today. |
-| RG-09 | "Clear all" clears filters | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — "Clear all" restores the result count; the in-dialog control is "Clear all", not "Reset All") |
-| RG-10 | Community Sort ("Sort by: Featured" → other options) reorders results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-02 — "Price - Low to High" changes the first card) |
-| RG-11 | Navigate to community via CTA ("Learn More") as well as the card | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-03 — the card's visible "Learn More" link) |
+| RG-04 | Map zoom in/out controls + "Reset map" | @regression | ✅ (`regionPage.spec.ts` "Map" TC-02 — both zoom controls present; "Zoom in" fetches fresh tiles (asserted); "Zoom out" operates + map healthy (best-effort tile signal); **"Reset map"** (`button[class*='map_reset-map']`) visible + clickable + map remains healthy with markers (see Item C)) |
+| RG-05 | Map pan behavior | @regression | ✅ (`regionPage.spec.ts` "Map" TC-03 — drag-pan fetches fresh tiles; map scrolled into view first; tile-fetch signal ~35 requests; 3× retry) |
+| RG-06 | Marker selection highlights the matching community card | @regression | ✅ (`regionPage.spec.ts` "Map" TC-04 — clicking a community pin adds `rail_selected` to the matching rail card; name verified via `data-card-element`). **Card→marker direction**: NOT implemented in the UI (clicking a rail card does not highlight its marker — interaction is one-way only) |
+| RG-07 | Scattered-lots rendering on the map | @regression | ⬜ deferred — **data limitation confirmed.** Exhaustive prod sweep of all 13 states found only `community:<id>` pins. Re-evaluate when a scattered-lot product exists. |
+| RG-08 | Community filters (Price Range + Bed & Baths) update results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — max-price filter reduces count; **per-result price ≤ max** validated on every visible card (Item A); Bed & Baths "3+" dialog interaction + restore (Item A). Live filter set: Price Range + Bed & Baths only — broader filters not in UI) |
+| RG-09 | "Clear all" clears filters and restores results | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-01 — "Clear all" restores count for both Price and Beds filters) |
+| RG-10 | Community Sort reorders results with correct price order | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-02 — **"Price - Low to High"** (non-decreasing price ordinals, tolerance 1/8); **"Price - High to Low"** (non-increasing); **"Featured"** (count ≥ baseline). Sort is client-side. All 5 options: Featured / Price Low→High / Price High→Low / A-Z / Z-A) |
+| RG-11 | Navigate to community via "Learn More" CTA | @regression | ✅ (`regionPage.spec.ts` "Filters & Sort" TC-03 — DOM-click the card's "Learn More" link → community detail URL + heading) |
 
-**Notes:** RG-08/RG-09 are covered by one test (filter reduces → "Clear all"
-restores). Result-count reads poll until the streaming "N results" settles.
-Markers are Google `gmp-advanced-marker`s; individual community pins carry
-`data-marker-id="community:<id>"` and only appear at a **city** view (state views
-cluster them). **Coverage split for both state & city:** Community Results uses the
-**Texas state** view (covers SB-01 + the state region page; it's light — loads +
-one card click); the **Map and Filters & Sort** blocks use the **Dallas city** view
-(Map needs individual markers for RG-06; the ~47-community state rail is too heavy
-for the multi-step filter/sort/CTA interactions on a degraded dev). Entry goes
-through a retrying `enterRegion()` helper that gates on a ready signal (heading + a
-result card); the "Learn More" CTA is DOM-clicked (`clickViaScript`) since the
-streaming rail leaves it attached-but-not-visible.
+**Notes:** RG-08/09/10 are all in the Dallas **city** view (lighter rail).
+Community Results TC-01/02 use the **Texas state** view (42 communities, SB-01 coverage).
+All entry via retrying `enterRegion()` (heading + first card ready-signal). `retries: 0` — every test passes first-go.
+Breadcrumbs and pagination are not present on the region page (confirmed by spike).
 
 ---
 
