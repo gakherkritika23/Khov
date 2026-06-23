@@ -121,20 +121,26 @@ _(Texas state region page — covers SB-01 + the state-level page.)_
 
 ---
 
-## Block 3 — Filters & Sort  _(Texas region)_
+## Block 3 — Filters & Sort  _(Dallas city view)_
 
 ### TC-01 | Price filter reduces the results and 'Clear all' restores them  `@regression`
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | **Baseline result count** | Read "N results" (`[class*='rail_results']`), polled until stable; **logged** |
 | 2 | **Filter reduces results** | Open the **"Price Range"** filter (`[role='dialog'][aria-label='Price Range']`), set **Maximum = 300000**, click **"Apply filters"**, await `/api/search` → result count is lower than baseline; **logged** |
-| 3 | **"Clear all" restores results** | Reopen the dialog, click **"Clear all"** + apply → result count returns (≥ baseline, and greater than the filtered count); **logged** |
+| 3 | **Per-result price validation** | Read every visible card's starting-price text (e.g. "Starting from the upper $200s") and parse it to a dollar ordinal; assert **every card's price ≤ $300,000** — not just the count; **logged** |
+| 4 | **"Clear all" restores results** | Reopen the dialog, click **"Clear all"** + apply → result count returns (≥ baseline, and greater than the filtered count); **logged** |
+| 5 | **Beds & Baths filter dialog interaction** | Open the **"Bed & Baths"** filter (`[role='dialog'][aria-label='Bed & Baths']`), select **Beds "3+"** (first occurrence — the dialog has Beds then Bathrooms, each with Any/1+/2+/…), apply → result count ≥ 1; **logged** with baseline context. _Note: bed/bath counts are not displayed on rail cards and the filter sets no URL params — per-result bed validation from the rail is not possible. A count that matches the baseline is correct behaviour when every community in the market offers ≥ the threshold (all Dallas communities offer ≥3 beds)._ |
+| 6 | **Beds "Clear all" restores results** | Reopen the Bed & Baths dialog, clear, apply → result count ≥ baseline; **logged** |
 
 ### TC-02 | Sorting the communities reorders the results  `@regression`
+Sort is **client-side** (no `/api/search` POST on sort operations). Sorting is verified by parsing each visible card's starting-price text into a comparable dollar ordinal and asserting the sequence is ordered. A small tolerance (1 per 8 results) is allowed for communities whose displayed teaser band does not match their actual sort rank.
 | # | Verification | How |
 |---|--------------|-----|
-| 1 | **First community before sort** | Read the first card's `data-card-element`; **logged** |
-| 2 | **Sort reorders** | Open the **"Sort by"** listbox (`rail_sort-trigger` → `role=option`), choose **"Price - Low to High"**, await `/api/search` → the first card's community **changes**; before/after **logged** (e.g. "River Ranch Trails → Piccolina") |
+| 1 | **Baseline count** | Read "N results" count before any sort; **logged** |
+| 2 | **Low → High sort** | Open sort listbox, choose **"Price - Low to High"** → parse all visible card prices → assert sequence is **non-decreasing**; inversion count **logged** (e.g. "0 out-of-order pair(s) of 13") |
+| 3 | **High → Low sort** | Choose **"Price - High to Low"** → parse all visible card prices → assert sequence is **non-increasing**; inversion count **logged** |
+| 4 | **Featured restores count** | Choose **"Featured"** → assert result count ≥ baseline (the sort chain must not lose communities); count **logged** |
 
 ### TC-03 | First community 'Learn More' CTA opens its detail page  `@regression`
 | # | Verification | How |
@@ -163,8 +169,8 @@ every env by the in-page QMI / Floorplan / Community surfaces.
 | Area | Status |
 |------|--------|
 | **Scattered-lots map rendering (RG-07)** | ⬜ **Deferred — confirmed data limitation.** An exhaustive prod sweep of all 13 state markets (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV) found only `community:<id>` map pins (+ "N cities" cluster pills) — no scattered-lot marker type, and "scatter"/"scattered" appears in no rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. There is nothing to assert until a scattered-lot product is launched. |
-| **Filter coverage** | Only the **Price Range** filter is exercised. The live filter set is currently **Price Range + Bed & Baths** only — the "Home Availability / Home Type / Community Type" filters in the original requirement are **not present** in the UI today. The **Bed & Baths** filter is not yet exercised; neither are multi-filter combinations or exact result counts per value. |
-| **Sort coverage** | Only "Price - Low to High" is exercised (asserts the first card changes). Other sort options and exact ordering are not verified. |
+| **Filter coverage** | **Price Range** and **Bed & Baths** are both exercised (the only two filters present in the live UI today). Price: per-result price ≤ max validated on every card. Beds: dialog interaction + count ≥ 1 (beds not on rail cards → per-result bed validation from the rail is not possible; no URL params either). Multi-filter combinations not exercised. |
+| **Sort coverage** | **"Price - Low to High"** (non-decreasing), **"Price - High to Low"** (non-increasing), and **"Featured"** (count restore) are all exercised with real price-order assertions. "A - Z" and "Z - A" not yet exercised. |
 | **Map** | Pan distance/direction (only that the camera moved); the cluster-pill drill-down (clicking an "N cities" pill); the "Reset map" button; keyboard/wheel panning (disabled on this map). |
 | **Results count** | Exact totals per region are not asserted (only relative reduce/restore for filtering). |
 

@@ -177,15 +177,37 @@ test.describe("Region Page — Filters & Sort", () => {
 
   test("TC-01 | Price filter reduces the results and 'Clear all' restores them @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Price filter: every result card must show a starting price ≤ the max.
     await regionPage.verifyPriceFilterReducesThenClearRestores(
       testData.region_filters_sort.maxPrice,
+    );
+    // Beds & Baths filter: dialog opens, beds option selectable, results remain
+    // non-empty, clear restores. Bed/bath counts are not on rail cards (no URL
+    // params either), so per-result bed validation from the rail is not possible —
+    // this exercises the filter interaction and confirms the result set is valid.
+    await regionPage.verifyBedsFilterAndRestore(
+      testData.region_filters_sort.bedsFilterValue,
     );
   });
 
   test("TC-02 | Sorting the communities reorders the results @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Read baseline so we can confirm Featured restores it.
+    const baseline = await regionPage.getResultsCount();
+    await reportValue(`Baseline community count: ${baseline}`);
+    // Low → High: prices must be non-decreasing.
     await regionPage.verifySortReordersResults(
       testData.region_filters_sort.sortOption,
+    );
+    // High → Low: prices must be non-increasing.
+    await regionPage.verifySortReordersResults(
+      testData.region_filters_sort.sortOptionHighToLow,
+      "desc",
+    );
+    // Featured: full count is restored to the pre-sort baseline.
+    await regionPage.verifySortRestoresOnFeatured(
+      testData.region_filters_sort.sortOptionFeatured,
+      baseline,
     );
   });
 

@@ -27,6 +27,11 @@ export class RegionPage extends BasePage {
   // Each community card carries a visible "Learn More" CTA (distinct from the
   // zero-size stretched link) that also opens the community detail page.
   readonly firstCommunityLearnMore: Locator;
+  // "Bed & Baths" filter trigger + its dialog. The dialog has two radio groups:
+  // Beds (Any/1+/2+/3+/4+) then Bathrooms (Any/1+/2+/3+). Each option is a
+  // radio input covered by a <span> label — click the span, not the input.
+  readonly bedsBathsTrigger: Locator;
+  readonly bedsBathsDialog: Locator;
   // Map (Google Maps JS API rendered into the page DOM — not an iframe): the
   // container, community markers, zoom controls, and the per-community preview
   // card that a marker selection reveals.
@@ -96,6 +101,13 @@ export class RegionPage extends BasePage {
     });
     this.firstCommunityLearnMore = this.firstCommunityCard
       .getByRole("link", { name: /Learn More/i })
+      .first();
+
+    this.bedsBathsTrigger = page
+      .getByRole("button", { name: "Bed & Baths", exact: true })
+      .first();
+    this.bedsBathsDialog = page
+      .locator("[role='dialog'][aria-label='Bed & Baths']:visible")
       .first();
 
     // The map is rendered per breakpoint, so target the visible container.
@@ -289,6 +301,18 @@ export class RegionPage extends BasePage {
       `Applying a max-price filter should reduce the results (${baseline} → ${filtered})`,
     );
 
+    // Per-result price validation: every visible card must show a parsed
+    // starting price ≤ the max. Beds/baths are not on the rail cards, but price
+    // IS — so this is the strongest per-result check we can make from the rail.
+    const maxPriceNum = Number(maxPrice);
+    const filteredPrices = await this.readCardPriceOrdinals();
+    await reportValue(`Filtered card prices: [${filteredPrices.join(", ")}]`);
+    const overBudget = filteredPrices.filter((p) => p > maxPriceNum);
+    await Validator.requireTrue(
+      overBudget.length === 0,
+      `Every result after max-price $${maxPrice} should have a starting price ≤ $${maxPrice} — ${overBudget.length} card(s) over budget: [${overBudget.join(", ")}]`,
+    );
+
     // Clear: reopen the dialog, Clear all, re-apply, expect the baseline back.
     await this.click(this.priceFilterTrigger, "Price Range filter (reopen)");
     await Validator.requireVisible(
@@ -416,6 +440,113 @@ export class RegionPage extends BasePage {
     const monthly = text.match(/Monthly payments? starting from\s*\$([\d,]+)/i);
     if (monthly) return Number(monthly[1].replace(/,/g, ""));
     return null;
+  }
+
+  // ── Bed & Baths Filter (RG-09) — Verification ─────────
+  // Opens the Bed & Baths filter dialog, applies a minimum-beds value (e.g. "3+"),
+  // confirms the results are non-empty, then clears and restores.
+  //
+  // Note: bed/bath counts are NOT displayed on rail cards and the filter does NOT
+  // set URL query params — so per-result bed validation from the rail is not
+  // possible. This method verifies the filter dialog interaction works correctly
+  // and the result set is valid (non-empty). Whether the count changes depends on
+  // the market: a market where every community offers ≥ the threshold value keeps
+  // the same count, which is correct behaviour (not a test defect).
+  async verifyBedsFilterAndRestore(bedsValue: string): Promise<void> {
+    const baseline = await this.getResultsCount();
+
+    await this.click(this.bedsBathsTrigger, "Bed & Baths filter");
+    await Validator.requireVisible(
+      this.bedsBathsDialog,
+      "Bed & Baths filter dialog should open",
+      10000,
+    );
+
+    // The beds radios are covered by their <span> labels — click the span.
+    // "3+" appears first in the Beds section, then again in Bathrooms; nth(0)
+    // reliably targets the Beds row.
+    const bedsOption = this.bedsBathsDialog
+      .getByText(bedsValue, { exact: true })
+      .nth(0);
+    await this.click(bedsOption, `Beds "${bedsValue}" option`);
+
+    const applyRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(
+      this.bedsBathsDialog.getByRole("button", { name: /Apply filters/i }),
+      "Apply filters (beds)",
+    );
+    await applyRefresh;
+    await this.page.waitForTimeout(1500);
+    const filtered = await this.getResultsCount();
+    await reportValue(
+      `Results after ${bedsValue} beds filter: ${filtered} (baseline ${baseline})`,
+    );
+    await Validator.requireTrue(
+      filtered > 0,
+      `Beds "${bedsValue}" filter should return at least one result (got ${filtered})`,
+    );
+
+    // Clear: reset the beds filter and verify the count is restored.
+    await this.click(this.bedsBathsTrigger, "Bed & Baths filter (reopen)");
+    await Validator.requireVisible(
+      this.bedsBathsDialog,
+      "Bed & Baths dialog should reopen",
+      10000,
+    );
+    const clearRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(
+      this.bedsBathsDialog.getByRole("button", { name: /Clear all/i }),
+      "Clear all (beds)",
+    );
+    if (
+      await this.bedsBathsDialog
+        .getByRole("button", { name: /Apply filters/i })
+        .isVisible()
+        .catch(() => false)
+    ) {
+      await this.click(
+        this.bedsBathsDialog.getByRole("button", { name: /Apply filters/i }),
+        "Apply filters after clear (beds)",
+      );
+    }
+    await clearRefresh;
+    await this.page.waitForTimeout(1500);
+    const restored = await this.getResultsCount();
+    await reportValue(`Results after clearing beds filter: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing the beds filter should restore results (baseline ${baseline}, restored ${restored})`,
+    );
+  }
+
+  // ── Featured Sort Restore — Verification ───────────────
+  // After applying a price sort, restores the "Featured" ordering and confirms
+  // the full result count is back (no communities were lost in the sort chain).
+  async verifySortRestoresOnFeatured(
+    featuredOption: string,
+    baseline: number,
+  ): Promise<void> {
+    await this.click(this.sortTrigger, "Sort by (restore Featured)");
+    await this.click(
+      this.page.getByRole("option", { name: featuredOption, exact: true }),
+      `Sort option: ${featuredOption}`,
+    );
+    await this.page.waitForTimeout(2000);
+    const restoredCount = await this.getResultsCount();
+    await reportValue(
+      `Results after "${featuredOption}" sort: ${restoredCount} (baseline ${baseline})`,
+    );
+    // The rail streams in (e.g. 13 cards on first settle → 17 when fully loaded),
+    // so the Featured count can legitimately be ≥ the baseline. Assert ≥ rather
+    // than exact equality — the Featured sort must never lose communities.
+    await Validator.requireTrue(
+      restoredCount >= baseline,
+      `Restoring "${featuredOption}" sort should return at least the baseline count (expected ≥${baseline}, got ${restoredCount})`,
+    );
   }
 
   // ── Navigate via card CTA (RG-11) — Actions ────────────
