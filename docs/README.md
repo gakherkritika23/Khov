@@ -4,8 +4,12 @@ This folder tracks the Playwright + TypeScript automation effort for **khov.com*
 
 | File | Purpose |
 |------|---------|
-| [`test-plan.md`](./test-plan.md) | Master test plan — the full coverage backlog, broken into epics → candidate test cases, mapped to POM/spec files, with a suggested build order. |
-| [`progress.md`](./progress.md) | Living progress tracker — what's done, in progress, and pending, plus a decisions/changelog log. |
+| [`test-plan.md`](./test-plan.md) | Master test plan — full coverage backlog broken into epics → TC IDs, mapped to POM/spec files, with ✅/⬜ status per case. |
+| [`progress.md`](./progress.md) | Living progress tracker — what's done, key decisions, and a dated changelog. |
+| [`region-page-verifications.md`](./region-page-verifications.md) | Detailed per-test assertion reference for the region page (what each TC checks and how). |
+| [`community-page-verifications.md`](./community-page-verifications.md) | Same reference for the community page. |
+| [`contact-us-verifications.md`](./contact-us-verifications.md) | Same reference for the contact/lead forms. |
+| `coverage-summary.md` | Human-readable summary of what is and isn't automated (gitignored — generated locally, not committed). |
 
 ## How work is produced
 
@@ -21,7 +25,7 @@ Stage 4  POM generation             Stage 7  Git push
 
 ## Framework quick reference
 
-- **Specs** live in `tests/`, import `test` from `./baseTest` (Allure hooks).
+- **Specs** live in `tests/`, import `test` from `./baseTest` (ReportPortal hooks).
 - **POMs** live in `page-objects/`, extend `BasePage`, assert via `Validator`.
 - All `Validator` / `waitForApi` calls live in POMs — never in specs.
 - Test data → `utils/test_data.json`; expected text/URLs → `utils/constants.json`.
