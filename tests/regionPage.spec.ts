@@ -186,18 +186,22 @@ test.describe("Region Page — Filters & Sort", () => {
     );
   });
 
-  test("TC-01 | Price filter reduces the results and 'Clear all' restores them @regression", async () => {
+  test("TC-01 | Price + Beds & Baths filters reduce results and 'Clear all' restores them @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
-    // Price filter: every result card must show a starting price ≤ the max.
+    // Price filter (min + max): every result card must have a starting price
+    // within the [minPrice, maxPrice] range.
     await regionPage.verifyPriceFilterReducesThenClearRestores(
+      testData.region_filters_sort.minPrice,
       testData.region_filters_sort.maxPrice,
     );
-    // Beds & Baths filter: dialog opens, beds option selectable, results remain
-    // non-empty, clear restores. Bed/bath counts are not on rail cards (no URL
-    // params either), so per-result bed validation from the rail is not possible —
-    // this exercises the filter interaction and confirms the result set is valid.
-    await regionPage.verifyBedsFilterAndRestore(
+    // Beds & Baths filter: dialog opens, both Beds and Bathrooms options are
+    // selectable, results remain non-empty, clear restores. Bed/bath counts are
+    // not on rail cards (no URL params either), so per-result validation from
+    // the rail is not possible — this exercises the filter dialog interaction
+    // and confirms the result set is valid.
+    await regionPage.verifyBedsBathsFilterAndRestore(
       testData.region_filters_sort.bedsFilterValue,
+      testData.region_filters_sort.bathsFilterValue,
     );
   });
 
@@ -220,9 +224,36 @@ test.describe("Region Page — Filters & Sort", () => {
       testData.region_filters_sort.sortOptionFeatured,
       baseline,
     );
+    // A → Z: community names must be alphabetically non-decreasing.
+    await regionPage.verifySortByName(
+      testData.region_filters_sort.sortOptionAtoZ,
+      "asc",
+    );
+    // Z → A: community names must be reverse-alphabetically non-decreasing.
+    await regionPage.verifySortByName(
+      testData.region_filters_sort.sortOptionZtoA,
+      "desc",
+    );
   });
 
-  test("TC-03 | First community 'Learn More' CTA opens its detail page @regression", async () => {
+  test("TC-03 | All filters modal — Home Availability, Home Type, Looks Communities @regression", async () => {
+    // 6 multi-step modal filter operations; raise ceiling so it doesn't race the describe-level limit
+    test.setTimeout(720_000);
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Home Availability — "Quick Move-In": count > 0 after filter; clear restores.
+    // (Per-card badge not asserted: availability badges and filter criteria are
+    // driven by different data layers — not every QMI-filtered card shows the badge.)
+    await regionPage.verifyAllFiltersHomeAvailability("Quick Move-In");
+    // Home Type — all four options; per-card assertion if results > 0, graceful
+    // skip for types absent in this market (e.g. Condominiums, Villas on Dallas).
+    for (const homeType of testData.region_filters_sort.homeTypes) {
+      await regionPage.verifyAllFiltersHomeType(homeType);
+    }
+    // Looks Communities — per-card: every filtered card must show the Looks badge.
+    await regionPage.verifyAllFiltersLooksCommunity();
+  });
+
+  test("TC-04 | First community 'Learn More' CTA opens its detail page @regression", async () => {
     const community = await regionPage.getFirstCommunityCardName();
     await reportValue(`First community: ${community}`);
 

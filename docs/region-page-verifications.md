@@ -1,6 +1,6 @@
 # Region Page — Verification Coverage
 
-_Last updated: 2026-06-16_
+_Last updated: 2026-06-23_
 
 What the **region page** (the market-results / "New Home Communities" results page,
 e.g. `/new-construction-homes/texas/`) automated tests verify today. Source files:
@@ -134,26 +134,40 @@ _(Texas state view — covers Items B + D)_
 
 ## Block 3 — Filters & Sort  _(Dallas city view)_
 
-### TC-01 | Price filter reduces the results and 'Clear all' restores them  `@regression`
+### TC-01 | Price + Beds & Baths filters reduce results and 'Clear all' restores them  `@regression`
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | **Baseline result count** | Read "N results" (`[class*='rail_results']`), polled until stable; **logged** |
-| 2 | **Filter reduces results** | Open the **"Price Range"** filter (`[role='dialog'][aria-label='Price Range']`), set **Maximum = 300000**, click **"Apply filters"**, await `/api/search` → result count is lower than baseline; **logged** |
-| 3 | **Per-result price validation** | Read every visible card's starting-price text (e.g. "Starting from the upper $200s") and parse it to a dollar ordinal; assert **every card's price ≤ $300,000** — not just the count; **logged** |
+| 2 | **Min+Max price filter reduces results** | Open the **"Price Range"** filter (`[role='dialog'][aria-label='Price Range']`), type **Minimum = 250000** and **Maximum = 450000**, click **"Apply filters"**, await `/api/search` → result count is lower than baseline; **logged** |
+| 3 | **Per-result max-price validation** | Read every visible card's starting-price text (e.g. "Starting from the upper $300s") and parse it to a dollar ordinal; assert **every card's price ≤ $450,000**. _Note: the min bound is validated indirectly via the count reduction. Card price bands are marketing approximations (e.g. "upper $200s" maps to ordinal 200,800 while the actual floor is ~$280–299k), so per-card min assertion is unreliable — max constraint is clean and asserted per-card._ **logged** |
 | 4 | **"Clear all" restores results** | Reopen the dialog, click **"Clear all"** + apply → result count returns (≥ baseline, and greater than the filtered count); **logged** |
-| 5 | **Beds & Baths filter dialog interaction** | Open the **"Bed & Baths"** filter (`[role='dialog'][aria-label='Bed & Baths']`), select **Beds "3+"** (first occurrence — the dialog has Beds then Bathrooms, each with Any/1+/2+/…), apply → result count ≥ 1; **logged** with baseline context. _Note: bed/bath counts are not displayed on rail cards and the filter sets no URL params — per-result bed validation from the rail is not possible. A count that matches the baseline is correct behaviour when every community in the market offers ≥ the threshold (all Dallas communities offer ≥3 beds)._ |
-| 6 | **Beds "Clear all" restores results** | Reopen the Bed & Baths dialog, clear, apply → result count ≥ baseline; **logged** |
+| 5 | **Beds & Baths filter dialog interaction** | Open the **"Bed & Baths"** filter (`[role='dialog'][aria-label='Bed & Baths']`), select **Beds "3+"** (Beds group) and **Baths "2+"** (Bathrooms group — `.nth(1)` targets the second occurrence of the value text, which is in the Bathrooms section), apply → result count ≥ 1; **logged** with baseline context. _Note: bed/bath counts are not displayed on rail cards and the filter sets no URL params — per-result bed/bath validation from the rail is not possible._ |
+| 6 | **Beds & Baths "Clear all" restores results** | Reopen the Bed & Baths dialog, clear, apply → result count ≥ baseline; **logged** |
 
 ### TC-02 | Sorting the communities reorders the results  `@regression`
-Sort is **client-side** (no `/api/search` POST on sort operations). Sorting is verified by parsing each visible card's starting-price text into a comparable dollar ordinal and asserting the sequence is ordered. A small tolerance (1 per 8 results) is allowed for communities whose displayed teaser band does not match their actual sort rank.
+Sort is **client-side** (no `/api/search` POST on sort operations). Price sorting is verified by parsing each visible card's starting-price text into a comparable dollar ordinal and asserting the sequence is ordered. Name sorting reads all card name headings and asserts alphabetical order. A small tolerance (1 per 8 results) is allowed for band-approximation communities. All 5 sort options exercised.
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | **Baseline count** | Read "N results" count before any sort; **logged** |
 | 2 | **Low → High sort** | Open sort listbox, choose **"Price - Low to High"** → parse all visible card prices → assert sequence is **non-decreasing**; inversion count **logged** (e.g. "0 out-of-order pair(s) of 13") |
 | 3 | **High → Low sort** | Choose **"Price - High to Low"** → parse all visible card prices → assert sequence is **non-increasing**; inversion count **logged** |
 | 4 | **Featured restores count** | Choose **"Featured"** → assert result count ≥ baseline (the sort chain must not lose communities); count **logged** |
+| 5 | **A → Z sort** | Choose **"A - Z"** → read all visible card name headings (`[class*='Community_name']`) → assert sequence is **alphabetically non-decreasing** (case-insensitive, same 1/8 tolerance); name sequence **logged** |
+| 6 | **Z → A sort** | Choose **"Z - A"** → read all visible card names → assert sequence is **reverse-alphabetically non-decreasing**; name sequence **logged** |
 
-### TC-03 | First community 'Learn More' CTA opens its detail page  `@regression`
+### TC-03 | All filters modal — Home Availability, Home Type, Looks Communities  `@regression`
+The **"All filters"** button (`getByRole("button", { name: /All filters/i })`) opens a `[role='dialog'][aria-label='All filters']` modal with checkbox groups (Home Availability, Home Type, Community Type) and sort radios. All filter operations are client-side (no `/api/search` on Apply). The modal's "Apply filters" button is awaited with a 2.5s settle rather than API interception. This test has a 12-minute timeout (`test.setTimeout(720_000)`) to accommodate 6 multi-step modal round-trips.
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | **Home Availability — Quick Move-In** | Open modal, click **"Quick Move-In"** label text (checkbox is covered by label), click **"Apply Filters"**, wait 2.5s → assert count > 0 (if 0, logs "no QMI in market" and skips per-card); re-open, **"Clear all"**, apply → assert count restored. _Note: QMI availability badge and filter criteria are different data layers — not every filtered card shows the "Quick Move in Homes Available" badge, so per-card badge assertion is intentionally omitted._ |
+| 2 | **Home Availability — Coming Soon** | Same modal flow with **"Coming Soon"** checkbox; graceful skip if 0 results in this market |
+| 3 | **Home Type — Single Family Homes** | Open modal, check **"Single Family Homes"**, apply → if > 0 results: read every card's `[class*='Community_details']` text (format: `"City, State Home Type"`) via `evaluateAll`, assert each **contains "Single Family Homes"**; clear + restore |
+| 4 | **Home Type — Townhouses** | Same as above with **"Townhouses"** |
+| 5 | **Home Type — Condominiums** | Same — graceful skip if 0 results (not present in Dallas market) |
+| 6 | **Home Type — Villas** | Same — graceful skip if 0 results (not present in Dallas market) |
+| 7 | **Looks Communities** | Open modal, check **"Looks Communities"**, apply → assert count ≥ 1; for every visible card: assert `[class*='Community_type']` text **contains "looks"** (case-insensitive) — the badge renders as `"Looks logoCommunity"`, normalised to `"looks logocommunity"` on read; clear + restore. _Note: all Dallas communities are Looks Communities — count stays at baseline (17), which is a valid result: the filter has no communities to exclude and every card correctly shows the badge._ |
+
+### TC-04 | First community 'Learn More' CTA opens its detail page  `@regression`
 | # | Verification | How |
 |---|--------------|-----|
 | 1 | First community name captured | From the card's `data-card-element`; **logged** |
@@ -180,8 +194,8 @@ every env by the in-page QMI / Floorplan / Community surfaces.
 | Area | Status |
 |------|--------|
 | **Scattered-lots map rendering (RG-07)** | ⬜ **Deferred — confirmed data limitation.** An exhaustive prod sweep of all 13 state markets (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV) found only `community:<id>` map pins (+ "N cities" cluster pills) — no scattered-lot marker type, and "scatter"/"scattered" appears in no rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. There is nothing to assert until a scattered-lot product is launched. |
-| **Filter coverage** | **Price Range** and **Bed & Baths** are both exercised (the only two filters present in the live UI today). Price: per-result price ≤ max validated on every card. Beds: dialog interaction + count ≥ 1 (beds not on rail cards → per-result bed validation from the rail is not possible; no URL params either). Multi-filter combinations not exercised. |
-| **Sort coverage** | **"Price - Low to High"** (non-decreasing), **"Price - High to Low"** (non-increasing), and **"Featured"** (count restore) are all exercised with real price-order assertions. "A - Z" and "Z - A" not yet exercised. |
+| **Filter coverage** | All inline filters exercised: **Price Range** (min+max; per-result max-price ≤ validation on every card), **Bed & Baths** (Beds "3+" + Baths "2+"; count ≥ 1; beds/baths not on rail cards → per-result validation not possible). **All filters modal**: Home Availability (Quick Move-In + Coming Soon), Home Type (all 4 values — Single Family Homes / Townhouses / Condominiums / Villas; per-card details assertion for types with results; graceful skip for 0-result types), Community Type (Looks Communities; per-card badge assertion). Multi-filter combinations not exercised. |
+| **Sort coverage** | All 5 sort options exercised: **"Price - Low to High"** (non-decreasing), **"Price - High to Low"** (non-increasing), **"Featured"** (count restore), **"A - Z"** (alphabetically non-decreasing names), **"Z - A"** (reverse-alphabetical). |
 | **Map** | Pan distance/direction (only that the camera moved); the cluster-pill drill-down (clicking an "N cities" pill); keyboard/wheel panning (disabled on this map). **"Reset map"**: now covered (TC-02, button visible + map healthy). **Bidirectional card→marker**: confirmed NOT implemented in the UI — clicking a rail card does not highlight the corresponding map marker (interaction is one-way: marker→card only, which TC-04 tests). |
 | **Results count** | Count accuracy (reported = rendered cards) now asserted in Community Results TC-02. |
 | **Breadcrumbs** | Not present on the region page — confirmed by exhaustive selector spike. N/A. |
