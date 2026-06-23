@@ -98,6 +98,17 @@ test.describe("Region Page — Community Results", () => {
       `Community detail heading: ${await communityPage.getHeading()}`,
     );
   });
+
+  // TC-02 covers Items B (card metadata + images) and D (count accuracy).
+  // Breadcrumbs and "Load more" are not present on the region page — all results
+  // render in a single rail on load — so those are not asserted.
+  test("TC-02 | Community results card metadata and images are valid @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Verifies: reported count == rendered card count (D); every card in the
+    // first 5 shows non-empty name, location/home-type, and starting price (B);
+    // each card's community image returns HTTP 200 (B).
+    await regionPage.verifyCardMetadataAndImages(5);
+  });
 });
 
 // The region map is the Google Maps JS API rendered into the page DOM (not an

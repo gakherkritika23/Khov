@@ -75,7 +75,7 @@ plain English rather than locator code.
 
 ---
 
-## Block 1 — Community Results
+## Block 1 — Community Results  _(Texas state view)_
 
 ### TC-01 | Selecting the 'Texas' region then the first community opens its detail page  `@regression`
 _(Texas state region page — covers SB-01 + the state-level page.)_
@@ -85,6 +85,16 @@ _(Texas state region page — covers SB-01 + the state-level page.)_
 | 2 | **"New Home Communities" section** shown | VISIBLE — section heading |
 | 3 | **First community name** captured | Read from the first community card's `data-card-element`; **logged** |
 | 4 | **First community card opens its detail page** | Click the card's zero-size "stretched link" via a DOM click (`clickViaScript`; the card list re-renders as the map loads); lands on a community detail URL (`new-construction-homes/texas/[^/]+/[^/]+`) with a level-1 heading naming that community; heading **logged** |
+
+### TC-02 | Community results card metadata and images are valid  `@regression`
+_(Texas state view — covers Items B + D)_
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | **Reported count = rendered cards** | Read "N results" (polled until stable) and count visible `[class*='Community_card']:visible` DOM elements — assert equal (D: count accuracy). The page loads all results in a single rail; no pagination / "Load more" present |
+| 2 | **Per-card metadata (first 5 cards)** | For each of the first 5 visible cards: `data-card-element` name non-empty; `[class*='Community_details']` location+home-type non-empty; `[class*='Community_pricing']` starting-price non-empty. Beds/baths are not shown on rail cards. |
+| 3 | **Per-card image HTTP 200 (first 5 cards)** | Read the `<picture> img` `src` for each of the first 5 cards; `page.request.get(url)` → assert status 200; URL + status **logged** |
+
+> **Breadcrumbs**: not present on the region page (confirmed by spike across all breadcrumb selector patterns — none found). **Pagination**: not present — all results render in a single rail on load with no "Load more" button. Both are documented as N/A.
 
 ---
 
@@ -102,6 +112,7 @@ _(Texas state region page — covers SB-01 + the state-level page.)_
 | 1 | Both zoom controls present | "Zoom in" and "Zoom out" buttons VISIBLE |
 | 2 | **Zoom in** moves the camera | Click "Zoom in" → the view changes (fresh `maps.googleapis.com` tiles fetched and/or the tile-layer transform changes); transform-changed + tile count **logged** |
 | 3 | **Zoom out** operates the control | Click "Zoom out" → confirm the map stays rendered with markers. A per-direction tile delta is best-effort here (zooming back to an already-visited level often serves cached tiles → 0 fetches), so it is **logged**, not asserted; zoom-in already proves the camera moves |
+| 4 | **"Reset map" button visible and operable** | `button[class*='map_reset-map']` must be VISIBLE; click it → map stays rendered with markers (**logged** whether a tile/transform signal fired; after zoom-in → zoom-out the initial-view tiles are cached so 0 fetches is expected — same treatment as zoom-out) |
 
 ### TC-03 | Panning the map changes the view  `@regression`
 | # | Verification | How |
@@ -171,8 +182,10 @@ every env by the in-page QMI / Floorplan / Community surfaces.
 | **Scattered-lots map rendering (RG-07)** | ⬜ **Deferred — confirmed data limitation.** An exhaustive prod sweep of all 13 state markets (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV) found only `community:<id>` map pins (+ "N cities" cluster pills) — no scattered-lot marker type, and "scatter"/"scattered" appears in no rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. There is nothing to assert until a scattered-lot product is launched. |
 | **Filter coverage** | **Price Range** and **Bed & Baths** are both exercised (the only two filters present in the live UI today). Price: per-result price ≤ max validated on every card. Beds: dialog interaction + count ≥ 1 (beds not on rail cards → per-result bed validation from the rail is not possible; no URL params either). Multi-filter combinations not exercised. |
 | **Sort coverage** | **"Price - Low to High"** (non-decreasing), **"Price - High to Low"** (non-increasing), and **"Featured"** (count restore) are all exercised with real price-order assertions. "A - Z" and "Z - A" not yet exercised. |
-| **Map** | Pan distance/direction (only that the camera moved); the cluster-pill drill-down (clicking an "N cities" pill); the "Reset map" button; keyboard/wheel panning (disabled on this map). |
-| **Results count** | Exact totals per region are not asserted (only relative reduce/restore for filtering). |
+| **Map** | Pan distance/direction (only that the camera moved); the cluster-pill drill-down (clicking an "N cities" pill); keyboard/wheel panning (disabled on this map). **"Reset map"**: now covered (TC-02, button visible + map healthy). **Bidirectional card→marker**: confirmed NOT implemented in the UI — clicking a rail card does not highlight the corresponding map marker (interaction is one-way: marker→card only, which TC-04 tests). |
+| **Results count** | Count accuracy (reported = rendered cards) now asserted in Community Results TC-02. |
+| **Breadcrumbs** | Not present on the region page — confirmed by exhaustive selector spike. N/A. |
+| **Pagination / "Load more"** | Not present — all results render in a single rail with no pagination. N/A. |
 
 ## Notes
 - **Two region pins:** the Community-Results and Filters-&-Sort blocks use the

@@ -40,6 +40,7 @@ export class RegionPage extends BasePage {
   readonly communityMarkers: Locator;
   readonly zoomInButton: Locator;
   readonly zoomOutButton: Locator;
+  readonly resetMapButton: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -121,6 +122,10 @@ export class RegionPage extends BasePage {
     );
     this.zoomInButton = page.getByRole("button", { name: "Zoom in" }).first();
     this.zoomOutButton = page.getByRole("button", { name: "Zoom out" }).first();
+    // "Reset map" restores the map to its initial camera position; always visible.
+    this.resetMapButton = page
+      .locator("button[class*='map_reset-map']:visible")
+      .first();
   }
 
   // ── New Home Communities — Actions ─────────────────────
@@ -167,6 +172,101 @@ export class RegionPage extends BasePage {
     // which makes the first card "unstable". clickViaScript does a DOM click
     // (re-resolving the locator), so the element need not be in the viewport.
     await this.clickViaScript(this.firstCommunityLink, "first community card");
+  }
+
+  // ── Community Results — Structure & Content (Item B + D) ─
+  // Asserts: (1) the "N results" count matches the number of rendered cards;
+  // (2) the first `maxCards` visible cards each carry non-empty name, location/
+  // home-type details, and starting-price text; (3) each of those cards' images
+  // returns HTTP 200.
+  //
+  // Breadcrumbs and pagination are NOT present on the region page — all results
+  // load in a single rail with no "Load more" control — so those are N/A here.
+  async verifyCardMetadataAndImages(maxCards = 5): Promise<void> {
+    // Item D: reported count should equal the rendered card count.
+    const reportedCount = await this.getResultsCount();
+    const cards = await this.page
+      .locator("[class*='Community_card']:visible")
+      .all();
+    const renderedCount = cards.length;
+    await reportValue(
+      `Reported count: ${reportedCount}, rendered cards: ${renderedCount}`,
+    );
+    await Validator.requireTrue(
+      renderedCount === reportedCount,
+      `Rendered card count (${renderedCount}) should match the reported "${reportedCount} results" in the rail header`,
+    );
+
+    // Item B: per-card metadata + image for the first `maxCards`.
+    const limit = Math.min(maxCards, cards.length);
+    await reportValue(`Checking metadata + image on first ${limit} of ${cards.length} cards`);
+
+    for (let i = 0; i < limit; i++) {
+      const card = cards[i];
+      const name = (
+        (await card.getAttribute("data-card-element").catch(() => null)) ?? ""
+      ).trim();
+      const details = (
+        (await card
+          .locator("[class*='Community_details']")
+          .first()
+          .textContent()
+          .catch(() => null)) ?? ""
+      )
+        .replace(/\s+/g, " ")
+        .trim();
+      const pricing = (
+        (await card
+          .locator("[class*='Community_pricing']")
+          .first()
+          .textContent()
+          .catch(() => null)) ?? ""
+      )
+        .replace(/\s+/g, " ")
+        .trim();
+
+      await Validator.requireTrue(
+        name.length > 0,
+        `Card[${i}] should have a non-empty community name`,
+      );
+      await Validator.requireTrue(
+        details.length > 0,
+        `Card[${i}] "${name}" should have non-empty location / home-type details`,
+      );
+      await Validator.requireTrue(
+        pricing.length > 0,
+        `Card[${i}] "${name}" should display a starting price`,
+      );
+
+      // Image HTTP 200 — the card's primary image (inside the <picture> element).
+      const imgSrc = (
+        (await card
+          .locator("picture img, img")
+          .first()
+          .getAttribute("src")
+          .catch(() => null)) ?? ""
+      ).trim();
+      const imgUrl = imgSrc.startsWith("//")
+        ? `https:${imgSrc}`
+        : imgSrc;
+      if (imgUrl.startsWith("http")) {
+        const resp = await this.page.request
+          .get(imgUrl, { timeout: 10000 })
+          .catch(() => null);
+        const status = resp?.status() ?? 0;
+        await reportValue(
+          `Card[${i}] "${name}" image: HTTP ${status} ${imgUrl.slice(0, 80)}`,
+        );
+        await Validator.requireTrue(
+          status === 200,
+          `Card[${i}] "${name}" community image should return HTTP 200 (got ${status})`,
+        );
+      } else {
+        await reportValue(
+          `Card[${i}] "${name}" image src not an absolute URL — skipped (src: "${imgSrc.slice(0, 60)}")`,
+        );
+      }
+    }
   }
 
   // ── New Home Communities — Data Getters ────────────────
@@ -623,6 +723,30 @@ export class RegionPage extends BasePage {
     await Validator.requireTrue(
       (await this.mapMarkers.count()) > 0,
       "Community markers should remain after zooming out",
+    );
+
+    // "Reset map" — restores the initial camera position (zooms/pans back to the
+    // full-Dallas view). After a zoom-in → zoom-out sequence the initial-view tiles
+    // are already cached, so the reset often fetches 0 new tiles (same situation as
+    // zoom-out). The strong proof is: button visible + clickable + map health (same
+    // treatment as zoom-out). Log whether a tile/transform signal fired.
+    await Validator.requireVisible(
+      this.resetMapButton,
+      "'Reset map' button should be visible",
+      10000,
+    );
+    const reset = await this.performMapAction("Resetting map view", () =>
+      this.click(this.resetMapButton, "Reset map"),
+    );
+    await reportValue(`Reset map produced an observable view change: ${reset}`);
+    await Validator.requireVisible(
+      this.mapContainer,
+      "Map should remain rendered after 'Reset map'",
+      10000,
+    );
+    await Validator.requireTrue(
+      (await this.mapMarkers.count()) > 0,
+      "Community markers should remain after 'Reset map'",
     );
   }
 
