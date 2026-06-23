@@ -39,12 +39,10 @@ export default defineConfig({
   globalSetup: "./global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  // The Request Information modal is a shared, deep-linked component that the app
-  // intermittently fails to mount (verified across region/community — it's an
-  // app/Cloudflare-side race, not fixable from the test). Retries auto-recover
-  // such a miss on a fresh run, keeping the suite reliably green. 2 retries also
-  // locally (not just CI), since this suite drives the live site.
-  retries: 2,
+  // No retries: a test must pass on the first attempt rather than relying on a
+  // re-run to occasionally go green. (If the app-side Request-Information modal
+  // mount flake proves intolerable, revisit per-spec.)
+  retries: 0,
   // Serial execution: this suite drives one live external site (khov.com).
   // Running spec files in parallel makes multiple browsers contend for the same
   // prod pages, causing timeouts and worker crashes. One worker = reliable.
