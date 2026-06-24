@@ -26,6 +26,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 | E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09/10/11 ✅; QD-05/08 deferred) |
 | E5 | Floorplan details page | `planDetailPage.ts` | `planDetailPage.spec.ts` | ✅ (FD-01..FD-09; Request Info lives in `contactForms.spec.ts`) |
 | E6 | Contact forms (site-wide) | `contactUsPage.ts` + `requestInformationForm.ts` _(shared)_ | `contactForms.spec.ts` | ✅ |
+| E7 | Home page (content) | `homePage.ts` _(shared with E1)_ | `homePage.spec.ts` | ✅ (consolidated to 8 cases) |
 
 The thin navigation-verification POM was **renamed `communityDetailPage.ts` →
 `communityPage.ts`** and extended for E3 (it's the single Community-page POM,
@@ -234,6 +235,75 @@ non-prod submit awaits the Cloudflare **Turnstile** token (the text-message moda
 has its own token, so it polls the modal-scoped one). Tag order: `@form` before
 `@smoke`/`@regression`. **Known dev defect:** the "Find your local information"
 dropdown lists 7 regions twice on dev (CF-05 flags it).
+
+---
+
+## E7 — Home page ✅
+
+> "Homepage loads correctly across all sections: hero, state selection, content
+> blocks, cards, testimonials, media, homepage CTAs."
+
+> Scope is **homepage-only** functionality. The site-wide **Header**, **Search
+> bar**, **Footer**, and **Contact forms** are covered by their own epics
+> (E1-Search, E6) and are intentionally **excluded** here. Many homepage sections
+> (promotions, testimonials, videos, marketing banners) are **conditional** and
+> are validated only when rendered.
+
+> Implemented in `page-objects/homePage.ts` (E7 blocks added alongside the
+> Search-bar POM) and `tests/homePage.spec.ts` (E7 `test.describe` blocks).
+> Certified against **prod** (`TEST_ENV=prod`) — **all passing**. The E7 content
+> coverage is **8 cases** (HP-01…HP-08), consolidated from the original 34 (the
+> `homePage.spec.ts` file also holds the 2 E1 search tests). Test-case → spec
+> references use the `homePage.spec.ts` describe block + TC number.
+
+| ID | Test case | Tag | Status |
+|----|-----------|-----|--------|
+| HP-01 | Homepage loads (200, main landmark), hero heading displayed, and initial render within threshold | @smoke | ✅ (`Page Load` TC-01) |
+| HP-02 | Hero section/video render, autoplay, load (embed 200) and play/pause round-trip — asserted via the Vimeo Player API | @smoke | ✅ (`Hero` TC-01) |
+| HP-03 | "Select a State" section displayed, all 13 states listed, and selecting a state navigates to its region page | @smoke | ✅ (`State Selection` TC-01 — active-state nav via the react-aria listbox: DOM-open + synthesized pointer-press) |
+| HP-04 | TrustBuilder section loads with overall rating (4.3/5), review count, and the "Read Reviews" CTA (external href asserted) | @smoke | ✅ (`Testimonials (TrustBuilder)` TC-01) |
+| HP-05 | All first-party homepage images load successfully (return 200) — no broken media | @smoke | ✅ (`Media` TC-01 — third-party CDN assets excluded; they lazy-load/decode racily) |
+| HP-06 | Lazy-loaded images render correctly on scroll | @regression | ✅ (`Media` TC-02) |
+| HP-07 | "Learn More" CTA navigates correctly | @regression | ✅ (`Navigation CTAs` TC-01 — → `/looks/`) |
+| HP-08 | All internal links return 200 | @regression | ✅ (`Links` TC-01 — 15 first-party links) |
+
+**Notes / open questions:**
+- The **HomePage** page object should contain **only** homepage-specific
+  functionality.
+- **Header**, **Footer**, **Search bar**, and **Contact forms** are intentionally
+  excluded here — they are covered by separate epics (E1-Search, E6) and reused
+  via their own POMs.
+- Some homepage sections (promotions, testimonials, videos, marketing banners)
+  are **conditional** and should be validated only when present.
+- Tests should **avoid hardcoding promotional content** and instead validate the
+  dynamically rendered sections (assert structure / presence, not fixed copy).
+- Purely **visual / subjective** checks (exact section spacing & layout, "no
+  overlapping elements", section order, responsive breakpoints) are out of scope
+  — they are not reliably automatable without a visual-regression baseline, and
+  were dropped in the latest consolidation.
+- **Image / link checks** (HP-05, HP-08) are scoped to **first-party (`khov.com`)**
+  assets. Third-party ad/analytics trackers (DoubleClick, GA, LinkedIn, TikTok,
+  Optimizely, etc.) fail/log noisily on every load and would make a naïve
+  whole-page "no failed requests" check permanently red.
+- **Hero** is a Vimeo **background-video** embed (`iframe[src*='player.vimeo.com']`)
+  with a play/pause control. Because the `<video>` lives in a cross-origin iframe,
+  autoplay and the user pause/play round-trip (both HP-02) are asserted against
+  the **real playback state** via the Vimeo Player **postMessage API**
+  (`getPaused` / `getCurrentTime`) — the background video buffers briefly before
+  autoplay engages, so the checks wait for the expected state rather than sampling
+  once.
+- **"Select a State" control:** the react-aria trigger button and its option
+  `<li>`s render **zero-size** for a normal pointer click, so the control is
+  driven via the DOM (HP-03, `State Selection` TC-01): a programmatic
+  `click()` opens the listbox popover, then the chosen option is activated with a
+  synthesized **pointer-press** sequence (`pointerdown` → `pointerup` → `click`)
+  — react-aria's `usePress` fires the navigation only on a real press (a bare
+  `.click()` merely marks the option selected without navigating). The backing
+  native `<select>` carries the canonical 13-state list (read for the list
+  assertion) but does **not** itself navigate. The selector is text-only (no
+  state images/cards).
+- **Coverage:** 8/8 cases automated & passing on prod (consolidated from the
+  original 34 — see the consolidation log under the E7 table).
 
 ---
 

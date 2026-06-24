@@ -1,7 +1,29 @@
 {
   "home_page": {
     "title": "K. Hovnanian Homes | New Homes for Sale",
-    "url": "/"
+    "url": "/",
+    "title_contains": "K. Hovnanian",
+    "looks_url": "/looks/",
+    "render_threshold_ms": 45000,
+    "state_nav": {
+      "name": "Texas",
+      "url_contains": "/new-construction-homes/texas/"
+    },
+    "configured_states": [
+      "Arizona",
+      "California",
+      "Delaware",
+      "Florida",
+      "Georgia",
+      "Maryland",
+      "New Jersey",
+      "Ohio",
+      "Pennsylvania",
+      "South Carolina",
+      "Texas",
+      "Virginia",
+      "West Virginia"
+    ]
   },
   "header": {
     "nav_links": {
