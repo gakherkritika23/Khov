@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>K. Hovnanian — Test Automation Framework Overview</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #1a1a2e;
+      background: #fff;
+    }
+
+    /* ── Print Setup ───────────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    @media print {
+      body { font-size: 11.5px; }
+      .no-print { display: none; }
+      h2 { page-break-before: always; }
+      h2:first-of-type { page-break-before: avoid; }
+      pre, table, .arch-box { page-break-inside: avoid; }
+    }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .page { max-width: 820px; margin: 0 auto; padding: 36px 40px 60px; }
+
+    /* ── Cover ─────────────────────────────────────────────── */
+    .cover {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      color: #fff;
+      border-radius: 8px;
+      padding: 48px 44px 40px;
+      margin-bottom: 40px;
+    }
+    .cover .logo-line {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #e94560;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .cover h1 {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 10px;
+    }
+    .cover .subtitle {
+      font-size: 13px;
+      color: #a8b2d8;
+      margin-bottom: 28px;
+    }
+    .cover .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+    .cover .meta-item .label {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #e94560;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .cover .meta-item .value {
+      font-size: 12px;
+      color: #ccd6f6;
+    }
+
+    /* ── Section Headings ───────────────────────────────────── */
+    h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f3460;
+      border-left: 4px solid #e94560;
+      padding-left: 12px;
+      margin: 36px 0 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h3 {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #16213e;
+      margin: 20px 0 8px;
+    }
+
+    /* ── Prose ─────────────────────────────────────────────── */
+    p { margin-bottom: 10px; color: #333; }
+
+    /* ── Tech Stack Badges ─────────────────────────────────── */
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+    .badge {
+      background: #f0f4ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #3730a3;
+    }
+
+    /* ── Architecture Box ──────────────────────────────────── */
+    .arch-box {
+      background: #f8faff;
+      border: 1px solid #dde4f0;
+      border-radius: 6px;
+      padding: 22px 24px;
+      margin: 14px 0 20px;
+    }
+    .arch-row {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .arch-row:last-child { margin-bottom: 0; }
+    .arch-label {
+      width: 260px;
+      flex-shrink: 0;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #0f3460;
+      background: #e8eeff;
+      border-radius: 4px;
+      padding: 3px 8px;
+    }
+    .arch-arrow {
+      color: #e94560;
+      font-weight: 700;
+      margin: 3px 12px 0 10px;
+      flex-shrink: 0;
+    }
+    .arch-desc {
+      font-size: 11.5px;
+      color: #555;
+      padding-top: 3px;
+    }
+
+    /* ── Code Block ────────────────────────────────────────── */
+    pre {
+      background: #1a1a2e;
+      color: #a8d8ea;
+      border-radius: 6px;
+      padding: 16px 18px;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11px;
+      line-height: 1.7;
+      overflow-x: auto;
+      margin: 10px 0 16px;
+    }
+    .kw  { color: #e94560; font-weight: 600; }
+    .fn  { color: #64b5f6; }
+    .str { color: #a5d6a7; }
+    .cm  { color: #607d8b; font-style: italic; }
+    .num { color: #ffcc80; }
+
+    /* ── Inline Code ───────────────────────────────────────── */
+    code {
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11px;
+      background: #f0f4ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: #3730a3;
+    }
+
+    /* ── Steps List ────────────────────────────────────────── */
+    .step-list { list-style: none; padding: 0; margin: 12px 0; }
+    .step-list li {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      background: #e94560;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      margin-top: 1px;
+    }
+    .step-list li p { margin: 0; color: #333; }
+
+    /* ── Table ─────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 12px; }
+    thead tr { background: #0f3460; color: #fff; }
+    thead th { padding: 9px 12px; text-align: left; font-weight: 600; font-size: 11px; letter-spacing: 0.3px; }
+    tbody tr:nth-child(odd)  { background: #f8faff; }
+    tbody tr:nth-child(even) { background: #fff; }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid #e8eef8; vertical-align: top; }
+    tbody td:first-child { font-family: "SF Mono", "Fira Code", monospace; font-size: 11px; color: #0f3460; font-weight: 600; }
+
+    /* ── Callout Box ───────────────────────────────────────── */
+    .callout {
+      border-left: 4px solid #e94560;
+      background: #fff5f7;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin: 14px 0;
+      font-size: 12px;
+      color: #444;
+    }
+    .callout strong { color: #c62040; }
+
+    /* ── Info Box ──────────────────────────────────────────── */
+    .info {
+      border-left: 4px solid #3b82f6;
+      background: #eff6ff;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin: 14px 0;
+      font-size: 12px;
+      color: #1e3a5f;
+    }
+
+    /* ── Divider ───────────────────────────────────────────── */
+    hr { border: none; border-top: 1px solid #e8eef8; margin: 30px 0; }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      font-size: 10.5px;
+      color: #aaa;
+      margin-top: 48px;
+      padding-top: 18px;
+      border-top: 1px solid #e8eef8;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════ COVER ═════════════════════════ -->
+  <div class="cover">
+    <div class="logo-line">K. Hovnanian Homes · QA Automation</div>
+    <h1>Test Automation Framework<br>Overview</h1>
+    <p class="subtitle">Contact Forms End-to-End Testing — Architecture &amp; Flow Guide</p>
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="label">Framework</div>
+        <div class="value">Playwright + TypeScript</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ SECTION 1 ═════════════════════ -->
+  <h2>1 · What We Built</h2>
+  <p>
+    We built a <strong>production-grade end-to-end automation framework</strong> for the K. Hovnanian
+    website (<code>khov.com</code>) using Playwright and TypeScript. The framework validates every
+    customer-facing contact form across four distinct surfaces — the Contact Us page, QMI detail
+    pages, floorplan detail pages, and community detail pages. Tests run
+    headed (visible browser) against dev, UAT, stage, or production environments with a single
+    command, and results are published live to a ReportPortal dashboard.
+  </p>
+  <p>
+    The framework is designed to be <strong>safe on production</strong>: forms are fully filled and
+    validated, but submission is intentionally skipped on prod so no real leads are created. All
+    API-level assertions run only on non-prod environments where there is no risk.
+  </p>
+
+
+  <!-- ═══════════════════════ SECTION 2 ═════════════════════ -->
+  <h2>2 · Tech Stack</h2>
+  <div class="badge-row">
+    <span class="badge">Playwright 1.58</span>
+    <span class="badge">TypeScript 6</span>
+    <span class="badge">Node.js</span>
+    <span class="badge">Chromium (headed)</span>
+    <span class="badge">ReportPortal</span>
+    <span class="badge">dotenv</span>
+    <span class="badge">cross-env</span>
+  </div>
+
+  <table>
+    <thead><tr><th>Component</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>@playwright/test</td><td>Browser automation engine — navigate, click, fill, assert, intercept network</td></tr>
+      <tr><td>TypeScript</td><td>Compile-time type safety for page objects, locators, and test data</td></tr>
+      <tr><td>dotenv / cross-env</td><td>Per-environment config — BASE_URL, env name, RP credentials</td></tr>
+      <tr><td>ReportPortal agent</td><td>Live test reporting dashboard with step trees, screenshots on failure</td></tr>
+    </tbody>
+  </table>
+
+
+  <!-- ═══════════════════════ SECTION 3 ═════════════════════ -->
+  <h2>3 · Architecture Layers</h2>
+  <p>The framework is structured in four clean layers. Each layer has a single responsibility.</p>
+
+  <div class="arch-box">
+    <div class="arch-row">
+      <span class="arch-label">npm script</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Entry point. Sets <code>TEST_ENV</code>, invokes Playwright CLI, passes project/file filters.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">playwright.config.ts</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Loads <code>environment/{env}.env</code> → sets <code>baseURL</code>. Configures reporters, projects (Chrome / smoke / regression), slowMo, retries.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">tests/baseTest.ts</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Extends Playwright's base <code>test</code> with an <code>afterEach</code> hook that attaches a failure screenshot. All spec files import from here.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">tests/*.spec.ts</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Test specs. Orchestrate the flow: beforeEach navigation → test body actions → Validator assertions.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">page-objects/</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Page Object Model classes. Each page gets one class. Locators defined as <code>readonly Locator</code> fields; actions are named methods.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">page-objects/basePage.ts</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Parent class. Shared primitives: <code>click()</code>, <code>type()</code>, <code>navigate()</code>, <code>waitForVisible()</code>, popup dismissal, retry navigation.</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">utils/</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc"><code>Validator</code> (named assertions), <code>apiUtils</code> (network intercept), <code>testDataUtils</code> (random names/emails), <code>constants.json</code> (URLs, text).</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-label">Browser (Chromium)</span>
+      <span class="arch-arrow">→</span>
+      <span class="arch-desc">Headed, maximised window. slowMo 200 ms so every action is visible during the demo.</span>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════ SECTION 4 ═════════════════════ -->
+  <h2>4 · Running the Demo — Step-by-Step</h2>
+
+  <h3>The command</h3>
+  <pre><span class="fn">npm run smoke:dev</span> -- tests/contactForms.spec.ts</pre>
+
+  <h3>What happens, step by step</h3>
+  <ol class="step-list">
+    <li>
+      <div class="step-num">1</div>
+      <p>
+        <strong><code>npm run smoke:dev</code></strong> expands to
+        <code>cross-env TEST_ENV=dev npx playwright test --project=smoke</code>.
+        <code>cross-env</code> injects <code>TEST_ENV=dev</code> into the process environment
+        before Playwright starts — this works identically on macOS, Linux, and Windows.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <p>
+        <strong><code>playwright.config.ts</code> loads the environment file.</strong>
+        It reads <code>TEST_ENV</code>, picks the file <code>environment/dev.env</code>,
+        and calls <code>dotenv.config()</code>. That file sets <code>BASE_URL=https://www-dev.khov.com</code>
+        (and similar vars). The config then sets <code>use.baseURL</code> to that value.
+        If <code>BASE_URL</code> is missing the config throws immediately — fail-fast.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <p>
+        <strong>The <code>smoke</code> project is selected</strong> by <code>--project=smoke</code>.
+        In the config this project has <code>grep: /@smoke/</code>, so Playwright only
+        collects tests whose description string contains the <code>@smoke</code> tag.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <p>
+        <strong><code>-- tests/contactForms.spec.ts</code></strong> (the part after <code>--</code>)
+        is passed through as an extra Playwright argument that scopes execution to that single file.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">5</div>
+      <p>
+        <strong>Playwright launches Chromium headed</strong>, maximised, with <code>slowMo: 200</code>
+        so every interaction is visible. One worker runs tests serially (no parallel browsers)
+        to avoid contention on the live site.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">6</div>
+      <p>
+        <strong>For each test:</strong> <code>beforeEach</code> instantiates the page object and
+        navigates to the target URL. The test body calls action methods on the page object, which
+        call <code>BasePage</code> primitives. Assertions go through <code>Validator</code> which
+        wraps each in a named <code>test.step()</code> so reports show human-readable step names.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">7</div>
+      <p>
+        <strong><code>afterEach</code></strong> (in <code>baseTest.ts</code>) runs after every
+        test. If the test failed it captures a screenshot via <code>page.screenshot()</code> and
+        attaches it to the test result. ReportPortal and the HTML report both display this attachment.
+      </p>
+    </li>
+    <li>
+      <div class="step-num">8</div>
+      <p>
+        <strong>Results are published</strong> to the ReportPortal dashboard (if <code>RP_API_KEY</code>
+        is set in the env file) and saved to <code>playwright-report/</code> (HTML).
+      </p>
+    </li>
+  </ol>
+
+  <h3>Smoke tests that execute for this command</h3>
+  <table>
+    <thead><tr><th>Test ID</th><th>Suite</th><th>What it verifies</th></tr></thead>
+    <tbody>
+      <tr><td>TC-01</td><td>Contact Us — Field Audit</td><td>Shopping for a new home — fields, dropdown options, validation, submit</td></tr>
+      <tr><td>TC-01</td><td>Contact Us — Local Information</td><td>All K. Hovnanian regions appear once (no duplicates) in state dropdown</td></tr>
+      <tr><td>TC-02</td><td>Contact Us — Local Information</td><td>Send us a text message modal — fields, validation, fill/submit</td></tr>
+      <tr><td>TC-01</td><td>QMI Details</td><td>Request Information modal — fields, validation, submit</td></tr>
+      <tr><td>TC-01</td><td>Community Details</td><td>Request Information modal — fields, validation, submit</td></tr>
+    </tbody>
+  </table>
+
+
+  <!-- ═══════════════════════ SECTION 5 ═════════════════════ -->
+  <h2>5 · Test Lifecycle</h2>
+
+  <pre><span class="cm">// 1. Spec imports</span>
+<span class="kw">import</span> { <span class="fn">test</span> } <span class="kw">from</span> <span class="str">"./baseTest"</span>;        <span class="cm">// always baseTest, never @playwright/test</span>
+<span class="kw">import</span> { <span class="fn">expect</span> } <span class="kw">from</span> <span class="str">"@playwright/test"</span>;  <span class="cm">// expect imported separately</span>
+<span class="kw">import</span> { <span class="fn">ContactUsPage</span> } <span class="kw">from</span> <span class="str">"../page-objects/contactUsPage"</span>;
+
+<span class="cm">// 2. Describe block groups related tests</span>
+<span class="fn">test</span>.<span class="fn">describe</span>(<span class="str">"Contact Us — Field &amp; Dropdown Audit"</span>, () =&gt; {
+  <span class="kw">let</span> contactUsPage: <span class="fn">ContactUsPage</span>;
+
+  <span class="cm">// 3. beforeEach: fresh navigation before every test</span>
+  <span class="fn">test</span>.<span class="fn">beforeEach</span>(<span class="kw">async</span> ({ page }) =&gt; {
+    contactUsPage = <span class="kw">new</span> <span class="fn">ContactUsPage</span>(page);
+    <span class="kw">await</span> contactUsPage.<span class="fn">navigateToContactViaFooter</span>(constants.home_page.url);
+  });
+
+  <span class="cm">// 4. Each test: actions → Validator assertions</span>
+  <span class="fn">test</span>(<span class="str">"TC-01 | Shopping for a new home @smoke"</span>, <span class="kw">async</span> () =&gt; {
+    <span class="kw">await</span> contactUsPage.<span class="fn">selectInterest</span>(<span class="str">"I am shopping for a new home"</span>);
+    <span class="kw">await</span> contactUsPage.<span class="fn">verifyFieldsForInterest</span>(<span class="str">"I am shopping for a new home"</span>);
+    <span class="kw">await</span> contactUsPage.<span class="fn">verifyRequiredFieldValidation</span>(...);
+    <span class="kw">const</span> resp = <span class="kw">await</span> contactUsPage.<span class="fn">submitForm</span>(...);  <span class="cm">// null on prod</span>
+    <span class="kw">if</span> (resp) <span class="kw">await</span> contactUsPage.<span class="fn">verifySubmissionSuccess</span>(...);
+  });
+
+  <span class="cm">// 5. afterEach (in baseTest.ts): screenshot on failure</span>
+  <span class="cm">// test.afterEach → page.screenshot() → testInfo.attach("failure-screenshot")</span>
+});</pre>
+
+
+  <!-- ═══════════════════════ SECTION 6 ═════════════════════ -->
+  <h2>6 · Page Object Model</h2>
+  <p>
+    Every page gets its own class that extends <code>BasePage</code>. Locators are declared
+    as <code>readonly Locator</code> fields in the constructor (never hardcoded inline in tests).
+    Methods describe user actions — <code>selectInterest()</code>, <code>submitForm()</code> —
+    so tests read like a specification, not low-level Playwright calls.
+  </p>
+
+  <pre><span class="cm">// page-objects/contactUsPage.ts (simplified)</span>
+<span class="kw">export class</span> <span class="fn">ContactUsPage</span> <span class="kw">extends</span> <span class="fn">BasePage</span> {
+  <span class="kw">private readonly</span> interestRadio: <span class="fn">Locator</span>;
+  <span class="kw">private readonly</span> firstNameInput: <span class="fn">Locator</span>;
+  <span class="kw">private readonly</span> submitButton: <span class="fn">Locator</span>;
+
+  <span class="kw">constructor</span>(page: <span class="fn">Page</span>) {
+    <span class="kw">super</span>(page);
+    <span class="kw">this</span>.interestRadio = page.<span class="fn">locator</span>(<span class="str">'input[name="interest"]'</span>);
+    <span class="kw">this</span>.firstNameInput = page.<span class="fn">getByLabel</span>(<span class="str">"First Name"</span>);
+    <span class="kw">this</span>.submitButton   = page.<span class="fn">getByRole</span>(<span class="str">"button"</span>, { name: <span class="str">"Submit"</span> });
+  }
+
+  <span class="kw">async</span> <span class="fn">selectInterest</span>(interest: <span class="fn">ContactInterest</span>): <span class="fn">Promise</span>&lt;<span class="kw">void</span>&gt; { <span class="cm">/* ... */</span> }
+  <span class="kw">async</span> <span class="fn">verifyFieldsForInterest</span>(interest: <span class="fn">ContactInterest</span>): <span class="fn">Promise</span>&lt;<span class="kw">void</span>&gt; { <span class="cm">/* ... */</span> }
+  <span class="kw">async</span> <span class="fn">submitForm</span>(interest: <span class="fn">ContactInterest</span>, endpoint: <span class="kw">string</span>): <span class="fn">Promise</span>&lt;<span class="fn">Response</span> | <span class="kw">null</span>&gt; { <span class="cm">/* ... */</span> }
+}</pre>
+
+  <h3>Shared form component</h3>
+  <p>
+    The <em>Request Information</em> modal (used on QMI, floorplan, and community pages)
+    is extracted into its own class <code>RequestInformationForm</code>, which is composed into
+    each page object as <code>this.requestInfo</code>. This avoids duplicating the modal
+    verification and submission logic across multiple page objects.
+  </p>
+
+
+  <!-- ═══════════════════════ SECTION 7 ═════════════════════ -->
+  <h2>7 · What contactForms.spec.ts Covers</h2>
+
+  <table>
+    <thead><tr><th>Surface</th><th>Tags</th><th>What's tested</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Contact Us page<br>(5 interest forms)</td>
+        <td><code>@smoke</code> <code>@regression</code></td>
+        <td>
+          Each interest (Shopping, Mortgage, Real Estate, Subcontractor, Selling Land):
+          fields visible, dropdown options logged, required-field error on empty submit,
+          invalid email/phone error, fill valid data and submit.
+        </td>
+      </tr>
+      <tr>
+        <td>Contact Us —<br>Local Information</td>
+        <td><code>@smoke</code></td>
+        <td>
+          State dropdown lists all 13 K. Hovnanian regions exactly once (no duplicates).
+          Selecting a state reveals local contact info + "Send us a text message" CTA.
+          Text message modal: fields, required validation, invalid validation, submit.
+        </td>
+      </tr>
+      <tr>
+        <td>QMI Details page</td>
+        <td><code>@smoke</code></td>
+        <td>Request Information modal: visible, fields correct, required validation, invalid validation, fill + submit, API 200 response assertion (non-prod).</td>
+      </tr>
+      <tr>
+        <td>Floorplan Details page</td>
+        <td><code>@regression</code></td>
+        <td>Same as QMI — modal flow on the Clyde II floorplan at River Ranch Trails.</td>
+      </tr>
+      <tr>
+        <td>Community Details page</td>
+        <td><code>@smoke</code></td>
+        <td>Request Information via header CTA on River Ranch Trails community page. Same modal flow + API assertion.</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <!-- ═══════════════════════ SECTION 8 ═════════════════════ -->
+  <h2>8 · Production Safety</h2>
+
+  <div class="callout">
+    <strong>No real leads are ever created on production.</strong> Every form is fully filled and
+    all field validations are exercised on every environment — but the actual HTTP submit call
+    is skipped on prod. The <code>submitForm()</code> / <code>submit()</code> method returns
+    <code>null</code> on prod and the test skips the success assertion branch.
+  </div>
+
+  <p>
+    On dev and UAT, submission goes through. The framework intercepts the
+    <code>/api/contact-us/</code> response via <code>waitForApi()</code>, asserts HTTP 200,
+    and inspects the JSON payload to confirm the form data was correctly posted.
+  </p>
+
+  <pre><span class="cm">// Non-prod: submit and assert API response</span>
+<span class="kw">const</span> response = <span class="kw">await</span> qmiPage.requestInfo.<span class="fn">submit</span>(constants.qmi.contact_us_api);
+<span class="kw">if</span> (response) {
+  <span class="kw">await</span> qmiPage.requestInfo.<span class="fn">verifyApiSubmission</span>(response);  <span class="cm">// asserts HTTP 200 + payload</span>
+  <span class="kw">await</span> qmiPage.requestInfo.<span class="fn">verifySubmissionSuccess</span>();        <span class="cm">// asserts success message on page</span>
+}
+<span class="cm">// On prod, response is null → if-block is skipped → no lead created</span></pre>
+
+
+  <!-- ═══════════════════════ SECTION 9 ═════════════════════ -->
+  <h2>9 · Reporting</h2>
+
+  <table>
+    <thead><tr><th>Reporter</th><th>Output</th><th>Use case</th></tr></thead>
+    <tbody>
+      <tr><td>ReportPortal</td><td>Live dashboard (browser)</td><td>Primary report. Named step tree, failure screenshots, per-launch attributes (env, OS, Node version). Enabled when <code>RP_API_KEY</code> is set.</td></tr>
+      <tr><td>HTML</td><td><code>playwright-report/</code></td><td>Local review. Full step details, traces, screenshots. Open after a run with <code>npx playwright show-report</code>.</td></tr>
+      <tr><td>List</td><td>Console</td><td>Real-time console output while tests run.</td></tr>
+    </tbody>
+  </table>
+
+
+  <!-- ═══════════════════════ SECTION 10 ═════════════════════ -->
+  <h2>10 · Shared Utilities</h2>
+
+  <table>
+    <thead><tr><th>Utility</th><th>File</th><th>What it provides</th></tr></thead>
+    <tbody>
+      <tr><td>Validator</td><td><code>utils/validator.ts</code></td><td>Static assertion helpers: <code>requireVisible</code>, <code>requireHidden</code>, <code>requireEnabled</code>, <code>requireText</code>, <code>requireUrlContains</code>, <code>requireNotEmpty</code>, <code>requireTrue</code> — each wrapped in a named <code>test.step</code>.</td></tr>
+      <tr><td>apiUtils</td><td><code>utils/apiUtils.ts</code></td><td><code>waitForApi(page, endpoint)</code> — intercepts a network response matching the URL + HTTP 200 and returns it. Used to assert the contact-us API call on non-prod.</td></tr>
+      <tr><td>testDataUtils</td><td><code>utils/testDataUtils.ts</code></td><td>Generates randomised test data: <code>randomFirstName()</code>, <code>randomLastName()</code>, <code>randomPhone()</code>, <code>randomEmail()</code>. Keeps form submissions unique across runs.</td></tr>
+      <tr><td>constants.json</td><td><code>utils/constants.json</code></td><td>Static expected values: page URLs, headings, API paths, interest labels, state dropdown options. Single source of truth — change a URL in one place, all tests pick it up.</td></tr>
+      <tr><td>test_data.json</td><td><code>utils/test_data.json</code></td><td>Dynamic test inputs: search terms, region names, API endpoints, local-information states for the text-message modal test.</td></tr>
+    </tbody>
+  </table>
+
+  <hr />
+
+  <div class="footer">
+    K. Hovnanian Homes — Test Automation Framework · June 2026
+  </div>
+
+</div>
+</body>
+</html>
