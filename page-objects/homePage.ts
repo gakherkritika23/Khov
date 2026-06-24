@@ -29,6 +29,10 @@ export class HomePage extends BasePage {
   readonly readReviewsCta: Locator;
   // Homepage content CTAs (excludes header/footer/search links — separate epics).
   readonly learnMoreCta: Locator;
+  // Legal Disclaimers section (with its "Read More"/"Read Less" expand toggle).
+  readonly legalDisclaimersSection: Locator;
+  readonly legalDisclaimersHeading: Locator;
+  readonly legalDisclaimersToggle: Locator;
   // All in-content images (used for the broken-media checks).
   readonly allImages: Locator;
 
@@ -40,8 +44,9 @@ export class HomePage extends BasePage {
     // Hero search box — react-aria searchbox exposed via its aria-label.
     // The element's id is dynamically generated, so we resolve it by role.
     this.searchInput = page.getByRole("searchbox", { name: "Search input" });
-    // Destination (results) page heading, e.g. "Dallas New Homes".
-    this.resultsHeading = page.locator("h1");
+    // Destination (results) page heading, e.g. "Dallas New Homes". Scoped to the
+    // main content area so a banner/breadcrumb <h1> can't shadow it.
+    this.resultsHeading = page.locator("main h1");
 
     // ── Hero ──
     this.heroSection = page.locator("section[class*='Hero_hero']").first();
@@ -57,7 +62,12 @@ export class HomePage extends BasePage {
     this.stateSectionHeading = page.getByRole("heading", {
       name: /Select a state to begin your search/i,
     });
-    this.stateNativeSelect = page.locator("select").first();
+    // Identify the state <select> by content (it holds the TX option) rather than
+    // by position, so an unrelated <select> elsewhere can't shadow it.
+    this.stateNativeSelect = page
+      .locator("select")
+      .filter({ has: page.locator("option[value='TX']") })
+      .first();
     this.stateOptions = this.stateNativeSelect.locator("option");
     // The visible, interactive trigger that opens the state listbox popover.
     this.stateSelectTrigger = page.locator(
@@ -81,7 +91,22 @@ export class HomePage extends BasePage {
       name: /Learn More About Looks/i,
     });
 
-    this.allImages = page.locator("main img, img");
+    // ── Legal Disclaimers ──
+    this.legalDisclaimersSection = page
+      .locator("section[class*='disclaimers_container']")
+      .first();
+    this.legalDisclaimersHeading = this.legalDisclaimersSection.getByRole(
+      "heading",
+      { name: /Legal Disclaimers/i },
+    );
+    this.legalDisclaimersToggle = this.legalDisclaimersSection
+      .locator("button[class*='Disclaimer_action']")
+      .first();
+
+    // All rendered images on the page (matches the scope validated by
+    // verifyNoBrokenImages). The previous "main img, img" was equivalent to "img"
+    // since the unscoped operand already matched everything.
+    this.allImages = page.locator("img");
   }
 
   // ── Hero Search — Actions ──────────────────────────────
@@ -202,12 +227,16 @@ export class HomePage extends BasePage {
   }
 
   // ── Page Load — Verification ───────────────────────────
-  async verifyHomePageLoaded(expectedTitlePart: string): Promise<void> {
+  /**
+   * Verifies the home page loaded: the document title matches **exactly** and the
+   * main landmark is visible.
+   */
+  async verifyHomePageLoaded(expectedTitle: string): Promise<void> {
     const title = await this.getTitle();
     await reportValue(`Home page title: ${title}`);
     await Validator.requireTrue(
-      title.includes(expectedTitlePart),
-      `Page title should contain "${expectedTitlePart}" (got "${title}")`,
+      title === expectedTitle,
+      `Page title should be "${expectedTitle}" (got "${title}")`,
     );
     await Validator.requireVisible(
       this.page.locator("main").first(),
@@ -256,15 +285,17 @@ export class HomePage extends BasePage {
       `Hero video should be a Vimeo player embed (src: ${src})`,
     );
     await reportValue(`Hero video src: ${src}`);
-    // Assert the video asset is actually reachable (player embed returns 200).
+    // Assert the video embed is reachable. This is a third-party (Vimeo) URL, so
+    // tolerate redirects (3xx) — only a 4xx/5xx (or no response) is a real
+    // failure. Actual playback is proven separately by verifyHeroVideoAutoplays.
     const resp = await this.page.request
-      .get(src, { timeout: 15000 })
+      .get(src, { timeout: 15000, maxRedirects: 5 })
       .catch(() => null);
     const status = resp ? resp.status() : "ERR";
     await reportValue(`Hero video embed status: ${status}`);
     await Validator.requireTrue(
-      status === 200,
-      `Hero video embed should return 200 (got ${status})`,
+      typeof status === "number" && status < 400,
+      `Hero video embed should be reachable (status < 400, got ${status})`,
     );
   }
 
@@ -387,10 +418,13 @@ export class HomePage extends BasePage {
     await this.page.waitForTimeout(1500);
     const t2 = await this.queryHeroPlayer("getCurrentTime");
     await reportValue(`Hero video currentTime: ${t1}s → ${t2}s`);
+    // Assert the playhead MOVED (not strictly greater): the video has loop=1, so
+    // two samples can straddle the loop boundary and make t2 < t1 — a changed
+    // time still proves the video is playing.
     await Validator.requireTrue(
       typeof t1 === "number" &&
         typeof t2 === "number" &&
-        (t2 as number) > (t1 as number),
+        (t2 as number) !== (t1 as number),
       `Hero video playback should advance while autoplaying (t1=${t1}, t2=${t2})`,
     );
   }
@@ -406,15 +440,11 @@ export class HomePage extends BasePage {
       "Hero media (play/pause) control should be visible",
       20000,
     );
-    // Playing on load (wait for autoplay to engage after initial buffering).
-    let paused = await this.waitForHeroVideoPaused(false);
-    await Validator.requireTrue(
-      paused === false,
-      `Hero video should be playing before pause (getPaused=${paused})`,
-    );
+    // Precondition: the caller (Hero TC-01) has already verified autoplay, so the
+    // video is playing here — go straight to the user pause→play round-trip.
     // User pause.
     await this.click(this.heroMediaControl, "Hero media control → pause");
-    paused = await this.waitForHeroVideoPaused(true);
+    let paused = await this.waitForHeroVideoPaused(true);
     await reportValue(`Hero video paused after pause click: ${paused}`);
     await Validator.requireTrue(
       paused === true,
@@ -548,11 +578,11 @@ export class HomePage extends BasePage {
 
   async verifyReadReviewsCtaWorks(): Promise<void> {
     await Validator.requireVisible(
-      this.readReviewsCta,
+      this.readReviewsCta.first(),
       "'Read TrustBuilder Reviews' CTA should be displayed",
       20000,
     );
-    const href = await this.getHref(this.readReviewsCta);
+    const href = await this.getHref(this.readReviewsCta.first());
     await reportValue(`Read TrustBuilder Reviews href: ${href}`);
     await Validator.requireTrue(
       /newhomesource\.com/i.test(href),
@@ -569,6 +599,72 @@ export class HomePage extends BasePage {
       expectedUrlPart,
       `'Learn More' should navigate to a URL containing "${expectedUrlPart}"`,
       20000,
+    );
+  }
+
+  // Poll the disclaimer toggle's label until it differs from `previous` (the
+  // React re-render after a click can lag under slowMo). Returns the new label,
+  // or the last-seen value if it never changes within the window.
+  private async waitForToggleLabelChange(previous: string): Promise<string> {
+    let current = previous;
+    for (let i = 0; i < 12; i++) {
+      current = (await this.legalDisclaimersToggle.innerText()).trim();
+      if (current.toLowerCase() !== previous.toLowerCase()) break;
+      await this.page.waitForTimeout(400);
+    }
+    return current;
+  }
+
+  // ── Legal Disclaimers — Verification ───────────────────
+  /**
+   * Verifies the Legal Disclaimers section: heading visible, disclaimer body
+   * text present, and the "Read More" control expands/collapses (label
+   * round-trips Read More → Read Less → Read More).
+   */
+  async verifyLegalDisclaimersSection(): Promise<void> {
+    await this.scrollIntoView(this.legalDisclaimersSection);
+    await Validator.requireVisible(
+      this.legalDisclaimersSection,
+      "Legal Disclaimers section should be displayed",
+      20000,
+    );
+    await Validator.requireVisible(
+      this.legalDisclaimersHeading,
+      "'Legal Disclaimers' heading should be displayed",
+      20000,
+    );
+
+    const body = (await this.legalDisclaimersSection.innerText())
+      .replace(/\s+/g, " ")
+      .replace(/Legal Disclaimers/i, "")
+      .replace(/Read More|Read Less/gi, "")
+      .trim();
+    await Validator.requireNotEmpty(
+      body,
+      "Legal Disclaimers body text should be present",
+    );
+    await reportValue(`Legal disclaimer length: ${body.length} chars`);
+
+    // Read More / Read Less expand toggle round-trip.
+    await Validator.requireVisible(
+      this.legalDisclaimersToggle,
+      "Legal Disclaimers 'Read More' control should be displayed",
+      20000,
+    );
+    const initial = (await this.legalDisclaimersToggle.innerText()).trim();
+    await this.click(this.legalDisclaimersToggle, "Legal Disclaimers expand toggle");
+    const expanded = await this.waitForToggleLabelChange(initial);
+    await reportValue(`Legal disclaimer toggle: "${initial}" → "${expanded}"`);
+    await Validator.requireTrue(
+      initial.toLowerCase() !== expanded.toLowerCase(),
+      `Legal Disclaimers toggle should change state (was "${initial}", now "${expanded}")`,
+    );
+    await this.click(this.legalDisclaimersToggle, "Legal Disclaimers collapse toggle");
+    const collapsed = await this.waitForToggleLabelChange(expanded);
+    await reportValue(`Legal disclaimer toggle back: "${expanded}" → "${collapsed}"`);
+    await Validator.requireTrue(
+      collapsed.toLowerCase() === initial.toLowerCase(),
+      `Legal Disclaimers toggle should revert (expected "${initial}", got "${collapsed}")`,
     );
   }
 
@@ -622,6 +718,7 @@ export class HomePage extends BasePage {
         .catch(() => null);
       const status = resp ? resp.status() : "ERR";
       if (status !== 200) nonOk.push(`${status} ${url}`);
+      await reportValue(`Image: ${status} ${url}`);
     }
 
     await reportValue(
@@ -657,11 +754,15 @@ export class HomePage extends BasePage {
         }
       };
       const vh = window.innerHeight;
-      // First-party images only (third-party CDN assets lazy-load/decode racily).
+      // First-party images currently in the viewport at the bottom of the page
+      // (third-party CDN assets lazy-load/decode racily). `top` is viewport-
+      // relative, so [0, vh) isolates the newly-revealed bottom images rather than
+      // re-checking images scrolled past above the fold (negative `top`).
       const imgs = Array.from(document.querySelectorAll("img")).filter((im) => {
         const r = im.getBoundingClientRect();
         return (
-          r.top < vh * 2 &&
+          r.top >= 0 &&
+          r.top < vh &&
           r.width > 1 &&
           r.height > 1 &&
           isFirstParty(im.currentSrc || im.src)

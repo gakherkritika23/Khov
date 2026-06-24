@@ -252,13 +252,13 @@ dropdown lists 7 regions twice on dev (CF-05 flags it).
 > Implemented in `page-objects/homePage.ts` (E7 blocks added alongside the
 > Search-bar POM) and `tests/homePage.spec.ts` (E7 `test.describe` blocks).
 > Certified against **prod** (`TEST_ENV=prod`) — **all passing**. The E7 content
-> coverage is **8 cases** (HP-01…HP-08), consolidated from the original 34 (the
+> coverage is **9 cases** (HP-01…HP-09), consolidated from the original 34 (the
 > `homePage.spec.ts` file also holds the 2 E1 search tests). Test-case → spec
 > references use the `homePage.spec.ts` describe block + TC number.
 
 | ID | Test case | Tag | Status |
 |----|-----------|-----|--------|
-| HP-01 | Homepage loads (200, main landmark), hero heading displayed, and initial render within threshold | @smoke | ✅ (`Page Load` TC-01) |
+| HP-01 | Homepage loads (exact page title + main landmark), hero heading displayed, and initial render within threshold | @smoke | ✅ (`Page Load` TC-01 — exact title "K. Hovnanian® Homes – New Home Builders") |
 | HP-02 | Hero section/video render, autoplay, load (embed 200) and play/pause round-trip — asserted via the Vimeo Player API | @smoke | ✅ (`Hero` TC-01) |
 | HP-03 | "Select a State" section displayed, all 13 states listed, and selecting a state navigates to its region page | @smoke | ✅ (`State Selection` TC-01 — active-state nav via the react-aria listbox: DOM-open + synthesized pointer-press) |
 | HP-04 | TrustBuilder section loads with overall rating (4.3/5), review count, and the "Read Reviews" CTA (external href asserted) | @smoke | ✅ (`Testimonials (TrustBuilder)` TC-01) |
@@ -266,6 +266,7 @@ dropdown lists 7 regions twice on dev (CF-05 flags it).
 | HP-06 | Lazy-loaded images render correctly on scroll | @regression | ✅ (`Media` TC-02) |
 | HP-07 | "Learn More" CTA navigates correctly | @regression | ✅ (`Navigation CTAs` TC-01 — → `/looks/`) |
 | HP-08 | All internal links return 200 | @regression | ✅ (`Links` TC-01 — 15 first-party links) |
+| HP-09 | Legal Disclaimers section displays disclaimer text and the "Read More" control expands/collapses | @regression | ✅ (`Legal Disclaimers` TC-01 — body text present + Read More→Read Less→Read More round-trip) |
 
 **Notes / open questions:**
 - The **HomePage** page object should contain **only** homepage-specific
