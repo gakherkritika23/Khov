@@ -94,31 +94,31 @@ export class GlobalFooter extends BasePage {
   }
 
   async verifyNavLinksVisible(): Promise<void> {
-    await Validator.requireVisible(this.navLinkFindYourHome, "Footer nav: Find Your Home");
-    await Validator.requireVisible(this.navLinkHomeBuyingProcess, "Footer nav: Home Buying Process");
-    await Validator.requireVisible(this.navLinkFinanceYourHome, "Footer nav: Finance Your Home");
-    await Validator.requireVisible(this.navLinkWhyKHovnanian, "Footer nav: Why K. Hovnanian");
-    await Validator.requireVisible(this.navLinkContactUs, "Footer nav: Contact Us");
-    await Validator.requireVisible(this.navLinkHomeownerServices, "Footer nav: Homeowner Services");
-    await Validator.requireVisible(this.navLinkInvestorRelations, "Footer nav: Investor Relations");
-    await Validator.requireVisible(this.navLinkCareers, "Footer nav: Careers");
-    await Validator.requireVisible(this.navLinkBlog, "Footer nav: Blog");
-    await Validator.requireVisible(this.navLinkSitemap, "Footer nav: Sitemap");
+    await Validator.requireVisible(this.navLinkFindYourHome, "Footer nav: Find Your Home should be visible");
+    await Validator.requireVisible(this.navLinkHomeBuyingProcess, "Footer nav: Home Buying Process should be visible");
+    await Validator.requireVisible(this.navLinkFinanceYourHome, "Footer nav: Finance Your Home should be visible");
+    await Validator.requireVisible(this.navLinkWhyKHovnanian, "Footer nav: Why K. Hovnanian should be visible");
+    await Validator.requireVisible(this.navLinkContactUs, "Footer nav: Contact Us should be visible");
+    await Validator.requireVisible(this.navLinkHomeownerServices, "Footer nav: Homeowner Services should be visible");
+    await Validator.requireVisible(this.navLinkInvestorRelations, "Footer nav: Investor Relations should be visible");
+    await Validator.requireVisible(this.navLinkCareers, "Footer nav: Careers should be visible");
+    await Validator.requireVisible(this.navLinkBlog, "Footer nav: Blog should be visible");
+    await Validator.requireVisible(this.navLinkSitemap, "Footer nav: Sitemap should be visible");
   }
 
   async verifySocialLinksVisible(): Promise<void> {
-    await Validator.requireVisible(this.socialLinkFacebook, "Footer social: Facebook");
-    await Validator.requireVisible(this.socialLinkPinterest, "Footer social: Pinterest");
-    await Validator.requireVisible(this.socialLinkYouTube, "Footer social: YouTube");
-    await Validator.requireVisible(this.socialLinkInstagram, "Footer social: Instagram");
+    await Validator.requireVisible(this.socialLinkFacebook, "Footer social: Facebook should be visible");
+    await Validator.requireVisible(this.socialLinkPinterest, "Footer social: Pinterest should be visible");
+    await Validator.requireVisible(this.socialLinkYouTube, "Footer social: YouTube should be visible");
+    await Validator.requireVisible(this.socialLinkInstagram, "Footer social: Instagram should be visible");
   }
 
   async verifyUtilityLinksVisible(): Promise<void> {
-    await Validator.requireVisible(this.utilityLinkPrivacyPolicy, "Footer utility: Privacy Policy");
-    await Validator.requireVisible(this.utilityLinkTermsAndConditions, "Footer utility: Terms & Conditions");
-    await Validator.requireVisible(this.utilityLinkAccessibility, "Footer utility: Accessibility");
-    await Validator.requireVisible(this.utilityLinkEqualHousingOpportunity, "Footer utility: Equal Housing Opportunity");
-    await Validator.requireVisible(this.utilityLinkManagePreferences, "Footer utility: Manage Preferences");
+    await Validator.requireVisible(this.utilityLinkPrivacyPolicy, "Footer utility: Privacy Policy should be visible");
+    await Validator.requireVisible(this.utilityLinkTermsAndConditions, "Footer utility: Terms & Conditions should be visible");
+    await Validator.requireVisible(this.utilityLinkAccessibility, "Footer utility: Accessibility should be visible");
+    await Validator.requireVisible(this.utilityLinkEqualHousingOpportunity, "Footer utility: Equal Housing Opportunity should be visible");
+    await Validator.requireVisible(this.utilityLinkManagePreferences, "Footer utility: Manage Preferences should be visible");
   }
 
   // ── Verification — Clickable ─────────────────────────────
@@ -191,9 +191,10 @@ export class GlobalFooter extends BasePage {
 
   async verifyFinanceYourHomeHref(): Promise<void> {
     const href = await this.getHref(this.navLinkFinanceYourHome);
+    const expected = constants.footer.nav_links.finance_your_home_url;
     await Validator.requireTrue(
-      href.includes(constants.footer.nav_links.finance_your_home_url),
-      "Finance Your Home link should point to khovmortgage.com",
+      href.includes(expected),
+      `Finance Your Home link href should contain "${expected}" (actual: "${href}")`,
     );
   }
 
@@ -201,16 +202,28 @@ export class GlobalFooter extends BasePage {
     const social = constants.footer.social_links;
 
     const facebook = await this.getHref(this.socialLinkFacebook);
-    await Validator.requireTrue(facebook.includes(social.facebook_url), "Facebook link should point to facebook.com");
+    await Validator.requireTrue(
+      facebook.includes(social.facebook_url),
+      `Facebook link href should contain "${social.facebook_url}" (actual: "${facebook}")`,
+    );
 
     const pinterest = await this.getHref(this.socialLinkPinterest);
-    await Validator.requireTrue(pinterest.includes(social.pinterest_url), "Pinterest link should point to pinterest.com");
+    await Validator.requireTrue(
+      pinterest.includes(social.pinterest_url),
+      `Pinterest link href should contain "${social.pinterest_url}" (actual: "${pinterest}")`,
+    );
 
     const youtube = await this.getHref(this.socialLinkYouTube);
-    await Validator.requireTrue(youtube.includes(social.youtube_url), "YouTube link should point to youtube.com");
+    await Validator.requireTrue(
+      youtube.includes(social.youtube_url),
+      `YouTube link href should contain "${social.youtube_url}" (actual: "${youtube}")`,
+    );
 
     const instagram = await this.getHref(this.socialLinkInstagram);
-    await Validator.requireTrue(instagram.includes(social.instagram_url), "Instagram link should point to instagram.com");
+    await Validator.requireTrue(
+      instagram.includes(social.instagram_url),
+      `Instagram link href should contain "${social.instagram_url}" (actual: "${instagram}")`,
+    );
   }
 
   async verifyUtilityLinkNavigations(): Promise<void> {
@@ -222,12 +235,6 @@ export class GlobalFooter extends BasePage {
     // Manage Preferences (href="#") triggers the OneTrust consent modal — no page navigation expected
   }
 
-  // ── Data Getters ────────────────────────────────────────
-
-  async getCopyrightText(): Promise<string> {
-    return await this.getText(this.copyrightText);
-  }
-
   // ── Verification — Copyright ─────────────────────────────
 
   async verifyCopyrightText(): Promise<void> {
@@ -237,5 +244,11 @@ export class GlobalFooter extends BasePage {
       expected,
       `Copyright text should read "${expected}"`,
     );
+  }
+
+  // ── Data Getters ────────────────────────────────────────
+
+  async getCopyrightText(): Promise<string> {
+    return await this.getText(this.copyrightText);
   }
 }

@@ -38,6 +38,7 @@ export class BasePage {
     label: string,
   ): Promise<void> {
     await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeVisible();
     await link.click();
     console.log(`Clicked on: ${label}`);
     await Validator.requireUrlContains(
