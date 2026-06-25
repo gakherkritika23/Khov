@@ -99,7 +99,7 @@ environment/    → dev.env / uat.env / stage.env / prod.env (per-env BASE_URL)
 
 `playwright.config.ts` reads `process.env.TEST_ENV` (set via npm scripts; falls back to `dev` if unset/unknown, with a warning) and loads `environment/{TEST_ENV}.env`. Supported envs: `dev`, `uat`, `stage`, `prod`. Each env file defines `ENV` and `BASE_URL`; `baseURL` comes **only** from `BASE_URL` (the config throws fail-fast if it's unset). Base URLs: dev `www-dev`, uat `www-uat`, stage `www-stg`, prod `www.khov.com`. Tests run **headed** (`headless: false` in config).
 
-> The community-page specs are pinned to a **prod**-only community (River Ranch Trails), so run them with `TEST_ENV=prod`.
+> The community-page specs are pinned to the River Ranch Trails community, which is available on dev, uat, and prod — they can run against any environment.
 
 ### ReportPortal Integration
 
