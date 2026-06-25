@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import { test } from "./baseTest";
 import { GlobalFooter } from "../page-objects/footer";
 import { HomePage } from "../page-objects/homePage";
@@ -69,8 +68,6 @@ test.describe("Global Footer", () => {
   test("TC-07 | Copyright text contains the brand name and rights notice @regression", async () => {
     const copyright = await footer.getCopyrightText();
     await reportValue(`Copyright text: ${copyright}`);
-    // Year changes annually — assert the stable parts only
-    expect(copyright, "Copyright should include 'K. Hovnanian'").toContain("K. Hovnanian");
-    expect(copyright, "Copyright should include 'All Rights Reserved'").toContain("All Rights Reserved");
+    await footer.verifyCopyrightText();
   });
 });

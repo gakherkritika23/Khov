@@ -37,6 +37,33 @@
     "heading": "Clyde II",
     "contact_us_api": "/api/contact-us/"
   },
+  "footer": {
+    "nav_links": {
+      "find_your_home_url": "/new-construction-homes/",
+      "home_buying_process_url": "/home-buying-process/",
+      "finance_your_home_url": "https://www.khovmortgage.com/",
+      "why_k_hovnanian_url": "/why-choose-k-hovnanian/",
+      "contact_us_url": "/contact-us/",
+      "homeowner_services_url": "/homeowner-services/",
+      "investor_relations_url": "/investor-relations/",
+      "careers_url": "/careers/",
+      "blog_url": "/blog/",
+      "sitemap_url": "/sitemap/"
+    },
+    "social_links": {
+      "facebook_url": "https://www.facebook.com/khovnanianhomes/",
+      "pinterest_url": "https://www.pinterest.com/khovnanianhomes/",
+      "youtube_url": "https://www.youtube.com/KHovnanianHomes",
+      "instagram_url": "https://www.instagram.com/khovhomes"
+    },
+    "utility_links": {
+      "privacy_policy_url": "/privacy-policy/",
+      "terms_and_conditions_url": "/terms-and-conditions/",
+      "accessibility_url": "/accessibility/",
+      "equal_housing_opportunity_url": "/equal-housing-opportunity/"
+    },
+    "copyright_text": "K. Hovnanian® Companies, LLC.  All Rights Reserved."
+  },
   "contact_us": {
     "url": "/contact-us/",
     "heading": "Contact Us",
