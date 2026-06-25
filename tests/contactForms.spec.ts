@@ -59,7 +59,7 @@ test.describe("Contact Us — Field & Dropdown Audit", () => {
     if (resp) await contactUsPage.verifySubmissionSuccess("I am shopping for a new home");
   });
 
-  test("TC-02 | Mortgage information — fields exist + dropdown options @form @regression", async () => {
+  test("TC-02 | Mortgage information — fields exist + dropdown options @form @smoke", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.selectInterest("I would like mortgage information");
     await contactUsPage.verifyFieldsForInterest("I would like mortgage information");
@@ -73,7 +73,7 @@ test.describe("Contact Us — Field & Dropdown Audit", () => {
     if (resp) await contactUsPage.verifySubmissionSuccess("I would like mortgage information");
   });
 
-  test("TC-03 | Real estate professional — fields exist + dropdown options @form @regression", async () => {
+  test("TC-03 | Real estate professional — fields exist + dropdown options @form @smoke", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.selectInterest("I am a real estate professional");
     await contactUsPage.verifyFieldsForInterest("I am a real estate professional");
@@ -87,7 +87,7 @@ test.describe("Contact Us — Field & Dropdown Audit", () => {
     if (resp) await contactUsPage.verifySubmissionSuccess("I am a real estate professional");
   });
 
-  test("TC-04 | Subcontractor — fields exist + dropdown options @form @regression", async () => {
+  test("TC-04 | Subcontractor — fields exist + dropdown options @form @smoke", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.selectInterest("I am a subcontractor");
     await contactUsPage.verifyFieldsForInterest("I am a subcontractor");
@@ -101,7 +101,7 @@ test.describe("Contact Us — Field & Dropdown Audit", () => {
     if (resp) await contactUsPage.verifySubmissionSuccess("I am a subcontractor");
   });
 
-  test("TC-05 | Selling land — fields exist + dropdown options @form @regression", async () => {
+  test("TC-05 | Selling land — fields exist + dropdown options @form @smoke", async () => {
     await reportValue(`Page URL: ${await contactUsPage.getUrl()}`);
     await contactUsPage.selectInterest("I am selling land");
     await contactUsPage.verifyFieldsForInterest("I am selling land");
@@ -222,7 +222,7 @@ test.describe("Floorplan Details — Request Information Form", () => {
     planPage = await PlanDetailPage.openFloorplan(page);
   });
 
-  test("TC-01 | Request Information form — fields, validation, submit @form @regression", async () => {
+  test("TC-01 | Request Information form — fields, validation, submit @form @smoke", async () => {
     await planPage.verifyCtasAreDisplayed();
     await planPage.openRequestInformationModal();
     await planPage.requestInfo.verifyModalIsDisplayed();

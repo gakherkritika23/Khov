@@ -61,7 +61,7 @@ test.describe("Community Page — Floorplan Section", () => {
     communityPage = await openCommunity(page);
   });
 
-  test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @regression", async () => {
+  test("TC-01 | Floorplan section — cards, carousels, meta data, mortgage calculator and detail navigation @smoke", async () => {
     await reportValue(`Page URL: ${await communityPage.getUrl()}`);
     // Floorplan/home cards: render with specs + pricing, images.
     await communityPage.verifyHomeCardsAreDisplayed();
