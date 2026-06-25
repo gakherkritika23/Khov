@@ -28,6 +28,7 @@
     "allure-js-commons": "^3.4.5",
     "allure-playwright": "^3.5.0",
     "cross-env": "^10.1.0",
+    "pptxgenjs": "^4.0.1",
     "prettier": "^3.8.1"
   },
   "dependencies": {
