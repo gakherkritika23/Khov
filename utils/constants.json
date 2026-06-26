@@ -4,10 +4,23 @@
     "url": "/"
   },
   "header": {
+    "logo_url": "/",
+    "sign_in": {
+      "warranty_portal_url": "https://warranty.khov.com/",
+      "design_price_tool_url": "/auth/login",
+      "mortgage_buyer_portal_url": "https://www.khov-pos.com/sign-in"
+    },
     "nav_links": {
-      "find_a_home": "Find a Home",
-      "why_khov": "Why K. Hovnanian",
-      "resources": "Resources"
+      "new_construction_homes_url": "/new-construction-homes/",
+      "active_lifestyle_url": "/four-seasons/",
+      "homebuying_process_url": "/home-buying-process/",
+      "financial_services_url": "/financial-services/",
+      "why_choose_us_url": "/why-choose-k-hovnanian/",
+      "investor_relations_url": "/investor-relations/",
+      "contact_us_url": "/contact-us/",
+      "homeowner_services_url": "/homeowner-services/",
+      "careers_url": "/careers/",
+      "looks_url": "/looks/"
     }
   },
   "home_search": {
