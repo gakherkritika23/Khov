@@ -1,6 +1,6 @@
 # Region Page — Verification Coverage
 
-_Last updated: 2026-06-23_
+_Last updated: 2026-06-26_
 
 What the **region page** (the market-results / "New Home Communities" results page,
 e.g. `/new-construction-homes/texas/`) automated tests verify today. Source files:
@@ -173,6 +173,24 @@ The **"All filters"** button (`getByRole("button", { name: /All filters/i })`) o
 | 1 | First community name captured | From the card's `data-card-element`; **logged** |
 | 2 | **"Learn More" opens the detail page** | DOM-click the card's **"Learn More"** link (`clickViaScript` — the card re-renders as the rail streams in, leaving the link attached-but-not-"visible", which hangs a normal click) → lands on that community's detail page (URL pattern + level-1 heading matches the name); heading **logged** |
 
+### TC-05 | Coming Soon badge, zero-results state, and multi-filter combination  `@regression`
+Three independent scenarios in one test (10-minute ceiling via `test.setTimeout(600_000)`). All filters modal operations are client-side (2.5s settle).
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | **Coming Soon per-card badge** | Open All Filters modal → check **"Coming Soon"** → apply → if count > 0: read every card's `[class*='Community_tags']` text via `evaluateAll`, assert each **contains "coming soon"** (case-insensitive). Coming Soon is 1:1 reliable: every community returned by the filter is exclusively in pre-sales state and always shows the badge. Dallas prod has 4 confirmed Coming Soon communities (Elevon 3, North Sky, The Preserve at Green Meadows, Bent Tree Meadows). Graceful skip if 0 results in other markets. Clear + restore. |
+| 2 | **Zero-results state** | Open Price Range filter, type **Minimum = 900000** (exceeds every Dallas community — max is mid $600s) → apply → assert count **exactly 0**; clear → assert count ≥ baseline. Verifies the UI handles an impossible filter gracefully (no crash, no stale data) and that clearing fully restores the rail. |
+| 3 | **Multi-filter combination** | Open All Filters modal → check both **"Single Family Homes"** (Home Type) AND **"Looks Communities"** (Community Type) → click Apply **once** (both active simultaneously). Per-card assertions: `[class*='Community_details']` contains "Single Family Homes" AND `[class*='Community_type']` contains "looks". Verifies two checkboxes in one modal apply don't interfere with each other. Dallas result: 16 (Providence Commons / Townhouse excluded). Clear + restore. |
+
+### TC-06 | Filter + Sort chain: price filter stays active after sorting  `@regression`
+| # | Verification | How |
+|---|--------------|-----|
+| 1 | **Price max filter applied** | Open Price Range, set **Maximum = 450000** → apply, await `/api/search` → assert count reduced (8 < 13 baseline); **logged** |
+| 2 | **Sort applied on filtered results** | Open sort listbox, choose **"Price - Low to High"** — no filter clear between filter and sort |
+| 3 | **Filter not reset by sort** | Assert result count after sort **equals** filtered count (8 = 8) — the sort must not silently clear the active price filter; **logged** |
+| 4 | **All prices ≤ max** | Read all card price ordinals → assert every price ≤ $450,000 (filter still constraining); **logged** |
+| 5 | **Prices non-decreasing** | Assert the sorted sequence is non-decreasing (same 1/8 tolerance as TC-02) — confirms sort works correctly on a reduced dataset; inversion count **logged** |
+| 6 | **Clear restores baseline** | Clear filter → assert count ≥ pre-filter baseline; **logged** |
+
 ---
 
 ## Region "Request Information" form  _(CF-10 — in `contactForms.spec.ts`)_
@@ -194,7 +212,7 @@ every env by the in-page QMI / Floorplan / Community surfaces.
 | Area | Status |
 |------|--------|
 | **Scattered-lots map rendering (RG-07)** | ⬜ **Deferred — confirmed data limitation.** An exhaustive prod sweep of all 13 state markets (AZ, CA, DE, FL, GA, MD, NJ, OH, PA, SC, TX, VA, WV) found only `community:<id>` map pins (+ "N cities" cluster pills) — no scattered-lot marker type, and "scatter"/"scattered" appears in no rendered DOM, `__NEXT_DATA__`, or network JSON anywhere. There is nothing to assert until a scattered-lot product is launched. |
-| **Filter coverage** | All inline filters exercised: **Price Range** (min+max; per-result max-price ≤ validation on every card), **Bed & Baths** (Beds "3+" + Baths "2+"; count ≥ 1; beds/baths not on rail cards → per-result validation not possible). **All filters modal**: Home Availability (Quick Move-In + Coming Soon), Home Type (all 4 values — Single Family Homes / Townhouses / Condominiums / Villas; per-card details assertion for types with results; graceful skip for 0-result types), Community Type (Looks Communities; per-card badge assertion). Multi-filter combinations not exercised. |
+| **Filter coverage** | All inline filters exercised: **Price Range** (min+max; per-result max-price ≤ validation; zero-results state verified), **Bed & Baths** (Beds "3+" + Baths "2+"; count ≥ 1). **All filters modal**: Home Availability (Quick Move-In count-only; Coming Soon with per-card badge via `Community_tags`), Home Type (all 4 values; per-card details assertion; graceful skip for 0-result types), Community Type (Looks Communities; per-card badge assertion). **Multi-filter combination** (Home Type + Community Type in one apply, per-card both signals). **Filter + Sort chain** (filter active during sort, count unchanged, prices still ≤ max). |
 | **Sort coverage** | All 5 sort options exercised: **"Price - Low to High"** (non-decreasing), **"Price - High to Low"** (non-increasing), **"Featured"** (count restore), **"A - Z"** (alphabetically non-decreasing names), **"Z - A"** (reverse-alphabetical). |
 | **Map** | Pan distance/direction (only that the camera moved); the cluster-pill drill-down (clicking an "N cities" pill); keyboard/wheel panning (disabled on this map). **"Reset map"**: now covered (TC-02, button visible + map healthy). **Bidirectional card→marker**: confirmed NOT implemented in the UI — clicking a rail card does not highlight the corresponding map marker (interaction is one-way: marker→card only, which TC-04 tests). |
 | **Results count** | Count accuracy (reported = rendered cards) now asserted in Community Results TC-02. |

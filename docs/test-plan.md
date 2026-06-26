@@ -1,6 +1,6 @@
 # khov.com — Test Automation Plan
 
-_Last updated: 2026-06-08_
+_Last updated: 2026-06-26_
 
 This is the master backlog for automating khov.com end-to-end coverage. Each
 epic below maps to one Page Object (`page-objects/*.ts`) and one spec
@@ -21,7 +21,7 @@ Status legend: ✅ Done · 🟡 Partial / in progress · ⬜ Not started
 |------|------|-----------------------|-----------------|--------|
 | E0 | Framework / shared helpers | `basePage.ts` | — | ✅ |
 | E1 | Search bar | `homePage.ts` | `homePage.spec.ts` | 🟡 (core ✅; SB-04/05 pending) |
-| E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | ✅ (RG-01..06, RG-08..11; RG-07 deferred — data limitation) |
+| E2 | Region page | `regionPage.ts` | `regionPage.spec.ts` | ✅ (RG-01..06, RG-08..11; Phase 4: Coming Soon badge, zero-results, multi-filter, filter+sort chain; RG-07 deferred — data limitation) |
 | E3 | Community page | `communityPage.ts` | `communityPage.spec.ts` | ✅ (header, floorplan, QMI) |
 | E4 | QMI details page | `qmiPage.ts` | `qmiPage.spec.ts` | 🟡 (QD-01/02/03/04/06/07/09/10/11 ✅; QD-05/08 deferred) |
 | E5 | Floorplan details page | `planDetailPage.ts` | `planDetailPage.spec.ts` | ✅ (FD-01..FD-09; Request Info lives in `contactForms.spec.ts`) |
@@ -95,6 +95,7 @@ keystrokes after React hydration (handled by `searchAndSelectSuggestion`).
 Community Results TC-01/02 use the **Texas state** view (42 communities, SB-01 coverage).
 All entry via retrying `enterRegion()` (heading + first card ready-signal). `retries: 0` — every test passes first-go.
 Breadcrumbs and pagination are not present on the region page (confirmed by spike).
+**Phase 4 additions** (TC-05 + TC-06 in the Filters & Sort describe): Coming Soon per-card badge (`[class*='Community_tags']` assertion — reliable 1:1 unlike QMI), zero-results state ($900k min → 0 results; graceful UI handling + clear restore), multi-filter combination (Home Type + Looks Communities in one apply with per-card signal for both), and filter+sort chain (sort on already-filtered results preserves count and price constraint). All 6 Filters & Sort tests pass prod first-go (~11 min).
 
 ---
 
