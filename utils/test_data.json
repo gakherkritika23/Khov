@@ -21,7 +21,8 @@
     "sortOptionZtoA": "Z - A",
     "bedsFilterValue": "3+",
     "bathsFilterValue": "2+",
-    "homeTypes": ["Single Family Homes", "Townhouses", "Condominiums", "Villas"]
+    "homeTypes": ["Single Family Homes", "Townhouses", "Condominiums", "Villas"],
+    "zeroResultsMinPrice": "900000"
   },
   "contact_us": {
     "_comment": "Single-occurrence states only — all verified to surface local-information results + a Send-us-a-text-message CTA. The duplicated dropdown regions (Arizona, California, Delaware, Georgia, Ohio, Pennsylvania, Texas) surface no local info, so TC-02 picks randomly from this safe set instead of the full list.",

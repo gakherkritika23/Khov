@@ -253,6 +253,36 @@ test.describe("Region Page — Filters & Sort", () => {
     await regionPage.verifyAllFiltersLooksCommunity();
   });
 
+  test("TC-05 | Coming Soon badge, zero-results state, and multi-filter combination @regression", async () => {
+    // Modal-heavy test — 3 All-filters round-trips + zero-results flow
+    test.setTimeout(600_000);
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Coming Soon per-card badge: dedicated method, existing TC-03 untouched.
+    await regionPage.verifyAllFiltersComingSoonBadge();
+    // Zero-results: min price $900k exceeds every Dallas community → 0 results;
+    // clearing must restore the baseline.
+    await regionPage.verifyZeroResultsState(
+      testData.region_filters_sort.zeroResultsMinPrice,
+    );
+    // Multi-filter: two checkboxes in one All Filters apply (Home Type +
+    // Community Type). Per-card: details contains homeType AND Looks badge present.
+    await regionPage.verifyMultipleAllFilters(
+      testData.region_filters_sort.homeTypes[0], // "Single Family Homes"
+      "Looks Communities",
+    );
+  });
+
+  test("TC-06 | Filter + Sort chain: price filter stays active after sorting @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Apply price max filter → sort Low→High on the filtered set. Asserts:
+    // (1) count unchanged after sort (filter not reset), (2) all prices ≤ max,
+    // (3) prices non-decreasing.
+    await regionPage.verifyFilterThenSort(
+      testData.region_filters_sort.maxPrice,
+      testData.region_filters_sort.sortOption,
+    );
+  });
+
   test("TC-04 | First community 'Learn More' CTA opens its detail page @regression", async () => {
     const community = await regionPage.getFirstCommunityCardName();
     await reportValue(`First community: ${community}`);

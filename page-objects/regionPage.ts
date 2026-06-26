@@ -1223,6 +1223,377 @@ export class RegionPage extends BasePage {
     );
   }
 
+  // ── Phase 4 additions ─────────────────────────────────────
+
+  // Coming Soon per-card badge validation. Existing verifyAllFiltersHomeAvailability
+  // is intentionally untouched; this dedicated method adds the per-card badge check
+  // that is reliable for Coming Soon (every filtered card IS a Coming Soon community
+  // — unlike QMI where filter and badge are different data layers).
+  async verifyAllFiltersComingSoonBadge(): Promise<void> {
+    const baseline = await this.getResultsCount();
+
+    await this.click(this.allFiltersTrigger, "All filters trigger (Coming Soon badge)");
+    await Validator.requireVisible(
+      this.allFiltersDialog,
+      "'All filters' dialog should open",
+      10000,
+    );
+    await this.allFiltersDialog
+      .getByText("Coming Soon", { exact: true })
+      .first()
+      .click();
+    await reportValue("Checked: Coming Soon");
+
+    const applyBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Apply filters/i,
+    });
+    await this.click(applyBtn, "Apply filters (Coming Soon badge)");
+    await this.page.waitForTimeout(2500);
+
+    const filtered = await this.getResultsCount();
+    await reportValue(
+      `Results after Coming Soon filter: ${filtered} (baseline ${baseline})`,
+    );
+
+    if (filtered === 0) {
+      await reportValue(
+        "No Coming Soon communities in this market — skipping badge assertion",
+      );
+    } else {
+      const missing = await this.page
+        .locator("[class*='Community_card']:visible")
+        .evaluateAll((cards) =>
+          cards.filter(
+            (c) =>
+              !((c.querySelector("[class*='Community_tags']")?.textContent || "")
+                .toLowerCase()
+                .includes("coming soon")),
+          ).length,
+        );
+      await reportValue(
+        `Coming Soon badge check: ${missing} card(s) missing the badge out of ${filtered}`,
+      );
+      await Validator.requireTrue(
+        missing === 0,
+        `Every card after "Coming Soon" filter should show the "Coming Soon" badge — ${missing} card(s) missing it`,
+      );
+    }
+
+    // Clear and restore
+    await this.click(
+      this.allFiltersTrigger,
+      "All filters trigger (reopen after Coming Soon badge)",
+    );
+    await Validator.requireVisible(
+      this.allFiltersDialog,
+      "'All filters' dialog should reopen",
+      10000,
+    );
+    const clearBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Clear all/i,
+    });
+    await this.click(clearBtn, "Clear all (Coming Soon badge)");
+    const reapplyBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Apply filters/i,
+    });
+    await this.click(reapplyBtn, "Apply after clear (Coming Soon badge)");
+    await this.page.waitForTimeout(2500);
+    const restored = await this.getResultsCount();
+    await reportValue(`Restored after Coming Soon badge test: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing Coming Soon filter should restore baseline (expected ≥${baseline}, got ${restored})`,
+    );
+  }
+
+  // Zero-results state: filter to an impossible price range, assert 0 results,
+  // clear and confirm baseline is restored.
+  async verifyZeroResultsState(minPrice: string): Promise<void> {
+    const baseline = await this.getResultsCount();
+    await reportValue(`Baseline before zero-results test: ${baseline}`);
+
+    await this.click(
+      this.priceFilterTrigger,
+      "Price Range filter (zero-results)",
+    );
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should open",
+      10000,
+    );
+    await this.type(
+      this.priceMinInput,
+      minPrice,
+      `Minimum price (zero-results: ${minPrice})`,
+    );
+
+    const applyRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(this.applyFiltersButton, "Apply filters (zero-results)");
+    await applyRefresh;
+    await this.page.waitForTimeout(1500);
+
+    const zeroCount = await this.getResultsCount();
+    await reportValue(`Results after min $${minPrice} filter: ${zeroCount}`);
+    await Validator.requireTrue(
+      zeroCount === 0,
+      `Filtering with min price $${minPrice} should return 0 results (got ${zeroCount})`,
+    );
+
+    // Clear and restore
+    await this.click(
+      this.priceFilterTrigger,
+      "Price Range filter (reopen after zero-results)",
+    );
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should reopen",
+      10000,
+    );
+    const clearRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(this.clearAllButton, "Clear all filters (zero-results)");
+    if (await this.applyFiltersButton.isVisible().catch(() => false)) {
+      await this.click(
+        this.applyFiltersButton,
+        "Apply after clear (zero-results)",
+      );
+    }
+    await clearRefresh;
+    await this.waitForResultsToSettle(0);
+    const restored = await this.getResultsCount();
+    await reportValue(`Results restored after zero-results clear: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing zero-results filter should restore baseline (expected ≥${baseline}, got ${restored})`,
+    );
+  }
+
+  // Filter + Sort chain: apply a price max filter then sort the filtered
+  // results — verifies (1) sort doesn't reset the active filter, (2) all
+  // prices still ≤ max, and (3) prices are non-decreasing after sort.
+  async verifyFilterThenSort(
+    maxPrice: string,
+    sortOption: string,
+  ): Promise<void> {
+    const baseline = await this.getResultsCount();
+
+    // Apply price max filter
+    await this.click(this.priceFilterTrigger, "Price Range filter (chain)");
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should open",
+      10000,
+    );
+    await this.type(
+      this.priceMaxInput,
+      maxPrice,
+      `Maximum price (chain: ${maxPrice})`,
+    );
+    const applyRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(this.applyFiltersButton, "Apply price filter (chain)");
+    await applyRefresh;
+    await this.waitForResultsToSettle(baseline);
+    const filteredCount = await this.getResultsCount();
+    await reportValue(
+      `After price max $${maxPrice} filter: ${filteredCount} results (baseline ${baseline})`,
+    );
+    await Validator.requireTrue(
+      filteredCount > 0 && filteredCount < baseline,
+      `Price filter should reduce results before sort (${baseline} → ${filteredCount})`,
+    );
+
+    // Apply sort on the filtered results — no clear between filter and sort
+    await this.click(this.sortTrigger, "Sort by (chain)");
+    await this.click(
+      this.page.getByRole("option", { name: sortOption, exact: true }),
+      `Sort option: ${sortOption} (chain)`,
+    );
+    await this.page.waitForTimeout(2000);
+
+    // Assert filter count is unchanged (sort must not reset the filter)
+    const countAfterSort = await this.getResultsCount();
+    await reportValue(
+      `After sort "${sortOption}" on filtered results: ${countAfterSort}`,
+    );
+    await Validator.requireTrue(
+      countAfterSort === filteredCount,
+      `Sort must not reset the active filter — count should stay ${filteredCount} (got ${countAfterSort})`,
+    );
+
+    // Assert all prices ≤ max AND non-decreasing
+    const prices = await this.readCardPriceOrdinals();
+    const maxPriceNum = Number(maxPrice);
+    const overBudget = prices.filter((p) => p > maxPriceNum);
+    await reportValue(`Prices after filter+sort: [${prices.join(", ")}]`);
+    await Validator.requireTrue(
+      overBudget.length === 0,
+      `After filter+sort, all prices should be ≤ $${maxPrice} — ${overBudget.length} card(s) over max`,
+    );
+    const inversions = prices.reduce(
+      (n, v, i) => (i === 0 ? n : n + (prices[i - 1] <= v ? 0 : 1)),
+      0,
+    );
+    const tolerance = Math.max(1, Math.floor(prices.length / 8));
+    await reportValue(
+      `Filter+sort price order: ${inversions} inversion(s) of ${prices.length} (tolerance ${tolerance})`,
+    );
+    await Validator.requireTrue(
+      inversions <= tolerance,
+      `After filter+sort, prices should be non-decreasing (≤${tolerance} outlier-pairs, got ${inversions})`,
+    );
+
+    // Clear filter to restore state
+    await this.click(this.priceFilterTrigger, "Price Range filter (clear chain)");
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should reopen",
+      10000,
+    );
+    const clearRefresh = waitForApi(this.page, "/api/search", 10000).catch(
+      () => null,
+    );
+    await this.click(this.clearAllButton, "Clear all (chain)");
+    if (await this.applyFiltersButton.isVisible().catch(() => false)) {
+      await this.click(this.applyFiltersButton, "Apply after clear (chain)");
+    }
+    await clearRefresh;
+    await this.waitForResultsToSettle(filteredCount);
+    const restored = await this.getResultsCount();
+    await reportValue(`Restored after filter+sort chain: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing after filter+sort chain should restore baseline (expected ≥${baseline}, got ${restored})`,
+    );
+  }
+
+  // Multi-filter combination: open the All Filters modal and select TWO
+  // checkboxes in one apply — Home Type + Community Type. Both per-card
+  // signals are reliable: details contains homeType, and Community_type
+  // contains "looks".
+  async verifyMultipleAllFilters(
+    homeType: string,
+    communityType: string,
+  ): Promise<void> {
+    const baseline = await this.getResultsCount();
+
+    await this.click(
+      this.allFiltersTrigger,
+      "All filters trigger (multi-filter)",
+    );
+    await Validator.requireVisible(
+      this.allFiltersDialog,
+      "'All filters' dialog should open",
+      10000,
+    );
+
+    await this.allFiltersDialog
+      .getByText(homeType, { exact: true })
+      .first()
+      .click();
+    await reportValue(`Checked Home Type: ${homeType}`);
+
+    await this.allFiltersDialog
+      .getByText(communityType, { exact: true })
+      .first()
+      .click();
+    await reportValue(`Checked Community Type: ${communityType}`);
+
+    const applyBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Apply filters/i,
+    });
+    await this.click(
+      applyBtn,
+      `Apply multi-filter (${homeType} + ${communityType})`,
+    );
+    await this.page.waitForTimeout(2500);
+
+    const filtered = await this.getResultsCount();
+    await reportValue(
+      `Results after "${homeType}" + "${communityType}" multi-filter: ${filtered} (baseline ${baseline})`,
+    );
+
+    if (filtered === 0) {
+      await reportValue(
+        "No results for this multi-filter combination — skipping per-card assertion",
+      );
+    } else {
+      // Per-card: details line contains homeType
+      const detailsMissing = await this.page
+        .locator("[class*='Community_card']:visible")
+        .evaluateAll(
+          (cards, ht) =>
+            cards.filter(
+              (c) =>
+                !(
+                  (
+                    c.querySelector("[class*='Community_details']")
+                      ?.textContent || ""
+                  )
+                    .toLowerCase()
+                    .includes(ht.toLowerCase())
+                ),
+            ).length,
+          homeType,
+        );
+      await Validator.requireTrue(
+        detailsMissing === 0,
+        `Every card after multi-filter should show Home Type "${homeType}" in details — ${detailsMissing} card(s) missing it`,
+      );
+
+      // Per-card: Community_type contains "looks"
+      const looksMissing = await this.page
+        .locator("[class*='Community_card']:visible")
+        .evaluateAll((cards) =>
+          cards.filter(
+            (c) =>
+              !(
+                (
+                  c.querySelector("[class*='Community_type']")?.textContent ||
+                  ""
+                )
+                  .toLowerCase()
+                  .includes("looks")
+              ),
+          ).length,
+        );
+      await Validator.requireTrue(
+        looksMissing === 0,
+        `Every card after multi-filter should show Looks badge — ${looksMissing} card(s) missing it`,
+      );
+    }
+
+    // Clear and restore
+    await this.click(
+      this.allFiltersTrigger,
+      "All filters trigger (reopen after multi-filter)",
+    );
+    await Validator.requireVisible(
+      this.allFiltersDialog,
+      "'All filters' dialog should reopen",
+      10000,
+    );
+    const clearBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Clear all/i,
+    });
+    await this.click(clearBtn, "Clear all (multi-filter)");
+    const reapplyBtn = this.allFiltersDialog.getByRole("button", {
+      name: /Apply filters/i,
+    });
+    await this.click(reapplyBtn, "Apply after clear (multi-filter)");
+    await this.page.waitForTimeout(2500);
+    const restored = await this.getResultsCount();
+    await reportValue(`Restored after multi-filter: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing multi-filter should restore baseline (expected ≥${baseline}, got ${restored})`,
+    );
+  }
+
   // The Google Maps tile layer carries CSS transform matrices that change as the
   // camera moves; join the first few as a signature for before/after comparison.
   private async readMapTransform(): Promise<string> {
