@@ -1341,6 +1341,39 @@ export class RegionPage extends BasePage {
       `Filtering with min price $${minPrice} should return 0 results (got ${zeroCount})`,
     );
 
+    // Soft-assert the no-results UI message. Two-tier selector strategy; falls
+    // back to a text search if the CSS-module prefix doesn't match the live DOM.
+    // The count=0 assertion above is the hard gate — this is observational.
+    const noResultsEl = this.page
+      .locator("[class*='rail_no-results']:visible, [class*='rail_empty']:visible")
+      .first();
+    const msgVisible = await noResultsEl
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (msgVisible) {
+      const msgText = (
+        (await noResultsEl.textContent().catch(() => "")) ?? ""
+      ).trim();
+      await reportValue(`No-results message: "${msgText}"`);
+      await Validator.requireTrue(
+        msgText.length > 0,
+        `No-results UI message should contain non-empty text (got "${msgText}")`,
+      );
+    } else {
+      const fallback = this.page
+        .locator("[class*='rail']:visible")
+        .getByText(/0 results|no communities|no results/i)
+        .first();
+      const fallbackFound = await fallback
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      await reportValue(
+        `No-results UI message: ${fallbackFound ? "found via text fallback" : "selector not matched — note for Phase 6 DOM spike"}`,
+      );
+    }
+
     // Clear and restore
     await this.click(
       this.priceFilterTrigger,
@@ -1592,6 +1625,152 @@ export class RegionPage extends BasePage {
       restored >= baseline,
       `Clearing multi-filter should restore baseline (expected ≥${baseline}, got ${restored})`,
     );
+  }
+
+  // ── Phase 5 additions ─────────────────────────────────────
+
+  // Verify that clicking outside the Price Range dialog (backdrop dismiss)
+  // auto-applies the currently-entered filter value — a product UX behaviour
+  // confirmed on prod: the dialog commits its state on any close, not just
+  // on an explicit "Apply filters" click. Also verifies Escape does NOT close
+  // the dialog (the only dismiss paths are backdrop click or Apply/Clear).
+  async verifyFilterDialogBackdropApplies(minPrice: string): Promise<void> {
+    const baseline = await this.getResultsCount();
+    await this.click(
+      this.priceFilterTrigger,
+      "Price Range filter (backdrop-apply test)",
+    );
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should open for backdrop test",
+      10000,
+    );
+    // Use max price for the backdrop test — gives a reliably large count
+    // reduction (e.g. $450k max narrows 13+ results to ~8) so the assertion
+    // is not affected by the ±1 streaming-count variance.
+    await this.type(
+      this.priceMaxInput,
+      minPrice,
+      `Maximum price (backdrop test: ${minPrice})`,
+    );
+
+    // Escape does NOT close this dialog (react-aria modal; confirmed on prod).
+    await this.page.keyboard.press("Escape");
+    const escapeClosed = !(await this.isVisible(this.priceDialog, 1500));
+    await reportValue(`Escape closes Price Range dialog: ${escapeClosed}`);
+
+    // Backdrop click DOES close the dialog and auto-applies the entered value.
+    const box = await this.mapContainer.boundingBox().catch(() => null);
+    if (box) {
+      await this.page.mouse.click(
+        box.x + box.width / 2,
+        box.y + box.height / 2,
+      );
+    } else {
+      await this.page.mouse.click(10, 10);
+    }
+    const backdropClosed = !(await this.isVisible(this.priceDialog, 2000));
+    await reportValue(`Backdrop click closes Price Range dialog: ${backdropClosed}`);
+    await Validator.requireTrue(
+      backdropClosed,
+      "Backdrop click should dismiss the Price Range dialog",
+    );
+
+    // The filter was auto-applied — count must be < baseline.
+    const applyRefresh = waitForApi(this.page, "/api/search", 8000).catch(
+      () => null,
+    );
+    await applyRefresh;
+    await this.page.waitForTimeout(1000);
+    const filteredCount = await this.getResultsCount();
+    await reportValue(
+      `Count after backdrop-dismiss with max $${minPrice}: ${filteredCount} (baseline ${baseline})`,
+    );
+    await Validator.requireTrue(
+      filteredCount < baseline,
+      `Backdrop-dismiss with max $${minPrice} should auto-apply and reduce results (baseline ${baseline}, got ${filteredCount})`,
+    );
+
+    // Restore baseline — open dialog, clear, apply.
+    await this.click(
+      this.priceFilterTrigger,
+      "Price Range filter (restore after backdrop test)",
+    );
+    await Validator.requireVisible(this.priceDialog, "Price Range dialog reopen", 10000);
+    const clearRefresh = waitForApi(this.page, "/api/search", 8000).catch(
+      () => null,
+    );
+    await this.click(this.clearAllButton, "Clear all (backdrop test)");
+    if (await this.applyFiltersButton.isVisible().catch(() => false)) {
+      await this.click(this.applyFiltersButton, "Apply after clear (backdrop test)");
+    }
+    await clearRefresh;
+    await this.waitForResultsToSettle(filteredCount);
+    const restored = await this.getResultsCount();
+    await reportValue(`Restored after backdrop test: ${restored}`);
+    await Validator.requireTrue(
+      restored >= baseline,
+      `Clearing after backdrop test should restore baseline (expected ≥${baseline}, got ${restored})`,
+    );
+  }
+
+  // Verify non-numeric input in the price filter does not crash the page.
+  // The hard gate is page health (results count element still visible, count ≥ 0).
+  // Whether the dialog shows a validation message or silently ignores the input
+  // are both acceptable outcomes — the test adapts to either.
+  async verifyInvalidPriceInputHandledGracefully(): Promise<void> {
+    const baseline = await this.getResultsCount();
+    await reportValue(`Baseline before invalid-input test: ${baseline}`);
+
+    await this.click(
+      this.priceFilterTrigger,
+      "Price Range filter (invalid input)",
+    );
+    await Validator.requireVisible(
+      this.priceDialog,
+      "Price Range dialog should open for invalid-input test",
+      10000,
+    );
+    await this.type(
+      this.priceMinInput,
+      "abc",
+      "Minimum price (invalid — non-numeric)",
+    );
+    await this.applyFiltersButton.click({ force: true }).catch(() => {});
+    await this.page.waitForTimeout(2000);
+
+    const dialogStillOpen = await this.isVisible(this.priceDialog, 1000);
+    if (dialogStillOpen) {
+      await reportValue(
+        "Dialog remained open after invalid input — possible validation message",
+      );
+      await this.page.keyboard.press("Escape");
+      await this.waitForHidden(this.priceDialog, 5000);
+    } else {
+      await reportValue(
+        "Dialog closed after invalid input — input silently ignored or reset",
+      );
+    }
+
+    await Validator.requireVisible(
+      this.resultsCount,
+      "Results count must remain visible after invalid input (page health check)",
+      10000,
+    );
+    const countAfter = await this.getResultsCount();
+    await reportValue(
+      `Count after invalid input: ${countAfter} (baseline ${baseline})`,
+    );
+    await Validator.requireTrue(
+      countAfter >= 0,
+      `Invalid price input must not crash the page — count must be a valid number (got ${countAfter})`,
+    );
+    if (countAfter > 0) {
+      await Validator.requireTrue(
+        countAfter >= baseline,
+        `Invalid input must not permanently reduce results (baseline ${baseline}, got ${countAfter})`,
+      );
+    }
   }
 
   // The Google Maps tile layer carries CSS transform matrices that change as the

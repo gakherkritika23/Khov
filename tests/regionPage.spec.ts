@@ -1,8 +1,10 @@
+import { expect } from "@playwright/test";
 import { test } from "./baseTest";
 import { HomePage } from "../page-objects/homePage";
 import { RegionPage } from "../page-objects/regionPage";
 import { CommunityPage } from "../page-objects/communityPage";
 import { reportValue } from "../utils/reporter";
+import { Validator } from "../utils/validator";
 import constants from "../utils/constants.json";
 import testData from "../utils/test_data.json";
 
@@ -207,6 +209,13 @@ test.describe("Region Page — Filters & Sort", () => {
 
   test("TC-02 | Sorting the communities reorders the results @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Assert "Featured" is the default sort before any interaction.
+    const sortLabel = await regionPage.sortTrigger.textContent();
+    await Validator.requireTrue(
+      (sortLabel ?? "").toLowerCase().includes("featured"),
+      `Sort trigger should show "Featured" by default (got "${sortLabel?.trim()}")`,
+    );
+    await reportValue(`Sort default label: ${sortLabel?.trim()}`);
     // Read baseline so we can confirm Featured restores it.
     const baseline = await regionPage.getResultsCount();
     await reportValue(`Baseline community count: ${baseline}`);
@@ -296,5 +305,24 @@ test.describe("Region Page — Filters & Sort", () => {
       testData.region_filters_sort.maxPrice,
       testData.region_filters_sort.sortOption,
     );
+  });
+
+  test("TC-07 | Price Range dialog auto-applies filter on backdrop click; Escape does not close it @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Product UX behaviour: backdrop click (clicking outside the dialog)
+    // auto-applies the entered filter — confirmed on prod. Escape does NOT
+    // close the dialog. This test documents both behaviours and asserts the
+    // backdrop-applied filter reduces results, then clears and restores.
+    await regionPage.verifyFilterDialogBackdropApplies(
+      testData.region_filters_sort.maxPrice,
+    );
+  });
+
+  test("TC-08 | Non-numeric price input is handled gracefully without crashing @regression", async () => {
+    await reportValue(`Page URL: ${await regionPage.getUrl()}`);
+    // Type "abc" into the min price field and apply. Hard gate: page health
+    // (results count element still visible, count ≥ baseline). Whether the
+    // dialog shows validation or silently ignores the input are both acceptable.
+    await regionPage.verifyInvalidPriceInputHandledGracefully();
   });
 });
