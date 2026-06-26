@@ -253,6 +253,21 @@ test.describe("Region Page — Filters & Sort", () => {
     await regionPage.verifyAllFiltersLooksCommunity();
   });
 
+  test("TC-04 | First community 'Learn More' CTA opens its detail page @regression", async () => {
+    const community = await regionPage.getFirstCommunityCardName();
+    await reportValue(`First community: ${community}`);
+
+    await regionPage.clickFirstCommunityLearnMore();
+
+    await communityPage.verifyCommunityPageDisplayed(
+      constants.region.community_detail_url_pattern,
+      community,
+    );
+    await reportValue(
+      `Community detail heading: ${await communityPage.getHeading()}`,
+    );
+  });
+
   test("TC-05 | Coming Soon badge, zero-results state, and multi-filter combination @regression", async () => {
     // Modal-heavy test — 3 All-filters round-trips + zero-results flow
     test.setTimeout(600_000);
@@ -280,21 +295,6 @@ test.describe("Region Page — Filters & Sort", () => {
     await regionPage.verifyFilterThenSort(
       testData.region_filters_sort.maxPrice,
       testData.region_filters_sort.sortOption,
-    );
-  });
-
-  test("TC-04 | First community 'Learn More' CTA opens its detail page @regression", async () => {
-    const community = await regionPage.getFirstCommunityCardName();
-    await reportValue(`First community: ${community}`);
-
-    await regionPage.clickFirstCommunityLearnMore();
-
-    await communityPage.verifyCommunityPageDisplayed(
-      constants.region.community_detail_url_pattern,
-      community,
-    );
-    await reportValue(
-      `Community detail heading: ${await communityPage.getHeading()}`,
     );
   });
 });
