@@ -109,7 +109,7 @@ test.describe("Region Page — Community Results", () => {
     // Verifies: reported count == rendered card count (D); every card in the
     // first 5 shows non-empty name, location/home-type, and starting price (B);
     // each card's community image returns HTTP 200 (B).
-    await regionPage.verifyCardMetadataAndImages(5);
+    await regionPage.verifyCardMetadataAndImages();
   });
 });
 

@@ -38,6 +38,7 @@ export class RegionPage extends BasePage {
   readonly mapContainer: Locator;
   readonly mapMarkers: Locator;
   readonly communityMarkers: Locator;
+  readonly individualCommunityMarkers: Locator;
   readonly zoomInButton: Locator;
   readonly zoomOutButton: Locator;
   readonly resetMapButton: Locator;
@@ -131,11 +132,20 @@ export class RegionPage extends BasePage {
     this.mapContainer = page.locator("[class*='map_map-container']:visible").first();
     // All markers (city-cluster pills + individual community pins).
     this.mapMarkers = page.locator("gmp-advanced-marker");
-    // Individual community markers carry data-marker-id="community:<id>"; at a
-    // city view these are pins (state views cluster them into "N cities" pills).
+    // Two types of visible map pins:
+    // - Individual community pins: role="img" + aria-label="<name>" on the
+    //   gmp-advanced-marker; inner div carries data-marker-id="community:<id>"
+    // - Cluster pins ("Communities N"): role="button" on the gmp-advanced-marker;
+    //   no data-marker-id on any descendant. Appear when communities are
+    //   geographically close (even at city-view zoom level).
+    // Using role to distinguish both from internal SDK markers (no role attr).
     this.communityMarkers = page.locator(
-      "gmp-advanced-marker [data-marker-id^='community:']",
+      "gmp-advanced-marker[role='img'], gmp-advanced-marker[role='button']",
     );
+    // Individual-only subset — used when clicking a marker to select a rail card
+    // (TC-04). Cluster pins open a zoom-in flow, not a rail highlight, so they
+    // must be excluded from click-to-select interactions.
+    this.individualCommunityMarkers = page.locator("gmp-advanced-marker[role='img']");
     this.zoomInButton = page.getByRole("button", { name: "Zoom in" }).first();
     this.zoomOutButton = page.getByRole("button", { name: "Zoom out" }).first();
     // "Reset map" restores the map to its initial camera position; always visible.
@@ -162,6 +172,11 @@ export class RegionPage extends BasePage {
     await this.page.waitForURL(new RegExp(expectedUrlPart), { timeout: 20000 });
     await this.communitiesHeading.waitFor({ state: "visible", timeout: 25000 });
     await this.communityCards.first().waitFor({ state: "visible", timeout: 25000 });
+    // Wait for the streaming rail to fully settle before returning. The count
+    // goes through multiple stable plateaus (e.g. 13 → 14 → 17) over several
+    // seconds — use a dedicated poller with 3 s intervals and 3 consecutive
+    // equal reads (~9 s of stability) to clear all intermediate plateaus.
+    await this.waitForInitialCountToSettle();
   }
 
   // ── New Home Communities — Verification ────────────────
@@ -198,7 +213,7 @@ export class RegionPage extends BasePage {
   //
   // Breadcrumbs and pagination are NOT present on the region page — all results
   // load in a single rail with no "Load more" control — so those are N/A here.
-  async verifyCardMetadataAndImages(maxCards = 5): Promise<void> {
+  async verifyCardMetadataAndImages(): Promise<void> {
     // Item D: reported count should equal the rendered card count.
     const reportedCount = await this.getResultsCount();
     const cards = await this.page
@@ -213,11 +228,12 @@ export class RegionPage extends BasePage {
       `Rendered card count (${renderedCount}) should match the reported "${reportedCount} results" in the rail header`,
     );
 
-    // Item B: per-card metadata + image for the first `maxCards`.
-    const limit = Math.min(maxCards, cards.length);
-    await reportValue(`Checking metadata + image on first ${limit} of ${cards.length} cards`);
+    // Item B: per-card metadata + parallel image HTTP checks for ALL cards.
+    await reportValue(`Checking metadata + image on all ${cards.length} cards`);
 
-    for (let i = 0; i < limit; i++) {
+    // Collect metadata first (sequential DOM reads, fast).
+    const cardData: Array<{ index: number; name: string; details: string; pricing: string; imgUrl: string }> = [];
+    for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
       const name = (
         (await card.getAttribute("data-card-element").catch(() => null)) ?? ""
@@ -243,18 +259,17 @@ export class RegionPage extends BasePage {
 
       await Validator.requireTrue(
         name.length > 0,
-        `Card[${i}] should have a non-empty community name`,
+        `Card[${i + 1}] should have a non-empty community name`,
       );
       await Validator.requireTrue(
         details.length > 0,
-        `Card[${i}] "${name}" should have non-empty location / home-type details`,
+        `Card[${i + 1}] "${name}" should have non-empty location / home-type details`,
       );
       await Validator.requireTrue(
         pricing.length > 0,
-        `Card[${i}] "${name}" should display a starting price`,
+        `Card[${i + 1}] "${name}" should display a starting price`,
       );
 
-      // Image HTTP 200 — the card's primary image (inside the <picture> element).
       const imgSrc = (
         (await card
           .locator("picture img, img")
@@ -262,24 +277,40 @@ export class RegionPage extends BasePage {
           .getAttribute("src")
           .catch(() => null)) ?? ""
       ).trim();
-      const imgUrl = imgSrc.startsWith("//")
-        ? `https:${imgSrc}`
-        : imgSrc;
-      if (imgUrl.startsWith("http")) {
-        const resp = await this.page.request
-          .get(imgUrl, { timeout: 10000 })
-          .catch(() => null);
-        const status = resp?.status() ?? 0;
+      const imgUrl = imgSrc.startsWith("//") ? `https:${imgSrc}` : imgSrc;
+      cardData.push({ index: i + 1, name, details, pricing, imgUrl });
+    }
+
+    // Fire all image HTTP checks in parallel — keeps wall-clock flat regardless
+    // of rail size (42 cards fire together, not one-by-one).
+    // Results are collected silently first, then logged in index order so the
+    // report always shows Card[0]…Card[N] sequentially.
+    const imageResults = await Promise.all(
+      cardData.map(async ({ index, name, imgUrl }) => {
+        if (imgUrl.startsWith("http")) {
+          const resp = await this.page.request
+            .get(imgUrl, { timeout: 15000 })
+            .catch(() => null);
+          const status = resp?.status() ?? 0;
+          return { index, name, imgUrl, status, skipped: false };
+        }
+        return { index, name, imgUrl, status: 0, skipped: true };
+      }),
+    );
+
+    // Log and assert in card order.
+    for (const { index, name, imgUrl, status, skipped } of imageResults) {
+      if (skipped) {
         await reportValue(
-          `Card[${i}] "${name}" image: HTTP ${status} ${imgUrl.slice(0, 80)}`,
-        );
-        await Validator.requireTrue(
-          status === 200,
-          `Card[${i}] "${name}" community image should return HTTP 200 (got ${status})`,
+          `Card[${index}] "${name}" image src not an absolute URL — skipped (src: "${imgUrl.slice(0, 60)}")`,
         );
       } else {
         await reportValue(
-          `Card[${i}] "${name}" image src not an absolute URL — skipped (src: "${imgSrc.slice(0, 60)}")`,
+          `Card[${index}] "${name}" image: HTTP ${status} ${imgUrl.slice(0, 80)}`,
+        );
+        await Validator.requireTrue(
+          status === 200,
+          `Card[${index}] "${name}" community image should return HTTP 200 (got ${status})`,
         );
       }
     }
@@ -354,19 +385,41 @@ export class RegionPage extends BasePage {
   // it. Kept lean — it's called several times per filter flow.
   async getResultsCount(): Promise<number> {
     await this.resultsCount.waitFor({ state: "visible", timeout: 25000 });
+    // The results rail streams in incrementally — the toolbar count updates in
+    // bursts over several seconds. Poll every 1.5 s and require 3 consecutive
+    // equal non-zero reads (~4.5 s of stability) before accepting the count.
     let last = -1;
     let stable = 0;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 20; i++) {
+      await this.page.waitForTimeout(1500);
       const current = await this.parseResultsCount();
       if (current > 0 && current === last) {
-        if (++stable >= 3) return current; // unchanged for ~1.2s → settled
+        if (++stable >= 3) return current;
       } else {
         stable = 0;
       }
       last = current;
-      await this.page.waitForTimeout(400);
     }
-    return last;
+    return last > 0 ? last : 0;
+  }
+
+  private async waitForInitialCountToSettle(): Promise<void> {
+    // Page-load only: the streaming rail passes through multiple stable
+    // plateaus before reaching the final count. Poll at 3 s intervals and
+    // require 3 consecutive equal non-zero reads (9 s of stability) to ensure
+    // all streaming waves have completed before any test logic runs.
+    let last = -1;
+    let stable = 0;
+    for (let i = 0; i < 20; i++) {
+      await this.page.waitForTimeout(3000);
+      const current = await this.parseResultsCount();
+      if (current > 0 && current === last) {
+        if (++stable >= 3) return;
+      } else {
+        stable = 0;
+      }
+      last = current;
+    }
   }
 
   private async parseResultsCount(): Promise<number> {
@@ -553,12 +606,9 @@ export class RegionPage extends BasePage {
       "",
     );
     const band = starting.match(/the (low|mid|upper) \$(\d+)s/i);
-    if (band) {
-      const tier = { low: 100, mid: 500, upper: 800 }[band[1].toLowerCase()] ?? 500;
-      return Number(band[2]) * 1000 + tier;
-    }
+    if (band) return Number(band[2]) * 1000;
     const bandNoTier = starting.match(/\$(\d+)s\b/);
-    if (bandNoTier) return Number(bandNoTier[1]) * 1000 + 400;
+    if (bandNoTier) return Number(bandNoTier[1]) * 1000;
     const millions = starting.match(/Starting from\s*\$([\d.]+)\s*M/i);
     if (millions) return Math.round(Number(millions[1]) * 1_000_000);
     const precise = starting.match(/Starting from\s*\$([\d,]{4,})/i);
@@ -704,8 +754,13 @@ export class RegionPage extends BasePage {
       "Region map should load",
       20000,
     );
-    await this.mapMarkers.first().waitFor({ state: "visible", timeout: 20000 });
-    const count = await this.mapMarkers.count();
+    await this.communityMarkers.first().waitFor({ state: "visible", timeout: 20000 });
+    // Wait 15 s after the first marker appears before counting. The Maps SDK
+    // streams pins in after initial render — snapping immediately under-counts.
+    // The count is dynamic (communities are added/removed), so we don't assert
+    // a specific number; this wait captures the bulk of the initial load burst.
+    await this.page.waitForTimeout(15000);
+    const count = await this.communityMarkers.count();
     await reportValue(`Map markers rendered: ${count}`);
     await Validator.requireTrue(
       count > 0,
@@ -754,7 +809,7 @@ export class RegionPage extends BasePage {
       10000,
     );
     await Validator.requireTrue(
-      (await this.mapMarkers.count()) > 0,
+      (await this.communityMarkers.count()) > 0,
       "Community markers should remain after zooming out",
     );
 
@@ -778,7 +833,7 @@ export class RegionPage extends BasePage {
       10000,
     );
     await Validator.requireTrue(
-      (await this.mapMarkers.count()) > 0,
+      (await this.communityMarkers.count()) > 0,
       "Community markers should remain after 'Reset map'",
     );
   }
@@ -884,7 +939,7 @@ export class RegionPage extends BasePage {
   // rail community card with the same name (data-card-element). Requires a view
   // with individual community pins (a city view), not clustered "N cities" pills.
   async verifyMarkerSelectionHighlightsCommunityCard(): Promise<void> {
-    const marker = this.communityMarkers.first();
+    const marker = this.individualCommunityMarkers.first();
     await marker.waitFor({ state: "visible", timeout: 20000 });
     const name = ((await marker.textContent()) ?? "").trim();
     await reportValue(`Selecting map marker for community: ${name}`);
@@ -1125,18 +1180,32 @@ export class RegionPage extends BasePage {
 
     // Per-card: every card should carry the "looks Community" badge
     // ([class*='Community_type'] renders the looks logo + "Community" text).
-    const communityTypes = await this.page
+    const looksResults = await this.page
       .locator("[class*='Community_card']:visible")
       .evaluateAll((cards) =>
-        cards.map((card) => {
-          const el = card.querySelector("[class*='Community_type']");
-          return (el?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-        }),
+        cards.map((card) => ({
+          name: (card.getAttribute("data-card-element") || "").trim(),
+          badgeText: (card.querySelector("[class*='Community_type']")?.textContent || "")
+            .replace(/\s+/g, " ").trim().toLowerCase(),
+        })),
       );
+    const looksNames = looksResults.map((r) => r.name).filter(Boolean);
     await reportValue(
-      `Looks badge texts: [${communityTypes.map((t) => `"${t}"`).join(", ")}]`,
+      `Looks communities (${looksNames.length}): ${looksNames.join(", ")}`,
     );
-    const missingBadge = communityTypes.filter((t) => !t.includes("looks"));
+    // Log per-card badge verification result so a pass is visible in the report.
+    for (const { name, badgeText } of looksResults) {
+      const hasBadge = badgeText.includes("looks");
+      await reportValue(
+        `  ${hasBadge ? "✓" : "✗"} "${name}" — badge: "${badgeText || "none"}"`,
+      );
+    }
+    const missingBadge = looksResults.filter((r) => !r.badgeText.includes("looks"));
+    if (missingBadge.length > 0) {
+      await reportValue(
+        `Missing Looks badge: ${missingBadge.map((r) => r.name).join(", ")}`,
+      );
+    }
     await Validator.requireTrue(
       missingBadge.length === 0,
       `Every card after Looks Communities filter should show the looks badge — ${missingBadge.length} card(s) missing it`,
@@ -1260,16 +1329,21 @@ export class RegionPage extends BasePage {
         "No Coming Soon communities in this market — skipping badge assertion",
       );
     } else {
-      const missing = await this.page
+      const cardResults = await this.page
         .locator("[class*='Community_card']:visible")
         .evaluateAll((cards) =>
-          cards.filter(
-            (c) =>
-              !((c.querySelector("[class*='Community_tags']")?.textContent || "")
-                .toLowerCase()
-                .includes("coming soon")),
-          ).length,
+          cards.map((c) => ({
+            name: (c.getAttribute("data-card-element") || "").trim(),
+            hasBadge: (c.querySelector("[class*='Community_tags']")?.textContent || "")
+              .toLowerCase()
+              .includes("coming soon"),
+          })),
         );
+      const names = cardResults.map((r) => r.name).filter(Boolean);
+      const missing = cardResults.filter((r) => !r.hasBadge).length;
+      await reportValue(
+        `Coming Soon communities (${names.length}): ${names.join(", ")}`,
+      );
       await reportValue(
         `Coming Soon badge check: ${missing} card(s) missing the badge out of ${filtered}`,
       );
@@ -1555,6 +1629,14 @@ export class RegionPage extends BasePage {
         "No results for this multi-filter combination — skipping per-card assertion",
       );
     } else {
+      const multiNames = await this.page
+        .locator("[class*='Community_card']:visible")
+        .evaluateAll((cards) =>
+          cards.map((c) => (c.getAttribute("data-card-element") || "").trim()).filter(Boolean),
+        );
+      await reportValue(
+        `Communities matching "${homeType}" + "${communityType}" (${multiNames.length}): ${multiNames.join(", ")}`,
+      );
       // Per-card: details line contains homeType
       const detailsMissing = await this.page
         .locator("[class*='Community_card']:visible")
@@ -1579,24 +1661,30 @@ export class RegionPage extends BasePage {
       );
 
       // Per-card: Community_type contains "looks"
-      const looksMissing = await this.page
+      const looksCheck = await this.page
         .locator("[class*='Community_card']:visible")
         .evaluateAll((cards) =>
-          cards.filter(
-            (c) =>
-              !(
-                (
-                  c.querySelector("[class*='Community_type']")?.textContent ||
-                  ""
-                )
-                  .toLowerCase()
-                  .includes("looks")
-              ),
-          ).length,
+          cards.map((c) => ({
+            name: (c.getAttribute("data-card-element") || "").trim(),
+            badgeText: (c.querySelector("[class*='Community_type']")?.textContent || "")
+              .toLowerCase().trim(),
+          })),
         );
+      for (const { name, badgeText } of looksCheck) {
+        const hasBadge = badgeText.includes("looks");
+        await reportValue(
+          `  ${hasBadge ? "✓" : "✗"} "${name}" — Looks badge: "${badgeText || "none"}"`,
+        );
+      }
+      const looksMissingCards = looksCheck.filter((r) => !r.badgeText.includes("looks"));
+      if (looksMissingCards.length > 0) {
+        await reportValue(
+          `Missing Looks badge: ${looksMissingCards.map((r) => r.name).join(", ")}`,
+        );
+      }
       await Validator.requireTrue(
-        looksMissing === 0,
-        `Every card after multi-filter should show Looks badge — ${looksMissing} card(s) missing it`,
+        looksMissingCards.length === 0,
+        `Every card after multi-filter should show Looks badge — ${looksMissingCards.length} card(s) missing it`,
       );
     }
 
