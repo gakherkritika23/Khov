@@ -23,9 +23,11 @@ Thumbs.db
 # logs
 debug.log
 
-# Generated coverage summary artifacts (local only — never commit)
-docs/coverage-summary.md
-docs/coverage-summary.pdf
+# Docs folder — local reference material only, never commit
+docs/
+
+# Claude Code config — skills and local settings, never commit
+.claude/
 scripts/coverage-summary.html
 
 # Claude Code runtime
