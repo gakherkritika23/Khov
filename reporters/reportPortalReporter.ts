@@ -24,14 +24,20 @@ import type { TestCase, TestResult, TestStep } from "@playwright/test/reporter";
  */
 const FORWARDED_STEP_CATEGORIES = new Set(["test.step", "hook"]);
 
+// Playwright split TestStep into TestStep + TestStepWithId in a later release;
+// the RP agent was written against the old shape where `id` was on TestStep.
+// The cast below is safe — Playwright still attaches `id` at runtime; only the
+// declared type changed.
+type StepWithId = TestStep & { id: string };
+
 export default class CleanReportPortalReporter extends RPReporter {
   onStepBegin(test: TestCase, result: TestResult, step: TestStep): void {
     if (!FORWARDED_STEP_CATEGORIES.has(step.category)) return;
-    super.onStepBegin(test, result, step);
+    super.onStepBegin(test, result, step as StepWithId);
   }
 
-  onStepEnd(test: TestCase, result: TestResult, step: TestStep): void | Promise<void> {
-    if (!FORWARDED_STEP_CATEGORIES.has(step.category)) return;
-    return super.onStepEnd(test, result, step);
+  onStepEnd(test: TestCase, result: TestResult, step: TestStep): Promise<void> {
+    if (!FORWARDED_STEP_CATEGORIES.has(step.category)) return Promise.resolve();
+    return super.onStepEnd(test, result, step as StepWithId);
   }
 }

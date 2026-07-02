@@ -39,7 +39,10 @@ export default defineConfig({
   globalSetup: "./global-setup.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // No retries: a test must pass on the first attempt rather than relying on a
+  // re-run to occasionally go green. (If the app-side Request-Information modal
+  // mount flake proves intolerable, revisit per-spec.)
+  retries: 0,
   // Serial execution: this suite drives one live external site (khov.com).
   // Running spec files in parallel makes multiple browsers contend for the same
   // prod pages, causing timeouts and worker crashes. One worker = reliable.
