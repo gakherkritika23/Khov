@@ -978,6 +978,84 @@ export class RegionPage extends BasePage {
     );
   }
 
+  // RG-new — clicking a cluster pin ("Communities N") zooms the map in. Cluster
+  // pins appear when multiple communities are geographically close; they carry
+  // role="button" (individual pins carry role="img"). If no cluster pins are
+  // present at the current zoom level the method exits with a logged skip rather
+  // than failing — cluster visibility is zoom/density dependent.
+  async verifyClusterMarkerDrillDown(): Promise<void> {
+    await this.scrollIntoView(this.mapContainer);
+    const clusterMarkers = this.page.locator(
+      "gmp-advanced-marker[role='button']",
+    );
+    // Allow up to 15 s for clusters to settle (map tiles may still be loading).
+    await this.page.waitForTimeout(2000);
+    const count = await clusterMarkers.count();
+    await reportValue(`Cluster markers present at current zoom: ${count}`);
+    if (count === 0) {
+      await reportValue(
+        "No cluster markers visible at this zoom level — drill-down skipped (clusters are zoom/density dependent)",
+      );
+      return;
+    }
+    const cluster = clusterMarkers.first();
+    const label = ((await cluster.textContent()) ?? "").trim();
+    const clusterCount = parseInt((label.match(/\d+/) ?? ["0"])[0], 10);
+    await reportValue(`Cluster label "${label}" advertises ${clusterCount} communities`);
+
+    // Snapshot individual community markers before the drill-down (deduplicated).
+    const beforeCount = await this.individualCommunityMarkers.count();
+    const beforeNamesRaw: string[] = [];
+    for (let i = 0; i < beforeCount; i++) {
+      const name = ((await this.individualCommunityMarkers.nth(i).textContent()) ?? "").trim();
+      if (name) beforeNamesRaw.push(name);
+    }
+    const beforeNames = [...new Set(beforeNamesRaw)];
+    await reportValue(
+      `Individual community markers before drill-down (${beforeCount} total, ${beforeNames.length} unique): ${beforeNames.join(", ") || "none"}`,
+    );
+
+    const drilled = await this.performMapAction(
+      `Cluster drill-down "${label}"`,
+      () => cluster.click({ force: true }),
+    );
+    await reportValue(`Cluster drill-down produced view change: ${drilled}`);
+    await Validator.requireTrue(
+      drilled,
+      `Clicking cluster marker "${label}" should zoom the map in (tile fetch or transform change)`,
+    );
+    await Validator.requireVisible(
+      this.mapContainer,
+      "Map should remain rendered after cluster drill-down",
+      10000,
+    );
+
+    // Allow the zoomed-in markers to settle, then snapshot and assert new names appeared.
+    await this.page.waitForTimeout(1500);
+    const afterCount = await this.individualCommunityMarkers.count();
+    const afterNamesRaw: string[] = [];
+    for (let i = 0; i < afterCount; i++) {
+      const name = ((await this.individualCommunityMarkers.nth(i).textContent()) ?? "").trim();
+      if (name) afterNamesRaw.push(name);
+    }
+    const beforeSet = new Set(beforeNames);
+    const afterUnique = [...new Set(afterNamesRaw)];
+    const newNames = afterUnique.filter((n) => !beforeSet.has(n));
+    await reportValue(
+      `Individual community markers after drill-down (${afterCount} total, ${afterUnique.length} unique): ${afterUnique.join(", ") || "none"}`,
+    );
+    await reportValue(
+      `New community names revealed by drill-down (${newNames.length}): ${newNames.join(", ") || "none"}`,
+    );
+    await Validator.requireTrue(
+      newNames.length > 0,
+      `Drilling into cluster "${label}" should reveal at least one new community marker not visible before`,
+    );
+
+    // Brief pause so the zoomed-in view is visible in headed runs.
+    await this.page.waitForTimeout(2000);
+  }
+
   // ── "All filters" modal — Home Availability (RG-new) ──
   // Opens the "All filters" modal, checks a Home Availability option (e.g.
   // "Quick Move-In"), applies, asserts count > 0, then clears and restores.

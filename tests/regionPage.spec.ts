@@ -106,9 +106,9 @@ test.describe("Region Page — Community Results", () => {
   // render in a single rail on load — so those are not asserted.
   test("TC-02 | Community results card metadata and images are valid @regression", async () => {
     await reportValue(`Page URL: ${await regionPage.getUrl()}`);
-    // Verifies: reported count == rendered card count (D); every card in the
-    // first 5 shows non-empty name, location/home-type, and starting price (B);
-    // each card's community image returns HTTP 200 (B).
+    // Verifies: reported count == rendered card count (D); every card shows
+    // non-empty name, location/home-type, and starting price (B); each card's
+    // community image returns HTTP 200 (B). Image checks run in parallel.
     await regionPage.verifyCardMetadataAndImages();
   });
 });
@@ -157,6 +157,13 @@ test.describe("Region Page — Map", () => {
 
   test("TC-04 | Selecting a marker highlights the matching community card @regression", async () => {
     await regionPage.verifyMarkerSelectionHighlightsCommunityCard();
+  });
+
+  test("TC-05 | Clicking a cluster marker zooms the map in @regression", async () => {
+    // Cluster pins ("Communities N") appear when multiple communities are
+    // geographically close at the current zoom. Clicking one zooms the map in
+    // to reveal individual pins. Graceful skip if no clusters present.
+    await regionPage.verifyClusterMarkerDrillDown();
   });
 });
 
