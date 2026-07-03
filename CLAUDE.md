@@ -70,7 +70,8 @@ and **browser** (chromium; firefox/webkit ready to enable). Config (`BASE_URL`, 
 comes from **GitHub Environments** (Variables + the `RP_API_KEY` Secret), not from
 `environment/*.env` files. CI sets `CI=true`, which switches the config to capture
 trace + video on failure; those plus the HTML report and JUnit XML are uploaded as
-artifacts. The matrix is scaffolded to add Windows/macOS by uncommenting one line.
+artifacts. Runs on `ubuntu-latest`; add browsers by uncommenting the projects in
+`playwright.config.ts` and the `firefox`/`webkit` options in the workflow.
 
 ### Viewing Reports
 

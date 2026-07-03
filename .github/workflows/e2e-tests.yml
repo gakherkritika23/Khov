@@ -1,8 +1,6 @@
 name: E2E Tests
 
-# Manual trigger only for now. To add scheduled runs later, uncomment the
-# `schedule` block below — the env vars use `inputs.* || <default>` fallbacks so a
-# scheduled run (which has no inputs) automatically uses sensible defaults.
+# Manual trigger with three dropdowns: environment, suite, browser.
 on:
   workflow_dispatch:
     inputs:
@@ -10,139 +8,59 @@ on:
         description: "Target environment"
         type: choice
         default: dev
-        options:
-          - dev
-          - stage
-          - prod
+        options: [dev, stage, prod]
       suite:
-        description: "Test suite to run"
+        description: "Test suite"
         type: choice
         default: smoke
-        options:
-          - smoke
-          - regression
-          - all
+        options: [smoke, regression, all]
       browser:
-        description: "Browser to run against"
+        description: "Browser"
         type: choice
         default: chromium
-        options:
-          - chromium
-          # Enable these once the matching projects are uncommented in
-          # playwright.config.ts (no other changes needed):
-          # - firefox
-          # - webkit
-  # schedule:
-  #   - cron: "0 6 * * *" # daily 06:00 UTC — runs smoke/dev/chromium via the defaults below
-
-# Least-privilege token: this workflow only needs to read the repo.
-permissions:
-  contents: read
+        # Add firefox / webkit here once their projects are uncommented in playwright.config.ts.
+        options: [chromium]
 
 jobs:
   e2e:
-    name: E2E — ${{ inputs.environment || 'dev' }} / ${{ inputs.suite || 'smoke' }} / ${{ inputs.browser || 'chromium' }}
-    # Binds the GitHub Environment (dev/stage/prod) so this job sees that
-    # environment's Variables + Secrets, and honors any required-reviewer gate
-    # (e.g. a manual approval on prod).
-    environment: ${{ inputs.environment || 'dev' }}
-
-    # Matrix is scaffolded for scale: add OSes by uncommenting the extra entries.
-    # Only ubuntu-latest is active today. fail-fast:false so one OS/leg failing
-    # does not cancel the others once more are enabled.
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
+    # Binds the chosen dev/stage/prod GitHub Environment so its Variables + Secret load.
+    environment: ${{ inputs.environment }}
     env:
-      # CI=true flips playwright.config.ts to failure-artifact mode (trace + video
-      # retain-on-failure).
-      CI: "true"
-      # Env selection + config. TEST_ENV drives which env playwright.config resolves;
-      # BASE_URL/RP_* come from the bound GitHub Environment (Variables + Secret),
-      # so no environment/*.env file is needed in CI. dotenv sees no file and
-      # no-ops, leaving these process env values in place.
-      TEST_ENV: ${{ inputs.environment || 'dev' }}
-      SUITE: ${{ inputs.suite || 'smoke' }}
-      BROWSER: ${{ inputs.browser || 'chromium' }}
+      CI: "true" # switches playwright.config to trace + video on failure
+      TEST_ENV: ${{ inputs.environment }}
       BASE_URL: ${{ vars.BASE_URL }}
       RP_ENDPOINT: ${{ vars.RP_ENDPOINT }}
       RP_PROJECT: ${{ vars.RP_PROJECT }}
-      # RP reporting activates only when this secret is present (config gate). If a
-      # given environment has no RP_API_KEY, the run still produces HTML/JUnit/trace
-      # artifacts — it just skips ReportPortal.
-      RP_API_KEY: ${{ secrets.RP_API_KEY }}
+      RP_API_KEY: ${{ secrets.RP_API_KEY }} # ReportPortal activates only when this is set
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          # Caches the npm global cache keyed on package-lock.json for fast installs.
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      # Resolve the installed Playwright version so the browser cache key changes
-      # whenever Playwright is upgraded (browsers are version-specific).
-      - name: Resolve Playwright version
-        id: pw
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - run: npx playwright install --with-deps ${{ inputs.browser }}
 
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
-
-      # On a cache miss, download the selected browser plus its OS dependencies.
-      - name: Install Playwright browser (+ OS deps)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps ${{ env.BROWSER }}
-
-      # On a cache hit the browser binary is restored, but OS-level libraries are
-      # not cached — install just those so headless Chromium can launch.
-      - name: Install Playwright OS deps (cache hit)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps ${{ env.BROWSER }}
-
-      # Map the suite input to a --grep filter. "all" => no filter (whole project).
-      - name: Resolve suite filter
-        id: suite
+      # "all" runs the whole project; otherwise filter to the @smoke / @regression tag.
+      - name: Run tests
         run: |
-          if [ "${SUITE}" = "all" ]; then
-            echo "grep=" >> "$GITHUB_OUTPUT"
-          else
-            echo "grep=--grep @${SUITE}" >> "$GITHUB_OUTPUT"
-          fi
+          GREP=""
+          if [ "${{ inputs.suite }}" != "all" ]; then GREP="--grep @${{ inputs.suite }}"; fi
+          npx playwright test --project=${{ inputs.browser }} $GREP
 
-      - name: Run Playwright tests
-        run: npx playwright test --project=${{ env.BROWSER }} ${{ steps.suite.outputs.grep }}
-
-      # Always upload the HTML report (even on failure) for browsing runs after the fact.
-      - name: Upload HTML report
+      # HTML report + traces/videos/screenshots + JUnit XML, uploaded even on failure.
+      - name: Upload report & results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ env.TEST_ENV }}-${{ env.SUITE }}-${{ env.BROWSER }}-${{ matrix.os }}
-          path: playwright-report/
-          retention-days: 14
-
-      # Traces, videos, failure screenshots (test-results/) + JUnit XML (results.xml).
-      - name: Upload test results (traces / videos / screenshots / JUnit)
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ env.TEST_ENV }}-${{ env.SUITE }}-${{ env.BROWSER }}-${{ matrix.os }}
+          name: playwright-${{ inputs.environment }}-${{ inputs.suite }}
           path: |
+            playwright-report/
             test-results/
             results.xml
           retention-days: 14
