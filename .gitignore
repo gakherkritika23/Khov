@@ -1,6 +1,12 @@
 # Dependencies
 node_modules/
 
+# Environment files — contain secrets (RP_API_KEY), never commit. Real values
+# live locally (developer-owned) and in GitHub Environments for CI. The tracked
+# example.env template documents which keys are required.
+environment/*.env
+!environment/example.env
+
 # Playwright test output — generated at runtime, must NOT be committed.
 results.xml
 playwright-report/

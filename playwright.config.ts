@@ -27,6 +27,10 @@ dotenv.config({ path: envPath });
 // normal runs are unaffected when RP_* is not configured).
 const reportPortalEnabled = !!process.env.RP_API_KEY;
 
+// CI mode (GitHub Actions sets CI=true). Used to enable heavier failure
+// artifacts (trace + video) only in CI so local runs stay fast.
+const isCI = !!process.env.CI;
+
 if (!process.env.BASE_URL) {
   throw new Error(
     `BASE_URL is not set. Define BASE_URL in environment/${testEnv}.env.`,
@@ -91,43 +95,51 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env.BASE_URL,
-    trace: "on-first-retry",
-    headless: false,
-    viewport: null,
+    // Trace: in CI keep a trace whenever a test fails (primary debugging artifact,
+    // works with retries:0). Locally, only on the first retry to avoid overhead.
+    trace: isCI ? "retain-on-failure" : "on-first-retry",
+    // Headless everywhere now that the demo phase is over. A headless runner has
+    // no display, so this is required for CI and keeps local runs fast.
+    headless: true,
+    // Deterministic viewport (replaces the old headed `viewport: null` +
+    // `--start-maximized`) so layout-dependent assertions are stable headless.
+    viewport: { width: 1920, height: 1080 },
     // Failure screenshots are captured explicitly in tests/baseTest.ts afterEach
     // (reliable even when a test fails right after a navigation). Native capture
     // is off to avoid duplicate screenshots in the report.
     screenshot: "off",
-    video: "off",
+    // Video: retain only on failure in CI (extra evidence for the artifact
+    // upload); off locally to keep runs light.
+    video: isCI ? "retain-on-failure" : "off",
     launchOptions: {
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],
-      // Demo pacing: wait ~350ms before each browser action so the whole headed
-      // run is watchable when presenting to the QA team / client.
-      slowMo: 200,
+      // --no-sandbox / --disable-setuid-sandbox are required to run Chromium on
+      // CI Linux runners. (--start-maximized dropped: a no-op in headless.)
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
   },
+  // Projects are BROWSERS (not suites). Suite selection is done with Playwright's
+  // --grep flag against the @smoke / @regression tags in test titles, e.g.:
+  //   npx playwright test --project=chromium --grep @smoke
+  // This decouples browser from suite so any browser can run any suite. Firefox
+  // and WebKit are stubbed below — uncomment (and add the CI input option) to
+  // enable them; no other refactor is needed.
   projects: [
     {
-      name: 'Chrome',
-      use: { browserName: 'chromium' },
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Use our deterministic viewport rather than the device's 1280x720.
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: undefined,
+      },
     },
     // {
-    //   name: 'Firefox',
-    //   use: { browserName: 'firefox' },
+    //   name: "firefox",
+    //   use: { ...devices["Desktop Firefox"], viewport: { width: 1920, height: 1080 } },
     // },
     // {
-    //   name: 'WebKit',
-    //   use: { browserName: 'webkit' },
+    //   name: "webkit",
+    //   use: { ...devices["Desktop Safari"], viewport: { width: 1920, height: 1080 } },
     // },
-    {
-      name: "smoke",
-      use: { ...devices["Desktop Chrome"], viewport: null, deviceScaleFactor: undefined },
-      grep: /@smoke/,
-    },
-    {
-      name: "regression",
-      use: { ...devices["Desktop Chrome"], viewport: null, deviceScaleFactor: undefined },
-      grep: /@regression/,
-    },
   ],
 });

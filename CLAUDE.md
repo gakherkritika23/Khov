@@ -17,52 +17,60 @@ npm run test:prod
 # Run only smoke-tagged tests
 npm run smoke:dev
 npm run smoke:uat
+npm run smoke:stage
 npm run smoke:prod
 
 # Run only regression-tagged tests
 npm run regression:dev
 npm run regression:uat
+npm run regression:stage
 npm run regression:prod
 ```
 
-> Note: there are npm scripts for `dev`/`uat`/`prod` only. For `stage`, set
-> `TEST_ENV=stage` directly (see below).
+> There are `dev`/`uat`/`stage`/`prod` npm scripts for each of `test`/`smoke`/`regression`.
 
-### Projects
+### Projects and suites
 
-`playwright.config.ts` defines three projects:
-- **`Chrome`** — Chromium, runs every test (use this to run a whole spec).
-- **`smoke`** — `grep` `@smoke` only.
-- **`regression`** — `grep` `@regression` only.
+Projects are **browsers**, not suites. `playwright.config.ts` defines one active
+project — **`chromium`** — with `firefox`/`webkit` stubbed (commented) for later.
+**Suite selection is done with `--grep`** against the `@smoke` / `@regression` tags,
+not with a project. This decouples browser from suite so any browser can run any suite:
 
-There is no `chromium` project — use `--project=Chrome`.
+```bash
+npx playwright test --project=chromium                 # whole suite, chromium
+npx playwright test --project=chromium --grep @smoke   # smoke only
+npx playwright test --project=chromium --grep @regression
+```
 
 ### Running a Single Test File
 
 ```bash
-npx playwright test tests/homePage.spec.ts --project=Chrome
+npx playwright test tests/homePage.spec.ts --project=chromium
 # one test by tag/title or line:
-npx playwright test tests/homePage.spec.ts --project=Chrome --grep "TC-01"
-npx playwright test tests/homePage.spec.ts:42 --project=Chrome
-```
-
-### Running Tests with a Specific Tag
-
-```bash
-npx playwright test --project=smoke
-npx playwright test --project=regression
+npx playwright test tests/homePage.spec.ts --project=chromium --grep "TC-01"
+npx playwright test tests/homePage.spec.ts:42 --project=chromium
 ```
 
 ### Running with a Specific Environment
 
 ```bash
 # via npm script (uses cross-env from node_modules):
-npm run test:prod -- tests/homePage.spec.ts --project=Chrome
+npm run test:prod -- tests/homePage.spec.ts --project=chromium
 
 # or set TEST_ENV inline (macOS/Linux). `cross-env` is NOT installed globally,
 # so prefix the variable directly rather than calling `cross-env`:
-TEST_ENV=stage npx playwright test tests/homePage.spec.ts --project=Chrome
+TEST_ENV=stage npx playwright test tests/homePage.spec.ts --project=chromium
 ```
+
+### CI (GitHub Actions)
+
+`.github/workflows/e2e-tests.yml` runs the suite in CI. It is `workflow_dispatch`
+(manual) with inputs **environment** (dev/stage/prod), **suite** (smoke/regression/all),
+and **browser** (chromium; firefox/webkit ready to enable). Config (`BASE_URL`, `RP_*`)
+comes from **GitHub Environments** (Variables + the `RP_API_KEY` Secret), not from
+`environment/*.env` files. CI sets `CI=true`, which switches the config to capture
+trace + video on failure; those plus the HTML report and JUnit XML are uploaded as
+artifacts. The matrix is scaffolded to add Windows/macOS by uncommenting one line.
 
 ### Viewing Reports
 
@@ -92,12 +100,16 @@ tests/          → Test specs (.spec.ts), consume page objects and utils
 page-objects/   → Page Object Model classes
 utils/          → Shared helpers (validation, API, string, constants)
 scripts/        → Tooling (e.g. generate-client-report.ts)
-environment/    → dev.env / uat.env / stage.env / prod.env (per-env BASE_URL)
+environment/    → example.env (tracked template) + local dev.env/uat.env/stage.env/prod.env (gitignored)
 ```
 
 ### Environment Configuration
 
-`playwright.config.ts` reads `process.env.TEST_ENV` (set via npm scripts; falls back to `dev` if unset/unknown, with a warning) and loads `environment/{TEST_ENV}.env`. Supported envs: `dev`, `uat`, `stage`, `prod`. Each env file defines `ENV` and `BASE_URL`; `baseURL` comes **only** from `BASE_URL` (the config throws fail-fast if it's unset). Base URLs: dev `www-dev`, uat `www-uat`, stage `www-stg`, prod `www.khov.com`. Tests run **headed** (`headless: false` in config).
+`playwright.config.ts` reads `process.env.TEST_ENV` (set via npm scripts; falls back to `dev` if unset/unknown, with a warning) and loads `environment/{TEST_ENV}.env`. Supported envs: `dev`, `uat`, `stage`, `prod`. Each env file defines `ENV` and `BASE_URL`; `baseURL` comes **only** from `BASE_URL` (the config throws fail-fast if it's unset). Base URLs: dev `www-dev`, uat `www-uat`, stage `www-stg`, prod `www.khov.com`.
+
+**Env files are gitignored** (they hold secrets like `RP_API_KEY`); only `environment/example.env` is tracked as the template — copy it to `dev.env` etc. and fill real values. In CI these come from GitHub Environments instead (see the CI section). Because `dotenv.config()` does not override already-set `process.env`, a local file feeds local runs while injected CI values feed CI runs; a missing file is a harmless no-op.
+
+Tests run **headless** (`headless: true` in config). CI (`CI=true`) additionally captures `trace`/`video` `retain-on-failure`; locally those stay light (`trace: on-first-retry`, `video: off`).
 
 > The community-page specs are pinned to the River Ranch Trails community, which is available on dev, uat, and prod — they can run against any environment.
 
