@@ -30,9 +30,15 @@ jobs:
       CI: "true" # switches playwright.config to trace + video on failure
       TEST_ENV: ${{ inputs.environment }}
       BASE_URL: ${{ vars.BASE_URL }}
-      RP_ENDPOINT: ${{ vars.RP_ENDPOINT }}
-      RP_PROJECT: ${{ vars.RP_PROJECT }}
-      RP_API_KEY: ${{ secrets.RP_API_KEY }} # ReportPortal activates only when this is set
+      # --- ReportPortal: DISABLED for now ---------------------------------------
+      # We're validating CI with the Playwright HTML report first. To enable live
+      # ReportPortal reporting later: add RP_ENDPOINT + RP_PROJECT as Environment
+      # Variables and RP_API_KEY as an Environment Secret, then uncomment these 3
+      # lines. (playwright.config.ts turns RP on automatically once RP_API_KEY is set.)
+      # RP_ENDPOINT: ${{ vars.RP_ENDPOINT }}
+      # RP_PROJECT: ${{ vars.RP_PROJECT }}
+      # RP_API_KEY: ${{ secrets.RP_API_KEY }}
+      # -------------------------------------------------------------------------
 
     steps:
       - uses: actions/checkout@v4
