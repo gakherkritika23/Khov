@@ -108,9 +108,9 @@ export default defineConfig({
     // (reliable even when a test fails right after a navigation). Native capture
     // is off to avoid duplicate screenshots in the report.
     screenshot: "off",
-    // Video: retain only on failure in CI (extra evidence for the artifact
-    // upload); off locally to keep runs light.
-    video: isCI ? "retain-on-failure" : "off",
+    // No video capture — failure screenshots (tests/baseTest.ts afterEach) are
+    // enough. Flip to "retain-on-failure" if video is ever needed.
+    video: "off",
     launchOptions: {
       // --no-sandbox / --disable-setuid-sandbox are required to run Chromium on
       // CI Linux runners. (--start-maximized dropped: a no-op in headless.)

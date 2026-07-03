@@ -68,7 +68,7 @@ jobs:
           if [ "${{ inputs.suite }}" != "all" ]; then GREP="--grep @${{ inputs.suite }}"; fi
           npx playwright test --project=${{ inputs.browser }} $GREP
 
-      # HTML report + traces/videos/screenshots + JUnit XML, uploaded even on failure.
+      # HTML report + traces + failure screenshots + JUnit XML, uploaded even on failure.
       - name: Upload report & results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
