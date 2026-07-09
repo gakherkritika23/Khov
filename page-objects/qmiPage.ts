@@ -1,35 +1,32 @@
 import { Page, Locator, expect } from "@playwright/test";
 import { BasePage } from "./basePage";
 import { Validator } from "../utils/validator";
-import { escapeRegExp, normalizeText } from "../utils/stringUtils";
+import { escapeRegExp } from "../utils/stringUtils";
+import { reportValue } from "../utils/reporter";
 import { RequestInformationForm } from "./requestInformationForm";
-
-export interface QmiCardData {
-  heading?: string;
-  address?: string;
-  keyFacts?: string;
-  pricing?: string;
-  availability?: string;
-  promo?: string;
-  href?: string;
-  rawText: string;
-}
 
 /**
  * Quick Move-In (QMI) details page — E4 in docs/test-plan.md.
  *
  * Pinned (via the spec) to a feature-rich, deterministic QMI home at River Ranch
  * Trails so the conditional checks are stable; if that pinned home is no longer
- * listed it falls back to a random available QMI home (see `navigateToQmi` /
- * `resolveQmiTarget`). The page composes a hero gallery ("hero gallery 2.0" →
- * `GalleryTwoModal`), a key-facts detail header, a pricing card with an estimated
- * monthly payment + mortgage-calculator popover, an interactive floor plan (IFP)
- * iframe, and the site-wide CTAs.
+ * listed, update `constants.qmi.detail_url`. The page composes a hero gallery
+ * ("hero gallery 2.0" → `GalleryTwoModal`), a key-facts detail header, a pricing
+ * card with an estimated monthly payment + mortgage-calculator popover, an
+ * interactive floor plan (IFP) iframe, and the site-wide CTAs.
+ *
+ * The mortgage calculator opens the shared "Calculate your mortgage" modal (the
+ * same component used by communityPage), so the calculator locators + helpers
+ * mirror communityPage's API (`setCalculatorField`, `selectLoanTerm`,
+ * `verifyCalculatorFieldsHaveData`, `verifyPaymentRecalculates`, …).
+ *
+ * Consumers (where the public methods are exercised):
+ *   - tests/qmiPage.spec.ts — Overview (TC-01–03), Media gallery (TC-04–05),
+ *     Pricing (TC-06–07).
+ *   - tests/contactForms.spec.ts — Request Information form on the QMI page.
  */
 export class QmiPage extends BasePage {
-  readonly quickMoveInNavTab: Locator;
-  readonly qmiSectionHeading: Locator;
-  private selectedCardData?: QmiCardData;
+  private selectedDetailHref?: string;
   readonly pageHeading: Locator;
   readonly detailHeader: Locator;
   readonly keyFacts: Locator;
@@ -42,36 +39,36 @@ export class QmiPage extends BasePage {
   readonly inlineMediaImage: Locator;
   readonly monthlyPayment: Locator;
   readonly mortgageInfoTrigger: Locator;
-  readonly mortgagePopover: Locator;
+  readonly mortgageCalculatorCta: Locator;
+  readonly calculatorHeading: Locator;
+  readonly calculatorModal: Locator;
+  readonly calculatorEstimatedPayment: Locator;
+  readonly calculatorInputs: Locator;
+  readonly modalCloseButton: Locator;
   readonly floorplanIframe: Locator;
   readonly qmiDetailNavBar: Locator;
   readonly requestTourCta: Locator;
+  readonly requestTourModal: Locator;
   readonly requestInfoCta: Locator;
   readonly requestInfo: RequestInformationForm;
   private galleryFallbackUsed = false;
 
+  // Builds all element locators for the QMI detail page. Called once per page
+  // object construction in the specs' `openQmi` helpers. Notable scoping:
+  // `detailHeader` carries the address + key facts; `monthlyPayment` is scoped to
+  // the "/mo." price (a second `Card_price` holds the total); `floorplanIframe` is
+  // scoped to the `/floorplan/` iframe (the lot-detail map is a separate iframe);
+  // the `calculator*` locators are scoped to the shared "Calculate your mortgage"
+  // modal (same component as communityPage), with `calculatorInputs` in order
+  // 0=Price, 1=Down Payment %, 2=Down Payment $, 3=Interest Rate.
   constructor(page: Page) {
     super(page);
-    // Community-page entry points used to reach the QMI detail page.
-    this.quickMoveInNavTab = page.getByRole("link", {
-      name: /Quick Move-in|Move-In Homes/i,
-    });
-    this.qmiSectionHeading = page.getByRole("heading", {
-      name: /Quick Move-in Homes Available/i,
-    });
-    // Header / key facts. h1 is the floorplan name ("Passionflower II"); the
-    // DetailHeader container carries the address, sq ft, beds, baths and the
-    // "Available Now" availability tag.
     this.pageHeading = page.locator("h1");
     this.detailHeader = page.locator("[class*='DetailHeader_container']");
-    // The amenities row holds the at-a-glance facts: "… Sq ft … Beds … Baths …".
     this.keyFacts = page.locator("[class*='DetailHeader_amenities']");
     this.availability = page.getByText(
       /Available (Now|January|February|March|April|May|June|July|August|September|October|November|December)/i,
     );
-    // Media gallery. "View Gallery (n)" opens the hero-gallery-2.0 modal whose
-    // section buttons (e.g. "Unfurnished Interior", "Home Exterior") jump
-    // between image groups.
     this.viewGalleryButton = page
       .getByRole("button", { name: /View Gallery/i })
       .or(page.locator("button").filter({ hasText: /View Gallery/i }));
@@ -91,9 +88,6 @@ export class QmiPage extends BasePage {
         ),
       })
       .first();
-    // Pricing. Two `Card_price` nodes exist (monthly payment + total price);
-    // scope the monthly one by its "/mo." suffix. The mortgage-info trigger
-    // opens a popover headed "Mortgage Calculator".
     this.monthlyPayment = page
       .locator("[class*='Card_price']")
       .filter({ hasText: /\/mo\./i })
@@ -106,20 +100,36 @@ export class QmiPage extends BasePage {
           name: /Mortgage calculation information|Info icon/i,
         }),
       );
-    this.mortgagePopover = page
-      .locator("[class*='Popover_popover']")
-      .or(page.getByText(/Mortgage Calculator|Principal and Interest|APR/i));
-    // Interactive Floor Plan — embedded ml3ds-cloud iframe (the lot-detail map
-    // is a separate iframe, so scope by the `/floorplan/` path).
+    this.mortgageCalculatorCta = page.getByRole("button", {
+      name: /Mortgage Calculator/i,
+    });
+    this.calculatorHeading = page.getByRole("heading", {
+      name: /Calculate your mortgage/i,
+    });
+    this.calculatorModal = page
+      .locator("[class*='Modal_dialog']")
+      .filter({ hasText: "Calculate your mortgage" });
+    this.calculatorEstimatedPayment = this.calculatorModal
+      .getByText(/^\$[\d,]+$/)
+      .first();
+    this.calculatorInputs = this.calculatorModal.locator("input[type='text']");
+    this.modalCloseButton = page.locator(
+      "[class*='Modal_dialog'] [class*='CircleIconButton']",
+    );
     this.floorplanIframe = page.locator("iframe[src*='/floorplan/']");
-    // QMI detail content nav CTAs. These are the nav-bar actions displayed after
-    // the detail page loads, distinct from duplicate CTAs elsewhere on the page.
     this.qmiDetailNavBar = page.locator(
       "nav[class*='ContentNavigation_content-nav'], nav[class*='ContentNavigation_actions-nav']",
     );
     this.requestTourCta = this.qmiDetailNavBar.getByRole("button", {
       name: "Request a Tour",
     });
+    // "Request a Tour" opens a scheduling modal (role=dialog) headed "Select a
+    // date and time for a tour"; keyed on that tour-specific text with a
+    // class-based fallback.
+    this.requestTourModal = page
+      .getByRole("dialog")
+      .filter({ hasText: /Select a date and time for a tour/i })
+      .or(page.locator("[class*='request-a-tour_modal']"));
     this.requestInfoCta = this.qmiDetailNavBar.getByRole("button", {
       name: "Request Information",
     });
@@ -127,98 +137,28 @@ export class QmiPage extends BasePage {
   }
 
   // ── Navigation — Actions ───────────────────────────────
-  // Pinned-with-fallback navigation. We prefer a specific, feature-rich QMI home
-  // (Passionflower II at River Ranch Trails — `constants.qmi.detail_url`) so the
-  // gallery / pricing / IFP / CTA checks are deterministic. If that home is no
-  // longer listed (sold/retired), we fall back to a random available QMI home so
-  // the suite keeps running instead of 404-ing — see `resolveQmiTarget`.
+  // Navigate directly to the pinned QMI detail URL (`constants.qmi.detail_url`)
+  // and dismiss any popups. `communityUrl` is accepted for caller compatibility
+  // (the community → QMI path is covered elsewhere) but not used here. Used by:
+  // the `openQmi` helper in tests/qmiPage.spec.ts and tests/contactForms.spec.ts
+  // (per-test `beforeEach`).
   async navigateToQmi(
     communityUrl: string,
     preferredDetailUrl: string,
   ): Promise<void> {
-    this.selectedCardData = {
-      rawText: "",
-      href: preferredDetailUrl,
-    };
+    this.selectedDetailHref = preferredDetailUrl;
     await this.navigate(this.resolveUrl(preferredDetailUrl));
     await this.page.waitForLoadState("domcontentloaded");
     await this.handlePagePopups();
   }
 
-  // Prefer the pinned home for determinism; if it is not present in the QMI
-  // section, fall back to a random available home. A fallback home may lack some
-  // conditional features (gallery / monthly payment / IFP), so feature-specific
-  // tests can legitimately fail after a fallback — the warning below flags that
-  // the pin needs updating in `constants.qmi.detail_url`.
-  private async resolveQmiTarget(preferredDetailUrl: string): Promise<string> {
-    const hrefs = await this.getQmiHrefs();
-
-    if (hrefs.length === 0) {
-      throw new Error("No QMI homes found in the Quick Move-In section.");
-    }
-
-    const preferredSlug = this.getLastPathSegment(preferredDetailUrl);
-    const pinned = hrefs.find(
-      (href) => this.getLastPathSegment(href) === preferredSlug,
-    );
-
-    if (pinned) {
-      return pinned;
-    }
-
-    const fallback = hrefs[Math.floor(Math.random() * hrefs.length)];
-    console.warn(
-      `Pinned QMI home "${preferredSlug}" not found in the QMI section; ` +
-      `falling back to random home "${this.getLastPathSegment(fallback)}". ` +
-      `Update constants.qmi.detail_url to re-pin.`,
-    );
-
-    return fallback;
-  }
-
-  async navigateToCommunity(url: string): Promise<void> {
-    await this.navigate(this.resolveUrl(url));
-    await this.page.waitForLoadState("domcontentloaded");
-    await this.handlePagePopups();
-  }
-
-  async openQuickMoveInTabFromNavBar(): Promise<void> {
-    await this.click(this.quickMoveInNavTab.first(), "Quick Move-In nav tab");
-    await Validator.requireVisible(
-      this.qmiSectionHeading.first(),
-      "'Quick Move-in Homes Available' section should be visible after nav click",
-      25000,
-    );
-  }
-
-  // Enumerate the QMI homes listed in the community's Quick Move-In section.
-  // Polls briefly because the cards hydrate client-side after the section loads.
-  private async getQmiHrefs(): Promise<string[]> {
-    const deadline = Date.now() + 25000;
-
-    while (Date.now() < deadline) {
-      const hrefs = await this.qmiSectionLinks().evaluateAll((links) =>
-        links
-          .map((link) => link.getAttribute("href"))
-          .filter((href): href is string => Boolean(href)),
-      );
-      const uniqueHrefs = [...new Set(hrefs)];
-
-      if (uniqueHrefs.length > 0) {
-        return uniqueHrefs;
-      }
-
-      await this.page.waitForTimeout(500);
-    }
-
-    return [];
-  }
-
   // ── Navigation — Verification ──────────────────────────
+  // Assert the browser landed on the expected QMI detail URL and the home
+  // heading is visible. Used by: tests/qmiPage.spec.ts Overview TC-01.
   async verifyQmiDetailPageDisplayed(detailUrlPattern?: string): Promise<void> {
     const expectedPattern =
       detailUrlPattern ??
-      escapeRegExp(this.toPath(this.selectedCardData?.href ?? ""));
+      escapeRegExp(this.toPath(this.selectedDetailHref ?? ""));
 
     await Validator.requireUrlContains(
       this.page,
@@ -231,51 +171,12 @@ export class QmiPage extends BasePage {
       "QMI home heading should be visible",
       20000,
     );
-  }
-
-  async verifyCardDataMatchesDetailPage(cardData: QmiCardData): Promise<void> {
-    if (cardData.href) {
-      const detailPath = this.toPath(cardData.href);
-      await Validator.requireUrlContains(
-        this.page,
-        escapeRegExp(detailPath),
-        "QMI details page URL should match the clicked QMI card",
-        20000,
-      );
-    }
-
-    if (cardData.heading) {
-      await Validator.requireVisible(
-        this.pageHeading.first(),
-        "QMI detail heading should be visible before card-data validation",
-        20000,
-      );
-      expect(cardData.rawText).toContain(await this.getHeading());
-    }
-
-    if (cardData.availability) {
-      await expect(this.detailHeader.first()).toContainText(
-        cardData.availability,
-        { timeout: 20000 },
-      );
-    }
-
-    const detailHeaderText = normalizeText(
-      await this.getText(this.detailHeader.first()),
-    );
-    for (const fact of this.extractComparableFacts(cardData.keyFacts ?? "")) {
-      expect(detailHeaderText).toContain(normalizeText(fact));
-    }
-
-    const currentPrice = this.extractCurrentPrice(cardData.pricing ?? "");
-    if (currentPrice) {
-      await expect(this.page.locator("body")).toContainText(currentPrice, {
-        timeout: 20000,
-      });
-    }
+    await reportValue("QMI detail page verified (URL + heading)");
   }
 
   // ── Header / Key Facts — Verification ──────────────────
+  // Assert the floorplan heading (h1) and the detail header (address / key
+  // facts container) are both visible. Used by: tests/qmiPage.spec.ts Overview TC-01.
   async verifyHeaderIsDisplayed(): Promise<void> {
     await Validator.requireVisible(
       this.pageHeading.first(),
@@ -287,34 +188,40 @@ export class QmiPage extends BasePage {
       "QMI detail header (address / key facts) should be visible",
       20000,
     );
+    await reportValue("QMI header & detail block are visible");
   }
 
+  // Assert the at-a-glance key facts row (beds / baths / sq ft) is visible.
+  // Used by: tests/qmiPage.spec.ts Overview TC-01.
   async verifyKeyFactsAreDisplayed(): Promise<void> {
     await Validator.requireVisible(
       this.keyFacts.first(),
       "Key facts (beds / baths / sq ft) should be visible",
       20000,
     );
+    await reportValue("Key facts row (beds / baths / sq ft) is visible");
   }
 
   // ── Availability — Verification ────────────────────────
+  // Assert the availability tag ("Available Now" / "Available <Month>") is
+  // visible. Used by: tests/qmiPage.spec.ts Overview TC-02.
   async verifyAvailabilityIsDisplayed(): Promise<void> {
-    if (this.selectedCardData?.availability) {
-      await expect(this.page.locator("body")).toContainText(
-        this.selectedCardData.availability,
-        { timeout: 20000 },
-      );
-      return;
-    }
-
     await Validator.requireVisible(
       this.availability.first(),
       "Availability should be visible",
       20000,
     );
+    await reportValue(
+      `Availability: ${(await this.getText(this.availability.first())).trim()}`,
+    );
   }
 
   // ── Media Gallery — Actions ────────────────────────────
+  // Open the hero-gallery-2.0 modal via the "View Gallery (n)" button. If no
+  // gallery CTA exists (some homes only have an inline media image), flips
+  // `galleryFallbackUsed` so the gallery verifications degrade to an inline-image
+  // check. Retries the open once after dismissing popups.
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-01 and TC-02 (`beforeEach`).
   async openGalleryModal(): Promise<void> {
     await this.handlePagePopups();
     this.galleryFallbackUsed = false;
@@ -333,54 +240,10 @@ export class QmiPage extends BasePage {
     }
   }
 
-  async jumpToGallerySection(index = 1): Promise<void> {
-    if (this.galleryFallbackUsed) {
-      await this.verifyInlineMediaImageIsDisplayed();
-      return;
-    }
-
-    // Section nav (hero gallery 2.0) — jump to another image group.
-    if (!(await this.isVisible(this.gallerySectionButtons.nth(index), 5000))) {
-      return;
-    }
-
-    await this.click(
-      this.gallerySectionButtons.nth(index),
-      "gallery section nav button",
-    );
-  }
-
-  async switchGalleryCategory(): Promise<void> {
-    if (this.galleryFallbackUsed) {
-      await this.verifyInlineMediaImageIsDisplayed();
-      return;
-    }
-
-    await Validator.requireVisible(
-      this.galleryTabButtons.first(),
-      "Gallery category tabs should be visible",
-      10000,
-    );
-
-    const tabCount = await this.galleryTabButtons.count();
-
-    if (tabCount < 2) {
-      throw new Error("Expected at least two gallery categories, such as Interior and Exterior.");
-    }
-
-    await this.click(this.galleryTabButtons.nth(1), "gallery category tab");
-    await Validator.requireVisible(
-      this.galleryImage.first(),
-      "Gallery should show an image after switching category",
-      10000,
-    );
-  }
-
-  async closeGalleryModal(): Promise<void> {
-    await this.page.keyboard.press("Escape");
-  }
-
   // ── Media Gallery — Verification ───────────────────────
+  // Assert the gallery modal and at least one image are visible (or the inline
+  // image when in fallback mode).
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-01 and TC-02.
   async verifyGalleryModalIsDisplayed(): Promise<void> {
     if (this.galleryFallbackUsed) {
       await this.verifyInlineMediaImageIsDisplayed();
@@ -397,8 +260,12 @@ export class QmiPage extends BasePage {
       "Gallery modal should show an image",
       20000,
     );
+    await reportValue("Gallery modal is displayed with an image");
   }
 
+  // Assert the hero-gallery-2.0 section-nav buttons are displayed (falls back to
+  // the plain modal check when section nav is absent / in inline-image fallback).
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-02.
   async verifyGallerySectionNavIsDisplayed(): Promise<void> {
     if (this.galleryFallbackUsed) {
       await this.verifyInlineMediaImageIsDisplayed();
@@ -415,13 +282,212 @@ export class QmiPage extends BasePage {
       "Hero gallery 2.0 section navigation should be displayed",
       20000,
     );
+    await reportValue("Hero Gallery 2.0 section navigation is displayed");
   }
 
-  // ── Pricing — Actions ──────────────────────────────────
+  // Assert the gallery modal's image count matches the count in the "View
+  // Gallery (n)" page CTA (or the inline image in fallback mode).
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-01.
+  async verifyGalleryImageCountMatchesPageCta(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    const pageCount = await this.getGalleryPageImageCount();
+
+    await Validator.requireVisible(
+      this.galleryModal.first(),
+      "Media gallery modal should be displayed before validating image count",
+      20000,
+    );
+
+    // Prefer the per-category tab counts (reliable). Only when there are no tab
+    // counts do we count unique image sources in the DOM — and since the gallery
+    // lazy-loads, that DOM count can be < pageCount, so assert a sane range there
+    // instead of strict equality.
+    const tabCounts = await this.getGalleryTabCounts();
+
+    if (tabCounts.length > 0) {
+      const modalCount = tabCounts.reduce((total, count) => total + count, 0);
+      await Validator.requireTrue(
+        modalCount === pageCount,
+        `Gallery modal tab counts (${modalCount}) should equal page CTA count (${pageCount})`,
+      );
+      await reportValue(
+        `Gallery image count: page CTA = ${pageCount}, modal tabs = ${modalCount}`,
+      );
+      return;
+    }
+
+    const domCount = await this.getUniqueGalleryImageCountFromDom();
+    await Validator.requireTrue(
+      domCount > 0 && domCount <= pageCount,
+      `Gallery modal image count (${domCount}) should be between 1 and the page CTA count (${pageCount})`,
+    );
+    await reportValue(
+      `Gallery image count: page CTA = ${pageCount}, modal DOM = ${domCount}`,
+    );
+  }
+
+  // Scroll the gallery modal and assert more than one (and no more than the CTA
+  // count) distinct images surface — i.e. the gallery is scrollable/lazy-loads.
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-01.
+  async verifyGalleryImagesCanBeScrolledThrough(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    const pageCount = await this.getGalleryPageImageCount();
+    const scrolledImageCount = await this.getScrolledGalleryImageCount();
+
+    await Validator.requireTrue(
+      scrolledImageCount > 1 && scrolledImageCount <= pageCount,
+      `Gallery should expose multiple images while scrolling (saw ${scrolledImageCount}, expected 2–${pageCount} from the page CTA)`,
+    );
+    await reportValue(
+      `Gallery scroll exposed ${scrolledImageCount}/${pageCount} images`,
+    );
+  }
+
+  // Switch to the second gallery category tab and assert the visible image set
+  // actually changes (and is non-empty afterwards).
+  // Used by: tests/qmiPage.spec.ts Media gallery TC-02.
+  async verifyGalleryImagesChangeAfterCategorySwitch(): Promise<void> {
+    if (this.galleryFallbackUsed) {
+      await this.verifyInlineMediaImageIsDisplayed();
+      return;
+    }
+
+    await Validator.requireVisible(
+      this.galleryTabButtons.first(),
+      "Gallery category tabs should be visible before switching category",
+      10000,
+    );
+
+    const tabCount = await this.galleryTabButtons.count();
+
+    await Validator.requireTrue(
+      tabCount >= 2,
+      "Expected at least two gallery category tabs (e.g. Interior / Exterior)",
+    );
+
+    const initialSources = await this.getVisibleGalleryImageSources();
+
+    await this.click(this.galleryTabButtons.nth(1), "gallery category tab");
+    await expect
+      .poll(
+        async () => (await this.getVisibleGalleryImageSources()).join("|"),
+        {
+          message: "Gallery images should change after switching category",
+          timeout: 10000,
+        },
+      )
+      .not.toBe(initialSources.join("|"));
+
+    const switchedSources = await this.getVisibleGalleryImageSources();
+
+    await Validator.requireTrue(
+      switchedSources.length > 0,
+      "Switched gallery category should show images",
+    );
+    await reportValue(
+      `Gallery category switch: ${initialSources.length} → ${switchedSources.length} visible images`,
+    );
+  }
+
+  // Fallback assertion used by the gallery methods when a home has no "View
+  // Gallery" CTA: assert an inline media image is displayed instead. Intentionally
+  // defensive — the pinned River Ranch Trails home always has a gallery, so this
+  // branch (and `galleryFallbackUsed`) is NOT exercised by the current specs; it
+  // keeps the gallery tests from hard-failing if the pin is ever moved to a home
+  // without a gallery modal.
+  async verifyInlineMediaImageIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.inlineMediaImage,
+      "QMI detail page should display an inline media image when no gallery CTA is available",
+      20000,
+    );
+    await reportValue("Inline media image is displayed (gallery fallback)");
+  }
+
+  // ── Media Gallery — Data getters ───────────────────────
+  // Read the image count embedded in the "View Gallery (n)" CTA text. Internal
+  // helper for the gallery count/scroll verifications.
+  private async getGalleryPageImageCount(): Promise<number> {
+    const ctaText = await this.viewGalleryButton.first().textContent();
+    const count = this.extractCount(ctaText ?? "");
+
+    await Validator.requireTrue(
+      count !== null,
+      `Unable to read image count from gallery CTA text: "${ctaText}"`,
+    );
+
+    return count as number;
+  }
+
+  // Parse the per-category image counts from the gallery tab labels (e.g.
+  // "Interior (12)"). Empty when the modal has no counted category tabs.
+  // Internal helper for `verifyGalleryImageCountMatchesPageCta`.
+  private async getGalleryTabCounts(): Promise<number[]> {
+    const tabTexts = await this.galleryTabButtons.allTextContents();
+    return tabTexts
+      .map((text) => this.extractCount(text))
+      .filter((count): count is number => count !== null);
+  }
+
+  // ── Request Information — Actions ──────────────────────
+  // Open the "Request Information" modal from the QMI detail nav CTA. Retries the
+  // atomic pointer press until the modal mounts (a plain click intermittently
+  // fails to fire the react-aria press under slowMo); never re-presses once the
+  // modal is up. Used by: tests/contactForms.spec.ts.
+  async openRequestInformationModal(): Promise<void> {
+    await this.handlePagePopups();
+    await this.scrollIntoView(this.requestInfoCta.first());
+    const cta = this.requestInfoCta.first();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
+      if (await this.isVisible(this.requestInfo.modal, 8000)) break;
+    }
+  }
+
+  // ── Request a Tour — Actions & Verification ────────────
+  // Open the "Request a Tour" scheduling modal from the QMI detail nav CTA. The
+  // CTA is a react-aria pressable (like Request Information), so retry the atomic
+  // pointer press until the modal mounts. Used by: tests/qmiPage.spec.ts Overview TC-02.
+  async openRequestTourModal(): Promise<void> {
+    await this.handlePagePopups();
+    await this.scrollIntoView(this.requestTourCta.first());
+    const cta = this.requestTourCta.first();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.pressAtomically(cta);
+      console.log(`Clicked on: Request a Tour CTA — attempt ${attempt}`);
+      if (await this.isVisible(this.requestTourModal.first(), 8000)) break;
+    }
+  }
+
+  // Assert the "Request a Tour" scheduling modal is displayed.
+  // Used by: tests/qmiPage.spec.ts Overview TC-02.
+  async verifyRequestTourModalIsDisplayed(): Promise<void> {
+    await Validator.requireVisible(
+      this.requestTourModal.first(),
+      "'Request a Tour' scheduling modal should be displayed",
+      20000,
+    );
+    await reportValue("'Request a Tour' scheduling modal is displayed");
+  }
+
+  // ── Mortgage Calculator — Actions ──────────────────────
+  // Open the shared "Calculate your mortgage" modal from the pricing card: jump
+  // to the Pricing section, scroll the monthly-payment + info icon into view,
+  // reveal the "Mortgage Calculator" CTA from the hover/tap popover (retried, as
+  // it is lazy and flaky headed), click it, and confirm the calculator modal
+  // opens. Used by: tests/qmiPage.spec.ts Pricing TC-02.
   async openMortgageCalculator(): Promise<void> {
     await this.page.waitForLoadState("domcontentloaded");
 
-    // Step 1: Go to Pricing section first
     const pricingTab = this.page
       .locator("a, button, [role='button']")
       .filter({ hasText: /^Pricing$/i })
@@ -432,7 +498,6 @@ export class QmiPage extends BasePage {
       await this.page.waitForTimeout(1000);
     }
 
-    // Step 2: Scroll monthly payment section into center of viewport
     await this.monthlyPayment.first().scrollIntoViewIfNeeded();
 
     await this.page.evaluate(() => {
@@ -445,7 +510,6 @@ export class QmiPage extends BasePage {
       20000,
     );
 
-    // Step 3: Scroll and validate info icon near monthly payment
     await this.mortgageInfoTrigger.first().scrollIntoViewIfNeeded();
 
     await this.page.evaluate(() => {
@@ -458,17 +522,7 @@ export class QmiPage extends BasePage {
       10000,
     );
 
-    // Step 4: Reveal the Mortgage Calculator CTA. It surfaces from the info-icon
-    // popover, which is hover- (and sometimes tap-) triggered and lazy, so a
-    // single hover is flaky (esp. headed/dev). Retry: hover (keep the cursor on
-    // the icon), and fall back to a tap, until the CTA appears.
     const infoIcon = this.mortgageInfoTrigger.first();
-    const mortgageCalculatorCta = this.page
-      .locator("button, a, [role='button']")
-      .filter({
-        hasText: /Mortgage Calculator/i,
-      })
-      .first();
 
     let ctaVisible = false;
     for (let attempt = 0; attempt < 4 && !ctaVisible; attempt++) {
@@ -480,196 +534,153 @@ export class QmiPage extends BasePage {
           .move(iconBox.x + iconBox.width / 2, iconBox.y + iconBox.height / 2)
           .catch(() => {});
       }
-      ctaVisible = await mortgageCalculatorCta.isVisible().catch(() => false);
+      ctaVisible = await this.mortgageCalculatorCta
+        .first()
+        .isVisible()
+        .catch(() => false);
       if (!ctaVisible) {
-        // Some surfaces open the popover on tap rather than hover.
         await infoIcon.click({ force: true }).catch(() => {});
-        ctaVisible = await mortgageCalculatorCta.isVisible().catch(() => false);
+        ctaVisible = await this.mortgageCalculatorCta
+          .first()
+          .isVisible()
+          .catch(() => false);
       }
       if (!ctaVisible) await this.page.waitForTimeout(700);
     }
 
-    // Step 5: Validate the CTA appeared.
     await Validator.requireVisible(
-      mortgageCalculatorCta,
+      this.mortgageCalculatorCta.first(),
       "Mortgage Calculator CTA should be displayed after opening the mortgage information popover",
       15000,
     );
 
-    // Step 6: Click Mortgage Calculator CTA
-    await this.click(
-      mortgageCalculatorCta,
-      "Mortgage Calculator CTA",
-    );
-
-    // Step 7: Validate mortgage calculator modal opens
-    const mortgageCalculatorModal = this.page
-      .locator(
-        "[role='dialog'], [class*='MortgageCalculator'], [class*='mortgage'], [class*='Calculator']",
-      )
-      .filter({
-        hasText: /Calculate your mortgage|Estimated Payment|15 Year Loan|30 Year Loan/i,
-      })
-      .first();
+    await this.click(this.mortgageCalculatorCta.first(), "Mortgage Calculator");
 
     await Validator.requireVisible(
-      mortgageCalculatorModal,
-      "Mortgage calculator modal should open after clicking Mortgage Calculator CTA",
+      this.calculatorHeading.first(),
+      "Mortgage calculator modal should open",
       15000,
     );
   }
 
-  // ── Pricing — Verification ─────────────────────────────
+  // Set a calculator text input by index (0=Price, 1=Down Payment %, 2=Down
+  // Payment $, 3=Interest Rate); the Tab blur triggers recalculation.
+  // Used by: tests/qmiPage.spec.ts Pricing TC-02 (via `verifyPaymentRecalculates`).
+  async setCalculatorField(
+    index: number,
+    value: string,
+    name: string,
+  ): Promise<void> {
+    const input = this.calculatorInputs.nth(index);
+    await input.click();
+    await input.fill(value);
+    await input.press("Tab"); // blur → triggers recalculation
+    await reportValue(`Set ${name} = ${value}`);
+  }
+
+  // Select the 15- or 30-year loan term in the calculator modal.
+  // Used by: tests/qmiPage.spec.ts Pricing TC-02 (via `verifyPaymentRecalculates`).
+  async selectLoanTerm(years: "15" | "30"): Promise<void> {
+    await this.click(
+      this.calculatorModal.getByText(`${years} Year Loan`).first(),
+      `${years} Year Loan`,
+    );
+  }
+
+  // Close the calculator modal via its (X) control and confirm it is hidden.
+  // Used by: tests/qmiPage.spec.ts Pricing TC-02.
+  async closeMortgageCalculator(): Promise<void> {
+    await this.click(this.modalCloseButton.first(), "Close mortgage calculator");
+    await Validator.requireHidden(
+      this.calculatorHeading.first(),
+      "Mortgage calculator should close",
+      10000,
+    );
+  }
+
+  // ── Mortgage Calculator — Verification ─────────────────
+  // Assert the estimated monthly payment is displayed on the pricing card.
+  // Used by: tests/qmiPage.spec.ts Pricing TC-01.
   async verifyMonthlyPaymentIsDisplayed(): Promise<void> {
     await Validator.requireVisible(
       this.monthlyPayment.first(),
       "Estimated monthly payment should be displayed",
       20000,
     );
+    await reportValue(
+      `Estimated monthly payment: ${(await this.getMonthlyPaymentText()).trim()}`,
+    );
   }
 
-  // ── Pricing — Verification ─────────────────────────────
-  async verifyMortgageCalculatorValuesUpdate(): Promise<void> {
-    const mortgageCalculatorModal = this.page
-      .locator("[role='dialog'], [class*='MortgageCalculator'], [class*='mortgage'], [class*='Calculator']")
-      .filter({
-        hasText: /Calculate your mortgage|Estimated Payment|15 Year Loan|30 Year Loan/i,
-      })
-      .first();
+  // Parse the calculator modal's top "Estimated Payment" amount to a number.
+  // Internal helper for `verifyCalculatorFieldsHaveData` / `verifyPaymentRecalculates`.
+  async getEstimatedPayment(): Promise<number> {
+    const text = (await this.calculatorEstimatedPayment.innerText()).trim();
+    return Number(text.replace(/[^0-9.]/g, ""));
+  }
 
+  // Read a calculator text input's current numeric value (strips $/commas).
+  // Used by: tests/qmiPage.spec.ts Pricing TC-02 to derive a home-independent price bump.
+  async getCalculatorFieldValue(index: number): Promise<number> {
+    const raw = (await this.calculatorInputs.nth(index).inputValue()).trim();
+    return Number(raw.replace(/[^0-9.]/g, ""));
+  }
+
+  // Assert the open calculator shows a positive estimated payment and every
+  // input field is pre-populated. Used by: tests/qmiPage.spec.ts Pricing TC-02.
+  async verifyCalculatorFieldsHaveData(): Promise<void> {
     await Validator.requireVisible(
-      mortgageCalculatorModal,
-      "Mortgage calculator modal should be displayed before updating values",
-      15000,
-    );
-
-    const estimatedPayment = mortgageCalculatorModal
-      .locator("text=/\\$[\\d,]+/")
-      .first();
-
-    await Validator.requireVisible(
-      estimatedPayment,
-      "Estimated payment should be displayed at the top of mortgage calculator modal",
+      this.calculatorEstimatedPayment,
+      "Calculator estimated payment should be shown at the top",
       10000,
     );
-
-    const initialEstimatedPayment = normalizeText(
-      await this.getText(estimatedPayment),
+    const payment = await this.getEstimatedPayment();
+    await Validator.requireTrue(
+      payment > 0,
+      "Estimated payment should be a positive amount",
     );
-
-    // Validate Price field is displayed
-    const priceField = mortgageCalculatorModal
-      .locator("label", { hasText: /^Price$/i })
-      .locator("..")
-      .locator("input")
-      .first()
-      .or(
-        mortgageCalculatorModal.locator(
-          "input[name*='price' i], input[id*='price' i], input[placeholder*='price' i]",
-        ).first(),
+    const fieldCount = await this.calculatorInputs.count();
+    for (let i = 0; i < fieldCount; i++) {
+      const value = (await this.calculatorInputs.nth(i).inputValue()).trim();
+      await Validator.requireNotEmpty(
+        value,
+        `Calculator field ${i + 1} should have a value (got "${value}")`,
       );
-
-    await Validator.requireVisible(
-      priceField,
-      "Price field should be displayed in mortgage calculator modal",
-      10000,
+    }
+    await reportValue(
+      `Calculator estimated payment $${payment}; ${fieldCount} fields populated`,
     );
+  }
 
-    // Change Price value
-    await priceField.click();
-    await priceField.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A",
+  // Capture the top estimated payment, run an edit, then assert it recalculated
+  // to a new valid amount in the expected direction (after focus change).
+  // Used by: tests/qmiPage.spec.ts Pricing TC-02.
+  async verifyPaymentRecalculates(
+    label: string,
+    edit: () => Promise<void>,
+    direction: "up" | "down",
+  ): Promise<void> {
+    const before = await this.getEstimatedPayment();
+    await edit();
+    let after = before;
+    for (let i = 0; i < 20 && after === before; i++) {
+      await this.page.waitForTimeout(400);
+      after = await this.getEstimatedPayment();
+    }
+    await reportValue(`${label}: $${before} → $${after}`);
+    await Validator.requireTrue(
+      after > 0 && after !== before,
+      `${label}: estimated payment should recalculate (was $${before}, now $${after})`,
     );
-    await priceField.fill("450000");
-    await priceField.blur();
-
-    // Validate top estimated payment changes after price update
-    await expect
-      .poll(
-        async () => normalizeText(await this.getText(estimatedPayment)),
-        {
-          message:
-            "Estimated payment should update after changing Price value",
-          timeout: 10000,
-        },
-      )
-      .not.toBe(initialEstimatedPayment);
-
-    const paymentAfterPriceChange = normalizeText(
-      await this.getText(estimatedPayment),
+    await Validator.requireTrue(
+      direction === "up" ? after > before : after < before,
+      `${label}: estimated payment should move ${direction} ($${before} → $${after})`,
     );
-
-    expect(paymentAfterPriceChange).toMatch(/\$[\d,]+/);
-
-    // Loan term selector is a radiogroup of <label> options (each wrapping a
-    // visually-hidden radio input + a span label) — NOT buttons. The modal
-    // defaults to "30 Year Loan" (data-selected="30"), so we switch to whichever
-    // term is *not* currently selected first to guarantee the payment changes.
-    const loanTermGroup = mortgageCalculatorModal.locator(
-      "[data-testid='loan-term']",
-    );
-
-    await Validator.requireVisible(
-      loanTermGroup,
-      "Loan term selector should be displayed in mortgage calculator modal",
-      10000,
-    );
-
-    const fifteenYearLoanTab = loanTermGroup.locator("label", {
-      hasText: /15 Year Loan/i,
-    });
-    const thirtyYearLoanTab = loanTermGroup.locator("label", {
-      hasText: /30 Year Loan/i,
-    });
-
-    const initiallySelected = await loanTermGroup.getAttribute("data-selected");
-    const [firstTab, secondTab] =
-      initiallySelected === "30"
-        ? [fifteenYearLoanTab, thirtyYearLoanTab]
-        : [thirtyYearLoanTab, fifteenYearLoanTab];
-
-    // Switch to the non-selected loan term and validate the payment updates
-    await firstTab.click();
-
-    await expect
-      .poll(
-        async () => normalizeText(await this.getText(estimatedPayment)),
-        {
-          message:
-            "Estimated payment should update after switching the loan term",
-          timeout: 10000,
-        },
-      )
-      .not.toBe(paymentAfterPriceChange);
-
-    const paymentAfterFirstSwitch = normalizeText(
-      await this.getText(estimatedPayment),
-    );
-
-    expect(paymentAfterFirstSwitch).toMatch(/\$[\d,]+/);
-
-    // Switch to the other loan term and validate the payment updates again
-    await secondTab.click();
-
-    await expect
-      .poll(
-        async () => normalizeText(await this.getText(estimatedPayment)),
-        {
-          message:
-            "Estimated payment should update after switching the loan term back",
-          timeout: 10000,
-        },
-      )
-      .not.toBe(paymentAfterFirstSwitch);
-
-    const paymentAfterSecondSwitch = normalizeText(
-      await this.getText(estimatedPayment),
-    );
-
-    expect(paymentAfterSecondSwitch).toMatch(/\$[\d,]+/);
   }
 
   // ── Interactive Floor Plan (IFP) — Verification ─────────
+  // Scroll the embedded floor-plan iframe into view and assert it is displayed.
+  // Used by: tests/qmiPage.spec.ts Overview TC-03.
   async verifyFloorplanIfpIsDisplayed(): Promise<void> {
     await this.scrollIntoView(this.floorplanIframe.first());
     await Validator.requireVisible(
@@ -677,9 +688,15 @@ export class QmiPage extends BasePage {
       "Interactive floor plan (IFP) iframe should be displayed",
       25000,
     );
+    await reportValue(
+      `IFP iframe src: ${await this.floorplanIframe.first().getAttribute("src")}`,
+    );
   }
 
   // ── CTAs — Verification ────────────────────────────────
+  // Assert the QMI detail nav bar and its "Request a Tour" / "Request
+  // Information" CTAs are visible. Used by: tests/qmiPage.spec.ts Overview TC-02 and
+  // tests/contactForms.spec.ts.
   async verifyCtasAreDisplayed(): Promise<void> {
     await this.page.waitForLoadState("load");
     await Validator.requireVisible(
@@ -697,166 +714,47 @@ export class QmiPage extends BasePage {
       "'Request Information' CTA should be visible in the QMI detail nav bar",
       20000,
     );
-  }
-
-  async verifyGalleryImageCountMatchesPageCta(): Promise<void> {
-    if (this.galleryFallbackUsed) {
-      await this.verifyInlineMediaImageIsDisplayed();
-      return;
-    }
-
-    const pageCount = await this.getGalleryPageImageCount();
-
-    await Validator.requireVisible(
-      this.galleryModal.first(),
-      "Media gallery modal should be displayed before validating image count",
-      20000,
-    );
-
-    const modalCount = await this.getGalleryModalImageCount();
-
-    expect(
-      modalCount,
-      `Gallery modal image count should match page CTA count (${pageCount})`,
-    ).toBe(pageCount);
-  }
-
-  async verifyGalleryImagesCanBeScrolledThrough(): Promise<void> {
-    if (this.galleryFallbackUsed) {
-      await this.verifyInlineMediaImageIsDisplayed();
-      return;
-    }
-
-    const pageCount = await this.getGalleryPageImageCount();
-    const scrolledImageCount = await this.getScrolledGalleryImageCount();
-
-    expect(
-      scrolledImageCount,
-      `Gallery should expose images while scrolling. Expected up to ${pageCount} from the page CTA.`,
-    ).toBeGreaterThan(1);
-    expect(scrolledImageCount).toBeLessThanOrEqual(pageCount);
-  }
-
-  async verifyGalleryImagesChangeAfterCategorySwitch(): Promise<void> {
-    if (this.galleryFallbackUsed) {
-      await this.verifyInlineMediaImageIsDisplayed();
-      return;
-    }
-
-    await Validator.requireVisible(
-      this.galleryTabButtons.first(),
-      "Gallery category tabs should be visible before switching category",
-      10000,
-    );
-
-    const tabCount = await this.galleryTabButtons.count();
-
-    if (tabCount < 2) {
-      throw new Error("Expected Interior/Exterior gallery category tabs.");
-    }
-
-    const initialSources = await this.getVisibleGalleryImageSources();
-
-    await this.click(this.galleryTabButtons.nth(1), "gallery category tab");
-    await expect
-      .poll(
-        async () => (await this.getVisibleGalleryImageSources()).join("|"),
-        {
-          message: "Gallery images should change after switching category",
-          timeout: 10000,
-        },
-      )
-      .not.toBe(initialSources.join("|"));
-
-    const switchedSources = await this.getVisibleGalleryImageSources();
-
-    expect(switchedSources.length, "Switched gallery category should show images").toBeGreaterThan(0);
-  }
-
-  async verifyInlineMediaImageIsDisplayed(): Promise<void> {
-    await Validator.requireVisible(
-      this.inlineMediaImage,
-      "QMI detail page should display an inline media image when no gallery CTA is available",
-      20000,
-    );
-  }
-
-  async getGalleryPageImageCount(): Promise<number> {
-    const ctaText = await this.viewGalleryButton.first().textContent();
-    const count = this.extractCount(ctaText ?? "");
-
-    if (count === null) {
-      throw new Error(`Unable to read image count from gallery CTA text: "${ctaText}"`);
-    }
-
-    return count;
-  }
-
-  async getGalleryModalImageCount(): Promise<number> {
-    const tabTexts = await this.galleryTabButtons.allTextContents();
-    const tabCounts = tabTexts
-      .map((text) => this.extractCount(text))
-      .filter((count): count is number => count !== null);
-
-    if (tabCounts.length > 0) {
-      return tabCounts.reduce((total, count) => total + count, 0);
-    }
-
-    return this.getUniqueGalleryImageCountFromDom();
-  }
-
-  async openRequestInformationModal(): Promise<void> {
-    await this.handlePagePopups();
-    await this.scrollIntoView(this.requestInfoCta.first());
-    // The CTA is a react-aria pressable; under slowMo a plain click intermittently
-    // fails to fire the press, leaving the modal unmounted. Dispatch the full
-    // pointer sequence atomically and retry until the modal appears — never
-    // re-press once it is up (a second press would reset a loading spinner).
-    const cta = this.requestInfoCta.first();
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await this.pressAtomically(cta);
-      console.log(`Clicked on: Request Information CTA — attempt ${attempt}`);
-      if (await this.isVisible(this.requestInfo.modal, 8000)) break;
-    }
+    await reportValue("QMI CTAs visible: Request a Tour, Request Information");
   }
 
   // ── Data Getters ───────────────────────────────────────
+  // Return the floorplan heading (h1) text. Used by: tests/qmiPage.spec.ts Overview TC-01.
   async getHeading(): Promise<string> {
     return await this.getText(this.pageHeading.first());
   }
 
+  // Return the estimated monthly payment text. Used by: tests/qmiPage.spec.ts Pricing TC-01.
   async getMonthlyPaymentText(): Promise<string> {
     return await this.getText(this.monthlyPayment.first());
   }
 
+  // Return the detail-header text (address + key facts). Used by:
+  // tests/qmiPage.spec.ts Overview TC-01.
   async getKeyFactsText(): Promise<string> {
     return await this.getText(this.detailHeader.first());
   }
 
-
-  private qmiCardLink(targetDetailUrl?: string): Locator {
-    if (targetDetailUrl) {
-      const slug = this.getLastPathSegment(targetDetailUrl);
-      return this.qmiSectionHeading.locator(
-        `xpath=following::a[contains(@class, 'stretched-link') and contains(@href, '${slug}')]`,
-      );
-    }
-
-    return this.qmiSectionLinks().first();
-  }
-
-  private qmiSectionLinks(): Locator {
-    return this.qmiSectionHeading.locator(
-      "xpath=following::a[contains(@class, 'stretched-link') and contains(@href, '/new-construction-homes/')]",
-    );
-  }
-
+  // ── Internal helpers ───────────────────────────────────
+  // Parse a count out of text — prefer a "(n)" parenthesized form, else the first
+  // bare integer. Internal helper for the gallery count getters.
   private extractCount(text: string): number | null {
     const countText = text.match(/\((\d+)\)/)?.[1] ?? text.match(/\b(\d+)\b/)?.[1];
 
     return countText ? Number(countText) : null;
   }
 
+  // Normalize a URL/href to just its path. Internal helper for
+  // `verifyQmiDetailPageDisplayed`.
+  private toPath(href: string): string {
+    if (href.startsWith("http")) {
+      return new URL(href).pathname;
+    }
+
+    return href;
+  }
+
+  // Count distinct, non-data-URI image sources currently in the gallery modal
+  // DOM. Internal fallback for `getGalleryModalImageCount`.
   private async getUniqueGalleryImageCountFromDom(): Promise<number> {
     return this.galleryModal.first().evaluate((modal) => {
       const imageSources = Array.from(modal.querySelectorAll("img"))
@@ -867,6 +765,8 @@ export class QmiPage extends BasePage {
     });
   }
 
+  // Return the sources of images currently visible (rendered + not hidden) in the
+  // gallery modal. Internal helper for `verifyGalleryImagesChangeAfterCategorySwitch`.
   private async getVisibleGalleryImageSources(): Promise<string[]> {
     return this.galleryModal.first().evaluate((modal) => {
       const images = Array.from(modal.querySelectorAll<HTMLImageElement>("img"));
@@ -888,6 +788,9 @@ export class QmiPage extends BasePage {
     });
   }
 
+  // Scroll the gallery modal's scroll container top-to-bottom, collecting the
+  // distinct visible image sources seen along the way, and return the count.
+  // Internal helper for `verifyGalleryImagesCanBeScrolledThrough`.
   private async getScrolledGalleryImageCount(): Promise<number> {
     return this.galleryModal.first().evaluate(async (modal) => {
       const scrollContainer =
@@ -936,111 +839,5 @@ export class QmiPage extends BasePage {
 
       return seenSources.size;
     });
-  }
-
-  private async getQmiCardData(targetDetailUrl?: string): Promise<QmiCardData> {
-    const link = this.qmiCardLink(targetDetailUrl).first();
-
-    await link.waitFor({ state: "attached", timeout: 25000 });
-
-    const href = await this.getHref(link);
-    const rawText = await link.evaluate((anchor) => {
-      const card = anchor.parentElement?.closest(
-        "[class*='HomeOfTheWeek_card'], [class*='Card_']",
-      );
-
-      return (card?.textContent ?? anchor.textContent ?? "")
-        .replace(/\s+/g, " ")
-        .trim();
-    });
-
-    return {
-      rawText,
-      href,
-      heading: this.extractHeading(rawText),
-      keyFacts: this.extractKeyFacts(rawText),
-      pricing: this.extractPricing(rawText),
-      availability: this.extractAvailability(rawText),
-      promo: this.extractPromo(rawText),
-    };
-  }
-
-  private async openQmiCard(targetDetailUrl?: string): Promise<void> {
-    const link = this.qmiCardLink(targetDetailUrl).first();
-    await link.waitFor({ state: "attached", timeout: 25000 });
-    await this.clickViaScript(link, "quick move-in home card");
-  }
-
-  private getLastPathSegment(url: string): string {
-    const parsed = new URL(this.resolveUrl(url));
-    return parsed.pathname.split("/").filter(Boolean).at(-1) ?? "";
-  }
-
-  private extractHeading(text: string): string | undefined {
-    const normalized = normalizeText(text);
-    const address = this.extractAddress(normalized);
-    const beforeAddress = address ? normalized.split(address)[0] : normalized;
-    const sqFtIndex = beforeAddress.search(/Sq\.?\s*ft\.?/i);
-    const beforeSpecs =
-      sqFtIndex > -1
-        ? beforeAddress.slice(0, sqFtIndex).replace(/\d[\d,]*\s*$/, "")
-        : beforeAddress.split(/\d+\s*Story|\d+(?:\.\d+)?\s*Beds?|\$[\d,]+/i)[0];
-    const candidate = beforeSpecs
-      .replace(/Home of the Week/gi, "")
-      .replace(/Available Now/gi, "")
-      .replace(/Promo Rate[^$]*/gi, "")
-      .replace(/\$[\d,]+(?:\s*\/mo\.)?/g, "")
-      .trim();
-
-    return candidate || undefined;
-  }
-
-  private extractAddress(text: string): string | undefined {
-    return normalizeText(text).match(
-      /\d+\s+(?!(?:Sq|Story|Beds?|Baths?|Cars?)\b)[A-Za-z0-9 .'-]+(?:Dr|Drive|Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Way|Ct|Court|Blvd|Trail|Trl)\b/i,
-    )?.[0];
-  }
-
-  private extractKeyFacts(text: string): string | undefined {
-    return normalizeText(text).match(
-      /\d[\d,]*\s*Sq\.?\s*ft\.?.*?\d+(?:\.\d+)?\s*Beds?.*?\d+(?:\.\d+)?\s*Baths?/i,
-    )?.[0];
-  }
-
-  private extractPricing(text: string): string | undefined {
-    const prices = text.match(/\$[\d,]+(?:\s*\/mo\.)?/g);
-    return prices?.join(" ");
-  }
-
-  private extractAvailability(text: string): string | undefined {
-    return text.match(
-      /Available Now|Available\s+[A-Za-z]+(?:\s+\d{1,2},?)?\s+\d{4}/i,
-    )?.[0];
-  }
-
-  private extractPromo(text: string): string | undefined {
-    return text.match(/Promo Rate[^$]*/i)?.[0]?.trim();
-  }
-
-  private toPath(href: string): string {
-    if (href.startsWith("http")) {
-      return new URL(href).pathname;
-    }
-
-    return href;
-  }
-
-  private extractComparableFacts(text: string): string[] {
-    const normalized = normalizeText(text);
-    const facts = normalized.match(
-      /\d[\d,]*\s*Sq\.?\s*ft\.?|\d+(?:\.\d+)?\s*Beds?|\d+(?:\.\d+)?\s*Baths?/gi,
-    );
-
-    return facts ?? [];
-  }
-
-  private extractCurrentPrice(text: string): string | undefined {
-    const prices = text.match(/\$[\d,]+/g);
-    return prices?.at(-1);
   }
 }

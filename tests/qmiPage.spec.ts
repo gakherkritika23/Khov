@@ -1,13 +1,18 @@
 import { Page } from "@playwright/test";
 import { test } from "./baseTest";
 import { QmiPage } from "../page-objects/qmiPage";
+import { reportValue } from "../utils/reporter";
 import constants from "../utils/constants.json";
+import testData from "../utils/test_data.json";
 
 /**
- * QMI (Quick Move-In) details page — E4 in docs/test-plan.md. Consolidated into
- * 3 tests by concern (each navigates a fresh, heavy detail page in beforeEach):
- *   TC-01 Overview  ·  TC-02 Media gallery
- *   TC-03 Pricing & calculator
+ * QMI (Quick Move-In) details page — E4 in docs/test-plan.md. Each test
+ * navigates a fresh, heavy detail page in beforeEach. Grouped by concern:
+ * TC ids restart per section (matching communityPage.spec.ts):
+ *   Overview        — TC-01 heading & key facts · TC-02 availability & CTAs
+ *                     TC-03 floorplan IFP
+ *   Media gallery   — TC-01 modal/count/scroll · TC-02 category switch
+ *   Pricing         — TC-01 monthly payment · TC-02 mortgage calculator
  *
  * The "Request Information" form test lives in
  * tests/contactForms.spec.ts alongside the other contact-form surfaces.
@@ -38,34 +43,100 @@ test.describe("QMI Details Page", () => {
 
   test.beforeEach(async ({ page }) => {
     qmiPage = await openQmi(page);
+    await reportValue(`Page URL: ${await qmiPage.getUrl()}`);
   });
 
-  test("TC-01 | Overview — heading, key facts, availability, CTAs, IFP @smoke", async () => {
-    await qmiPage.verifyQmiDetailPageDisplayed();
-    await qmiPage.verifyHeaderIsDisplayed();
-    await qmiPage.verifyKeyFactsAreDisplayed();
-    console.log(
-      `QMI home: ${await qmiPage.getHeading()} | ${await qmiPage.getKeyFactsText()}`,
-    );
-    await qmiPage.verifyAvailabilityIsDisplayed();
-    await qmiPage.verifyCtasAreDisplayed();
-    await qmiPage.verifyFloorplanIfpIsDisplayed();
+  test.describe("Overview", () => {
+    test("TC-01 | Heading & key facts @smoke", async () => {
+      await qmiPage.verifyQmiDetailPageDisplayed();
+      await qmiPage.verifyHeaderIsDisplayed();
+      await qmiPage.verifyKeyFactsAreDisplayed();
+      await reportValue(
+        `QMI home: ${await qmiPage.getHeading()} | ${await qmiPage.getKeyFactsText()}`,
+      );
+    });
+
+    test("TC-02 | Availability & CTAs @regression", async () => {
+      await qmiPage.verifyAvailabilityIsDisplayed();
+      await qmiPage.verifyCtasAreDisplayed();
+      // CTAs are not just present but functional: "Request a Tour" opens its
+      // scheduling modal. (The "Request Information" flow is covered in
+      // contactForms.spec.ts.)
+      await qmiPage.openRequestTourModal();
+      await qmiPage.verifyRequestTourModalIsDisplayed();
+    });
+
+    test("TC-03 | Floorplan IFP @regression", async () => {
+      await qmiPage.verifyFloorplanIfpIsDisplayed();
+    });
   });
 
-  test("TC-02 | Media gallery — modal navigation + Hero Gallery 2.0 category switch @regression", async () => {
-    await qmiPage.openGalleryModal();
-    await qmiPage.verifyGalleryModalIsDisplayed();
-    await qmiPage.verifyGalleryImageCountMatchesPageCta();
-    await qmiPage.verifyGalleryImagesCanBeScrolledThrough();
-    await qmiPage.verifyGallerySectionNavIsDisplayed();
-    await qmiPage.verifyGalleryImagesChangeAfterCategorySwitch();
-    await qmiPage.verifyGalleryModalIsDisplayed();
+  test.describe("Media gallery", () => {
+    // Every gallery test needs the modal open and confirmed displayed first.
+    test.beforeEach(async () => {
+      await qmiPage.openGalleryModal();
+      await qmiPage.verifyGalleryModalIsDisplayed();
+    });
+
+    test("TC-01 | Modal opens, image count & scroll @regression", async () => {
+      await qmiPage.verifyGalleryImageCountMatchesPageCta();
+      await qmiPage.verifyGalleryImagesCanBeScrolledThrough();
+    });
+
+    test("TC-02 | Hero Gallery 2.0 category switch @regression", async () => {
+      await qmiPage.verifyGallerySectionNavIsDisplayed();
+      await qmiPage.verifyGalleryImagesChangeAfterCategorySwitch();
+      await qmiPage.verifyGalleryModalIsDisplayed();
+    });
   });
 
-  test("TC-03 | Pricing & mortgage calculator @regression", async () => {
-    await qmiPage.verifyMonthlyPaymentIsDisplayed();
-    console.log(`Monthly payment: ${await qmiPage.getMonthlyPaymentText()}`);
-    await qmiPage.openMortgageCalculator();
-    await qmiPage.verifyMortgageCalculatorValuesUpdate();
+  test.describe("Pricing", () => {
+    test("TC-01 | Monthly payment @regression", async () => {
+      await qmiPage.verifyMonthlyPaymentIsDisplayed();
+    });
+
+    test("TC-02 | Mortgage calculator @regression", async () => {
+      await qmiPage.openMortgageCalculator();
+      await qmiPage.verifyCalculatorFieldsHaveData();
+      await qmiPage.verifyPaymentRecalculates(
+        "Down Payment % up",
+        () =>
+          qmiPage.setCalculatorField(
+            1,
+            testData.mortgage_calculator.downPaymentPercent,
+            "Down Payment %",
+          ),
+        "down",
+      );
+      await qmiPage.verifyPaymentRecalculates(
+        "Interest Rate up",
+        () =>
+          qmiPage.setCalculatorField(
+            3,
+            testData.mortgage_calculator.interestRate,
+            "Interest Rate",
+          ),
+        "up",
+      );
+      // Bump the home's current price by a fixed delta so the "up" direction
+      // holds regardless of the pinned home's base price.
+      const currentPrice = await qmiPage.getCalculatorFieldValue(0);
+      await qmiPage.verifyPaymentRecalculates(
+        "Price up",
+        () =>
+          qmiPage.setCalculatorField(
+            0,
+            String(currentPrice + 50000),
+            "Price",
+          ),
+        "up",
+      );
+      await qmiPage.verifyPaymentRecalculates(
+        "15-year term",
+        () => qmiPage.selectLoanTerm("15"),
+        "up",
+      );
+      await qmiPage.closeMortgageCalculator();
+    });
   });
 });
