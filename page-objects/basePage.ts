@@ -1,4 +1,5 @@
 import { Page, Locator, expect } from "@playwright/test";
+import { Validator } from "../utils/validator";
 
 export class BasePage {
   protected readonly page: Page;
@@ -29,6 +30,24 @@ export class BasePage {
 
   async verifyNavigation(expectedUrl: string): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(expectedUrl));
+  }
+
+  protected async clickAndVerifyNavigation(
+    link: Locator,
+    expectedUrl: string,
+    label: string,
+  ): Promise<void> {
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeVisible();
+    await link.click();
+    console.log(`Clicked on: ${label}`);
+    await Validator.requireUrlContains(
+      this.page,
+      expectedUrl,
+      `${label} should navigate to a URL containing "${expectedUrl}"`,
+    );
+    await this.page.goBack();
+    await this.page.waitForLoadState("domcontentloaded");
   }
 
   /* ================= BASIC ACTIONS ================= */
