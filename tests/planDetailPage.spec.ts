@@ -1,11 +1,16 @@
 import { test } from "./baseTest";
 import { PlanDetailPage } from "../page-objects/planDetailPage";
+import { reportValue } from "../utils/reporter";
+import testData from "../utils/test_data.json";
 
 /**
- * Floorplan details page — E5 in docs/test-plan.md. Consolidated into 3 tests by
- * concern (each navigates a fresh, heavy detail page in beforeEach):
- *   TC-01 Overview  ·  TC-02 Media gallery
- *   TC-03 Pricing & calculator
+ * Floorplan details page — E5 in docs/test-plan.md. Each test navigates a fresh,
+ * heavy detail page in beforeEach. TC ids restart per section (matching
+ * communityPage.spec.ts):
+ *   Overview        — TC-01 name & starting price · TC-02 CTAs (+ Request a Tour)
+ *                     TC-03 IFP
+ *   Media gallery   — TC-01 modal & image · TC-02 navigates images
+ *   Pricing         — TC-01 monthly payment · TC-02 mortgage calculator
  *
  * The "Request Information" form test lives in
  * tests/contactForms.spec.ts alongside the other contact-form surfaces.
@@ -20,28 +25,89 @@ test.describe("Floorplan Details Page", () => {
 
   test.beforeEach(async ({ page }) => {
     planPage = await PlanDetailPage.openFloorplan(page);
+    await reportValue(`Page URL: ${await planPage.getUrl()}`);
   });
 
-  test("TC-01 | Overview — name heading, starting price, CTAs, IFP @smoke", async () => {
-    await planPage.verifyPageLoaded();
-    console.log(
-      `Floorplan: ${await planPage.getHeading()} | Starting price: ${await planPage.getStartingPriceText()}`,
-    );
-    await planPage.verifyCtasAreDisplayed();
-    await planPage.verifyFloorplanIfpIsDisplayed();
+  test.describe("Overview", () => {
+    test("TC-01 | Name heading & starting price @smoke", async () => {
+      await planPage.verifyPageLoaded();
+      await reportValue(
+        `Floorplan: ${await planPage.getHeading()} | Starting price: ${await planPage.getStartingPriceText()}`,
+      );
+    });
+
+    test("TC-02 | CTAs @regression", async () => {
+      await planPage.verifyCtasAreDisplayed();
+      // CTAs are not just present but functional: "Request a Tour" opens its
+      // scheduling modal. (The "Request Information" flow is covered in
+      // contactForms.spec.ts.)
+      await planPage.openRequestTourModal();
+      await planPage.verifyRequestTourModalIsDisplayed();
+    });
+
+    test("TC-03 | Floorplan IFP @regression", async () => {
+      await planPage.verifyFloorplanIfpIsDisplayed();
+    });
   });
 
-  test("TC-02 | Media gallery — modal opens and navigates between images @regression", async () => {
-    await planPage.openGalleryModal();
-    await planPage.verifyGalleryModalIsDisplayed();
-    await planPage.verifyGalleryNavigatesImages();
+  test.describe("Media gallery", () => {
+    // Every gallery test needs the modal open first.
+    test.beforeEach(async () => {
+      await planPage.openGalleryModal();
+    });
+
+    test("TC-01 | Modal opens and shows an image @regression", async () => {
+      await planPage.verifyGalleryModalIsDisplayed();
+    });
+
+    test("TC-02 | Navigates between images @regression", async () => {
+      await planPage.verifyGalleryNavigatesImages();
+    });
   });
 
-  test("TC-03 | Pricing & mortgage calculator @regression", async () => {
-    await planPage.verifyStartingPriceDisplayed();
-    await planPage.verifyMonthlyPaymentIsDisplayed();
-    console.log(`Monthly payment: ${await planPage.getMonthlyPaymentText()}`);
-    await planPage.openMortgageCalculator();
-    await planPage.verifyMortgageCalculatorIsDisplayed();
+  test.describe("Pricing", () => {
+    test("TC-01 | Monthly payment @regression", async () => {
+      await planPage.verifyMonthlyPaymentIsDisplayed();
+    });
+
+    test("TC-02 | Mortgage calculator @regression", async () => {
+      await planPage.openMortgageCalculator();
+      const calc = planPage.mortgageCalculator;
+      await calc.verifyFieldsHaveData();
+      await calc.verifyPaymentRecalculates(
+        "Down Payment % up",
+        () =>
+          calc.setField(
+            1,
+            testData.mortgage_calculator.downPaymentPercent,
+            "Down Payment %",
+          ),
+        "down",
+      );
+      await calc.verifyPaymentRecalculates(
+        "Interest Rate up",
+        () =>
+          calc.setField(
+            3,
+            testData.mortgage_calculator.interestRate,
+            "Interest Rate",
+          ),
+        "up",
+      );
+      // Bump the floorplan's current price by a fixed delta so the "up" direction
+      // holds regardless of the pinned floorplan's starting price.
+      const currentPrice = await calc.getFieldValue(0);
+      await calc.verifyPaymentRecalculates(
+        "Price up",
+        () => calc.setField(0, String(currentPrice + 50000), "Price"),
+        "up",
+      );
+      await calc.verifyPaymentRecalculates(
+        "15-year term",
+        () => calc.selectLoanTerm("15"),
+        "up",
+      );
+      await calc.close();
+    });
   });
 });
