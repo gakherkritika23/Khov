@@ -47,7 +47,7 @@ test.describe("QMI Details Page", () => {
   });
 
   test.describe("Overview", () => {
-    test("TC-01 | Heading & key facts @smoke", async () => {
+    test("TC-01 | QMI detail page loads with heading and key facts (beds, baths, sq ft) @smoke", async () => {
       await qmiPage.verifyQmiDetailPageDisplayed();
       await qmiPage.verifyHeaderIsDisplayed();
       await qmiPage.verifyKeyFactsAreDisplayed();
@@ -56,7 +56,7 @@ test.describe("QMI Details Page", () => {
       );
     });
 
-    test("TC-02 | Availability & CTAs @regression", async () => {
+    test("TC-02 | Availability and CTAs are shown, and 'Request a Tour' opens its scheduling modal @regression", async () => {
       await qmiPage.verifyAvailabilityIsDisplayed();
       await qmiPage.verifyCtasAreDisplayed();
       // CTAs are not just present but functional: "Request a Tour" opens its
@@ -66,7 +66,7 @@ test.describe("QMI Details Page", () => {
       await qmiPage.verifyRequestTourModalIsDisplayed();
     });
 
-    test("TC-03 | Floorplan IFP @regression", async () => {
+    test("TC-03 | Interactive floor plan (IFP) is displayed @regression", async () => {
       await qmiPage.verifyFloorplanIfpIsDisplayed();
     });
   });
@@ -78,12 +78,12 @@ test.describe("QMI Details Page", () => {
       await qmiPage.verifyGalleryModalIsDisplayed();
     });
 
-    test("TC-01 | Modal opens, image count & scroll @regression", async () => {
+    test("TC-01 | Gallery modal image count matches the page CTA and images can be scrolled through @regression", async () => {
       await qmiPage.verifyGalleryImageCountMatchesPageCta();
       await qmiPage.verifyGalleryImagesCanBeScrolledThrough();
     });
 
-    test("TC-02 | Hero Gallery 2.0 category switch @regression", async () => {
+    test("TC-02 | Hero Gallery 2.0 section navigation switches image categories @regression", async () => {
       await qmiPage.verifyGallerySectionNavIsDisplayed();
       await qmiPage.verifyGalleryImagesChangeAfterCategorySwitch();
       await qmiPage.verifyGalleryModalIsDisplayed();
@@ -91,11 +91,11 @@ test.describe("QMI Details Page", () => {
   });
 
   test.describe("Pricing", () => {
-    test("TC-01 | Monthly payment @regression", async () => {
+    test("TC-01 | Estimated monthly payment is displayed @regression", async () => {
       await qmiPage.verifyMonthlyPaymentIsDisplayed();
     });
 
-    test("TC-02 | Mortgage calculator @regression", async () => {
+    test("TC-02 | Mortgage calculator recalculates the payment for each input change @regression", async () => {
       await qmiPage.openMortgageCalculator();
       await qmiPage.verifyCalculatorFieldsHaveData();
       await qmiPage.verifyPaymentRecalculates(

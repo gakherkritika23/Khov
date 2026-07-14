@@ -85,7 +85,7 @@ test.describe("Home Page — Hero", () => {
     await homePage.navigateToHome(constants.home_page.url);
   });
 
-  test("TC-01 | Hero section/video render, autoplay, load (200) and play/pause works @smoke", async () => {
+  test("TC-01 | Hero video renders, autoplays, loads successfully and play/pause works @smoke", async () => {
     await reportValue(`Page URL: ${await homePage.getUrl()}`);
     await homePage.verifyHeroSectionIsDisplayed();
     // Video render + reachable embed (200) covers the hero-assets-load check.
