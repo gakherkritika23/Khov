@@ -29,14 +29,14 @@ test.describe("Floorplan Details Page", () => {
   });
 
   test.describe("Overview", () => {
-    test("TC-01 | Name heading & starting price @smoke", async () => {
+    test("TC-01 | Floorplan detail page loads with name heading and starting price @smoke", async () => {
       await planPage.verifyPageLoaded();
       await reportValue(
         `Floorplan: ${await planPage.getHeading()} | Starting price: ${await planPage.getStartingPriceText()}`,
       );
     });
 
-    test("TC-02 | CTAs @regression", async () => {
+    test("TC-02 | CTAs are shown, and 'Request a Tour' opens its scheduling modal @regression", async () => {
       await planPage.verifyCtasAreDisplayed();
       // CTAs are not just present but functional: "Request a Tour" opens its
       // scheduling modal. (The "Request Information" flow is covered in
@@ -45,7 +45,7 @@ test.describe("Floorplan Details Page", () => {
       await planPage.verifyRequestTourModalIsDisplayed();
     });
 
-    test("TC-03 | Floorplan IFP @regression", async () => {
+    test("TC-03 | Interactive floor plan (IFP) is displayed @regression", async () => {
       await planPage.verifyFloorplanIfpIsDisplayed();
     });
   });
@@ -56,21 +56,21 @@ test.describe("Floorplan Details Page", () => {
       await planPage.openGalleryModal();
     });
 
-    test("TC-01 | Modal opens and shows an image @regression", async () => {
+    test("TC-01 | Gallery modal opens and shows an image @regression", async () => {
       await planPage.verifyGalleryModalIsDisplayed();
     });
 
-    test("TC-02 | Navigates between images @regression", async () => {
+    test("TC-02 | Gallery navigates between images @regression", async () => {
       await planPage.verifyGalleryNavigatesImages();
     });
   });
 
   test.describe("Pricing", () => {
-    test("TC-01 | Monthly payment @regression", async () => {
+    test("TC-01 | Estimated monthly payment is displayed @regression", async () => {
       await planPage.verifyMonthlyPaymentIsDisplayed();
     });
 
-    test("TC-02 | Mortgage calculator @regression", async () => {
+    test("TC-02 | Mortgage calculator recalculates the payment for each input change @regression", async () => {
       await planPage.openMortgageCalculator();
       const calc = planPage.mortgageCalculator;
       await calc.verifyFieldsHaveData();
