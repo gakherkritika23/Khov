@@ -1,0 +1,82 @@
+name: E2E Tests
+
+# Manual trigger with three dropdowns: environment, suite, browser.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        default: dev
+        options: [dev, stage, prod]
+      suite:
+        description: "Test suite"
+        type: choice
+        default: smoke
+        options: [smoke, regression, all]
+      browser:
+        description: "Browser"
+        type: choice
+        default: chromium
+        # Add firefox / webkit here once their projects are uncommented in playwright.config.ts.
+        options: [chromium]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # NOTE: We intentionally do NOT bind a GitHub Environment here — creating
+    # Environments needs repo-admin rights. BASE_URL (a public, non-secret URL) is
+    # resolved from the `environment` input in the "Run tests" step below, so this
+    # workflow needs zero GitHub config to run. When admin sets up Environments
+    # later, add `environment: ${{ inputs.environment }}` and move BASE_URL/RP_* to
+    # Environment Variables/Secrets.
+    env:
+      CI: "true" # switches playwright.config to trace + video on failure
+      TEST_ENV: ${{ inputs.environment }}
+      # --- ReportPortal: DISABLED for now ---------------------------------------
+      # To enable live ReportPortal later: store the (rotated) key as a repository
+      # secret RP_API_KEY (Settings → Secrets and variables → Actions), add
+      # RP_ENDPOINT + RP_PROJECT as repository variables, and uncomment these.
+      # (playwright.config.ts turns RP on automatically once RP_API_KEY is set.)
+      # RP_ENDPOINT: ${{ vars.RP_ENDPOINT }}
+      # RP_PROJECT: ${{ vars.RP_PROJECT }}
+      # RP_API_KEY: ${{ secrets.RP_API_KEY }}
+      # -------------------------------------------------------------------------
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps ${{ inputs.browser }}
+
+      # Resolve the base URL from the environment input (public URLs, not secrets),
+      # then run. "all" runs the whole project; otherwise filter to the tag.
+      - name: Run tests
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)   export BASE_URL="https://www-dev.khov.com" ;;
+            stage) export BASE_URL="https://www-stg.khov.com" ;;
+            prod)  export BASE_URL="https://www.khov.com/" ;;
+          esac
+          GREP=""
+          if [ "${{ inputs.suite }}" != "all" ]; then GREP="--grep @${{ inputs.suite }}"; fi
+          npx playwright test --project=${{ inputs.browser }} $GREP
+
+      # HTML report + traces + failure screenshots + JUnit XML, uploaded even on failure.
+      - name: Upload report & results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ inputs.environment }}-${{ inputs.suite }}
+          path: |
+            playwright-report/
+            test-results/
+            results.xml
+          retention-days: 14
+          if-no-files-found: ignore
